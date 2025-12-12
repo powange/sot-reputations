@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-pirate: 'Pirata One', cursive;
+
+  /* Sea of Thieves Mint/Turquoise - Primary accent (#00ff9c, #34da9e) */
+  --color-sot-50: #cdf9d9;
+  --color-sot-100: #a8f5c5;
+  --color-sot-200: #88c5b1;
+  --color-sot-300: #48987e;
+  --color-sot-400: #34da9e;
+  --color-sot-500: #00ff9c;
+  --color-sot-600: #00d682;
+  --color-sot-700: #00b36d;
+  --color-sot-800: #009058;
+  --color-sot-900: #03241c;
+  --color-sot-950: #021610;
+
+  /* Sea of Thieves Dark - Neutral background (#0b1e24, #1d4351) */
+  --color-pirate-50: #f1eee5;
+  --color-pirate-100: #e2dfd8;
+  --color-pirate-200: #c5c2bb;
+  --color-pirate-300: #a8a59e;
+  --color-pirate-400: #696763;
+  --color-pirate-500: #3d4a50;
+  --color-pirate-600: #1d4351;
+  --color-pirate-700: #152f3a;
+  --color-pirate-800: #0b1e24;
+  --color-pirate-900: #111119;
+  --color-pirate-950: #0f0d09;
+}
+
+/* Classe utilitaire pour la font pirate */
+.font-pirate {
+  font-family: 'Pirata One', cursive;
+}
