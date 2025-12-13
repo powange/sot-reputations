@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: sot-reputations
     restart: unless-stopped
-#    ports:
-#      - "3011:3000"
+    ports:
+      - "3015:3000"
     volumes:
       - sot-data:/app/data
     environment:
