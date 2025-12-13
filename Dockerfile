@@ -21,19 +21,19 @@ ENV NODE_ENV=production
 
 # Setup: wget for healthcheck, user, data folder
 # Install dependencies for better-sqlite3 runtime
-RUN apk add --no-cache wget libstdc++ \
+RUN apk add --no-cache wget libstdc++ su-exec \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nuxtjs \
     && mkdir -p ./data \
     && chown nuxtjs:nodejs ./data
 
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./.output
-
-USER nuxtjs
+COPY --chmod=755 entrypoint.sh ./entrypoint.sh
 
 EXPOSE 3000
 
 ENV HOST=0.0.0.0
 ENV PORT=3000
 
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["node", ".output/server/index.mjs"]
