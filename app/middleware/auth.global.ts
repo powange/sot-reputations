@@ -1,8 +1,4 @@
 export default defineNuxtRouteMiddleware(async () => {
-  const { fetchUser, isLoading } = useAuth()
-
-  // Ne charger l'utilisateur qu'une seule fois
-  if (isLoading.value) {
-    await fetchUser()
-  }
+  // nuxt-auth-utils gère automatiquement le chargement de la session
+  // Ce middleware est conservé pour d'éventuelles vérifications futures
 })

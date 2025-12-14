@@ -1,14 +1,11 @@
-export default defineEventHandler((event) => {
-  const user = event.context.user
+export default defineEventHandler(async (event) => {
+  const session = await getUserSession(event)
 
-  if (!user) {
+  if (!session?.user) {
     return { user: null }
   }
 
   return {
-    user: {
-      id: user.id,
-      username: user.username
-    }
+    user: session.user
   }
 })

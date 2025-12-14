@@ -134,6 +134,14 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE campaigns ADD COLUMN description TEXT')
   }
 
+  // Migration: ajouter microsoft_id aux utilisateurs pour OAuth Microsoft
+  const userColumnsForMicrosoft = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+  const hasMicrosoftId = userColumnsForMicrosoft.some(col => col.name === 'microsoft_id')
+  if (!hasMicrosoftId) {
+    db.exec('ALTER TABLE users ADD COLUMN microsoft_id TEXT')
+    db.exec('CREATE INDEX IF NOT EXISTS idx_users_microsoft_id ON users(microsoft_id)')
+  }
+
   return db
 }
 

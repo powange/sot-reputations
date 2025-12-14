@@ -1,7 +1,17 @@
 <script setup lang="ts">
 const toast = useToast()
-const { user, isAuthenticated, isLoading, login } = useAuth()
+const { user, isAuthenticated, isLoading, login, loginWithMicrosoft } = useAuth()
 const { groups, fetchGroups, createGroup } = useGroups()
+
+// Vérifier si erreur OAuth dans l'URL
+const route = useRoute()
+if (route.query.error === 'oauth') {
+  toast.add({
+    title: 'Erreur de connexion',
+    description: 'La connexion Xbox a echoue. Veuillez reessayer.',
+    color: 'error'
+  })
+}
 
 // Formulaire de connexion
 const loginForm = ref({
@@ -139,6 +149,21 @@ async function handleCreateGroup() {
               icon="i-lucide-log-in"
               :loading="isLoggingIn"
               block
+            />
+
+            <div class="flex items-center gap-4 my-4">
+              <div class="flex-1 h-px bg-muted/30" />
+              <span class="text-sm text-muted">ou</span>
+              <div class="flex-1 h-px bg-muted/30" />
+            </div>
+
+            <UButton
+              label="Connexion Xbox"
+              icon="i-lucide-gamepad-2"
+              color="success"
+              variant="outline"
+              block
+              @click="loginWithMicrosoft"
             />
           </form>
 

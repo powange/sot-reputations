@@ -1,44 +1,46 @@
-interface User {
-  id: number
-  username: string
-}
-
 export function useAuth() {
-  const user = useState<User | null>('auth-user', () => null)
-  const isAuthenticated = computed(() => !!user.value)
-  const isLoading = useState('auth-loading', () => true)
+  const { loggedIn, user, session, clear, fetch: fetchSession } = useUserSession()
+
+  const isLoading = useState('auth-loading', () => false)
+
+  const isAuthenticated = computed(() => loggedIn.value)
 
   async function fetchUser() {
+    isLoading.value = true
     try {
-      const response = await $fetch<{ user: User | null }>('/api/auth/me')
-      user.value = response.user
-    } catch {
-      user.value = null
+      await fetchSession()
     } finally {
       isLoading.value = false
     }
   }
 
   async function login(username: string, password: string) {
-    const response = await $fetch<{ success: boolean, user: User }>('/api/auth/login', {
+    const response = await $fetch<{ success: boolean, user: { id: number, username: string } }>('/api/auth/login', {
       method: 'POST',
       body: { username, password }
     })
-    user.value = response.user
+    // Recharger la session après login
+    await fetchSession()
     return response
   }
 
   async function logout() {
     await $fetch('/api/auth/logout', { method: 'POST' })
-    user.value = null
+    await clear()
+  }
+
+  // Connexion via Microsoft/Xbox
+  function loginWithMicrosoft() {
+    window.location.href = '/auth/microsoft'
   }
 
   return {
-    user: readonly(user),
+    user: computed(() => user.value as { id: number, username: string, microsoftId?: string } | null),
     isAuthenticated,
     isLoading: readonly(isLoading),
     fetchUser,
     login,
-    logout
+    logout,
+    loginWithMicrosoft
   }
 }
