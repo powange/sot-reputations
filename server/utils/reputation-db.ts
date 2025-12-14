@@ -67,6 +67,43 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_emblems_campaign ON emblems(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_user_emblems_user ON user_emblems(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_emblems_emblem ON user_emblems(emblem_id);
+
+    -- Groupes
+    CREATE TABLE IF NOT EXISTS groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uid TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER NOT NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    -- Membres de groupes
+    CREATE TABLE IF NOT EXISTS group_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(group_id, user_id)
+    );
+
+    -- Sessions
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT UNIQUE NOT NULL,
+      user_id INTEGER NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
+    CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
+    CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -447,6 +484,258 @@ export function getFullReputationData() {
 
       const emblemsWithProgress = emblems.map((emblem) => {
         const progress = getUserProgressForEmblem(emblem.id)
+        const userProgress: Record<number, UserEmblemProgress> = {}
+        for (const p of progress) {
+          userProgress[p.userId] = p
+        }
+        return { ...emblem, factionKey: faction.key, campaignName: campaign.name, userProgress }
+      })
+
+      factionWithCampaigns.campaigns.push({
+        ...campaign,
+        emblems: emblemsWithProgress
+      })
+    }
+
+    result.factions.push(factionWithCampaigns)
+  }
+
+  return result
+}
+
+// ============ GROUPES ============
+
+export interface GroupInfo {
+  id: number
+  uid: string
+  name: string
+  createdAt: string
+  createdBy: number
+}
+
+export interface GroupMemberInfo {
+  id: number
+  groupId: number
+  userId: number
+  username: string
+  role: 'admin' | 'member'
+  joinedAt: string
+  lastImportAt: string | null
+}
+
+export interface GroupWithRole extends GroupInfo {
+  role: 'admin' | 'member'
+}
+
+// Génère un UID court et URL-safe
+function generateGroupUid(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+export function createGroup(name: string, createdBy: number): GroupInfo {
+  const db = getReputationDb()
+
+  // Générer un UID unique
+  let uid = generateGroupUid()
+  let attempts = 0
+  while (attempts < 10) {
+    const existing = db.prepare('SELECT id FROM groups WHERE uid = ?').get(uid)
+    if (!existing) break
+    uid = generateGroupUid()
+    attempts++
+  }
+
+  const result = db.prepare(`
+    INSERT INTO groups (uid, name, created_by) VALUES (?, ?, ?)
+  `).run(uid, name, createdBy)
+
+  // Ajouter le créateur comme admin
+  db.prepare(`
+    INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'admin')
+  `).run(result.lastInsertRowid, createdBy)
+
+  return {
+    id: result.lastInsertRowid as number,
+    uid,
+    name,
+    createdAt: new Date().toISOString(),
+    createdBy
+  }
+}
+
+export function getGroupByUid(uid: string): GroupInfo | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id, uid, name, created_at as createdAt, created_by as createdBy
+    FROM groups WHERE uid = ?
+  `).get(uid) as GroupInfo | undefined
+  return row || null
+}
+
+export function getGroupsByUserId(userId: number): GroupWithRole[] {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT g.id, g.uid, g.name, g.created_at as createdAt, g.created_by as createdBy, gm.role
+    FROM groups g
+    JOIN group_members gm ON g.id = gm.group_id
+    WHERE gm.user_id = ?
+    ORDER BY g.name
+  `).all(userId) as GroupWithRole[]
+}
+
+export function getGroupMembers(groupId: number): GroupMemberInfo[] {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT gm.id, gm.group_id as groupId, gm.user_id as userId, u.username,
+           gm.role, gm.joined_at as joinedAt, u.last_import_at as lastImportAt
+    FROM group_members gm
+    JOIN users u ON gm.user_id = u.id
+    WHERE gm.group_id = ?
+    ORDER BY gm.role DESC, u.username
+  `).all(groupId) as GroupMemberInfo[]
+}
+
+export function isGroupMember(groupId: number, userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+  `).get(groupId, userId)
+  return !!row
+}
+
+export function isGroupAdmin(groupId: number, userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id FROM group_members WHERE group_id = ? AND user_id = ? AND role = 'admin'
+  `).get(groupId, userId)
+  return !!row
+}
+
+export function getGroupAdminCount(groupId: number): number {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT COUNT(*) as count FROM group_members WHERE group_id = ? AND role = 'admin'
+  `).get(groupId) as { count: number }
+  return row.count
+}
+
+export function addGroupMember(groupId: number, userId: number, role: 'admin' | 'member' = 'member'): void {
+  const db = getReputationDb()
+  db.prepare(`
+    INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)
+  `).run(groupId, userId, role)
+}
+
+export function removeGroupMember(groupId: number, userId: number): void {
+  const db = getReputationDb()
+  db.prepare(`
+    DELETE FROM group_members WHERE group_id = ? AND user_id = ?
+  `).run(groupId, userId)
+}
+
+export function promoteToAdmin(groupId: number, userId: number): void {
+  const db = getReputationDb()
+  db.prepare(`
+    UPDATE group_members SET role = 'admin' WHERE group_id = ? AND user_id = ?
+  `).run(groupId, userId)
+}
+
+export function deleteGroup(groupId: number): void {
+  const db = getReputationDb()
+  // Les group_members seront supprimés automatiquement grâce à ON DELETE CASCADE
+  db.prepare('DELETE FROM groups WHERE id = ?').run(groupId)
+}
+
+export function getUserByUsername(username: string): UserInfo | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id, username, last_import_at as lastImportAt FROM users WHERE username = ?
+  `).get(username) as UserInfo | undefined
+  return row || null
+}
+
+export function getUserById(userId: number): UserInfo | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id, username, last_import_at as lastImportAt FROM users WHERE id = ?
+  `).get(userId) as UserInfo | undefined
+  return row || null
+}
+
+// Récupère les réputations pour un groupe (seulement les membres du groupe)
+export function getGroupReputationData(groupId: number) {
+  const db = getReputationDb()
+
+  // Récupérer les membres du groupe
+  const members = getGroupMembers(groupId)
+  const memberUserIds = members.map(m => m.userId)
+
+  if (memberUserIds.length === 0) {
+    return { users: [], factions: [] }
+  }
+
+  const users: UserInfo[] = members.map(m => ({
+    id: m.userId,
+    username: m.username,
+    lastImportAt: m.lastImportAt
+  }))
+
+  const factions = getAllFactions()
+
+  const result: {
+    users: UserInfo[]
+    factions: Array<FactionInfo & {
+      campaigns: Array<CampaignInfo & {
+        emblems: Array<EmblemInfo & {
+          userProgress: Record<number, UserEmblemProgress>
+        }>
+      }>
+    }>
+  } = {
+    users,
+    factions: []
+  }
+
+  // Créer le placeholder pour les IDs
+  const placeholders = memberUserIds.map(() => '?').join(',')
+
+  for (const faction of factions) {
+    const campaigns = getCampaignsByFaction(faction.id)
+    const factionWithCampaigns: typeof result.factions[0] = {
+      ...faction,
+      campaigns: []
+    }
+
+    for (const campaign of campaigns) {
+      const emblems = db.prepare(`
+        SELECT
+          id, key, name, description, image, max_grade as maxGrade, campaign_id as campaignId
+        FROM emblems
+        WHERE campaign_id = ?
+        ORDER BY sort_order, id
+      `).all(campaign.id) as EmblemInfo[]
+
+      const emblemsWithProgress = emblems.map((emblem) => {
+        // Ne récupérer que la progression des membres du groupe
+        const progress = db.prepare(`
+          SELECT
+            u.id as userId,
+            u.username,
+            ue.value,
+            ue.threshold,
+            ue.grade,
+            ue.completed
+          FROM user_emblems ue
+          JOIN users u ON ue.user_id = u.id
+          WHERE ue.emblem_id = ? AND u.id IN (${placeholders})
+          ORDER BY u.username
+        `).all(emblem.id, ...memberUserIds) as UserEmblemProgress[]
+
         const userProgress: Record<number, UserEmblemProgress> = {}
         for (const p of progress) {
           userProgress[p.userId] = p
