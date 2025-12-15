@@ -289,9 +289,14 @@ const bookmarkletCode = computed(() => {
 
 // Version minifiée pour le bookmarklet
 const bookmarkletUrl = computed(() => {
+  // Minification sûre : supprime d'abord les lignes de commentaires, puis minifie
   const minified = bookmarkletCode.value
-    .replace(/\n\s*/g, '')
-    .replace(/\s{2,}/g, ' ')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => !line.startsWith('//')) // Supprime les lignes de commentaires
+    .join(' ')
+    .replace(/\s{2,}/g, ' ') // Réduit les espaces multiples
+    .trim()
   return minified
 })
 
