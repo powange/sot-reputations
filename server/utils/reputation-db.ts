@@ -18,7 +18,8 @@ export function getReputationDb(): Database.Database {
       password_hash TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_import_at DATETIME
+      last_import_at DATETIME,
+      is_admin INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS factions (
@@ -157,6 +158,13 @@ export function getReputationDb(): Database.Database {
   if (!hasMicrosoftId) {
     db.exec('ALTER TABLE users ADD COLUMN microsoft_id TEXT')
     db.exec('CREATE INDEX IF NOT EXISTS idx_users_microsoft_id ON users(microsoft_id)')
+  }
+
+  // Migration: ajouter is_admin aux utilisateurs pour le système d'administration
+  const userColumnsForAdmin = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+  const hasIsAdmin = userColumnsForAdmin.some(col => col.name === 'is_admin')
+  if (!hasIsAdmin) {
+    db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
   }
 
   // Migration: convertir les rôles 'admin' en 'chef' pour le nouveau système de grades
@@ -534,6 +542,19 @@ export function getFullReputationData() {
   }
 
   return result
+}
+
+// ============ ADMINISTRATION ============
+
+export function isUserAdmin(userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT is_admin FROM users WHERE id = ?').get(userId) as { is_admin: number } | undefined
+  return row?.is_admin === 1
+}
+
+export function setUserAdmin(userId: number, isAdmin: boolean): void {
+  const db = getReputationDb()
+  db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(isAdmin ? 1 : 0, userId)
 }
 
 // ============ GROUPES ============

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { user, isAuthenticated, logout } = useAuth()
+const { user, isAuthenticated, isAdmin, logout } = useAuth()
 const toast = useToast()
 
 useHead({
@@ -26,11 +26,16 @@ useSeoMeta({
 
 const navItems = computed(() => {
   const items = [
-    { label: 'Mes reputations', to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true },
-    { label: 'Mes groupes', to: '/', icon: 'i-lucide-users', requiresAuth: true },
-    { label: 'Tutoriel', to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false }
+    { label: 'Mes reputations', to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true, requiresAdmin: false },
+    { label: 'Mes groupes', to: '/', icon: 'i-lucide-users', requiresAuth: true, requiresAdmin: false },
+    { label: 'Tutoriel', to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false, requiresAdmin: false },
+    { label: 'Admin', to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
   ]
-  return items.filter(item => !item.requiresAuth || isAuthenticated.value)
+  return items.filter(item => {
+    if (item.requiresAdmin && !isAdmin.value) return false
+    if (item.requiresAuth && !isAuthenticated.value) return false
+    return true
+  })
 })
 
 async function handleLogout() {

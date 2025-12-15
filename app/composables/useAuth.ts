@@ -34,9 +34,15 @@ export function useAuth() {
     window.location.href = '/auth/microsoft'
   }
 
+  const isAdmin = computed(() => {
+    const u = user.value as { isAdmin?: boolean } | null
+    return u?.isAdmin === true
+  })
+
   return {
-    user: computed(() => user.value as { id: number, username: string, microsoftId?: string } | null),
+    user: computed(() => user.value as { id: number, username: string, microsoftId?: string, isAdmin?: boolean } | null),
     isAuthenticated,
+    isAdmin,
     isLoading: readonly(isLoading),
     fetchUser,
     login,
