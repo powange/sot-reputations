@@ -165,8 +165,13 @@ const bookmarkletCode = computed(() => {
     return count;
   }
 
+  // Détecter la langue du site depuis l'URL (ex: /fr/, /de/, /es/)
+  const langMatch = window.location.pathname.match(/^\\/([a-z]{2})\\//);
+  const langPrefix = langMatch ? '/' + langMatch[1] : '';
+  const apiUrl = 'https://www.seaofthieves.com' + langPrefix + '/api/profilev2/reputation';
+
   // Récupérer les données
-  fetch('https://www.seaofthieves.com/api/profilev2/reputation', {
+  fetch(apiUrl, {
     credentials: 'include'
   })
   .then(response => {
