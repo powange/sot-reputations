@@ -101,10 +101,26 @@ export function getReputationDb(): Database.Database {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    -- Liens d'invitation aux groupes
+    CREATE TABLE IF NOT EXISTS group_invites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      code TEXT UNIQUE NOT NULL,
+      created_by INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
+      max_uses INTEGER,
+      uses_count INTEGER DEFAULT 0,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_group_invites_code ON group_invites(code);
+    CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -801,4 +817,109 @@ export function getGroupReputationData(groupId: number) {
   }
 
   return result
+}
+
+// ============ INVITATIONS ============
+
+export interface GroupInvite {
+  id: number
+  groupId: number
+  code: string
+  createdBy: number
+  createdAt: string
+  expiresAt: string | null
+  maxUses: number | null
+  usesCount: number
+}
+
+// Génère un code d'invitation unique
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let result = ''
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+export function createGroupInvite(groupId: number, createdBy: number, expiresAt?: Date, maxUses?: number): GroupInvite {
+  const db = getReputationDb()
+
+  // Générer un code unique
+  let code = generateInviteCode()
+  let attempts = 0
+  while (attempts < 10) {
+    const existing = db.prepare('SELECT id FROM group_invites WHERE code = ?').get(code)
+    if (!existing) break
+    code = generateInviteCode()
+    attempts++
+  }
+
+  const result = db.prepare(`
+    INSERT INTO group_invites (group_id, code, created_by, expires_at, max_uses)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(groupId, code, createdBy, expiresAt?.toISOString() || null, maxUses || null)
+
+  return {
+    id: result.lastInsertRowid as number,
+    groupId,
+    code,
+    createdBy,
+    createdAt: new Date().toISOString(),
+    expiresAt: expiresAt?.toISOString() || null,
+    maxUses: maxUses || null,
+    usesCount: 0
+  }
+}
+
+export function getGroupInvite(groupId: number): GroupInvite | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id, group_id as groupId, code, created_by as createdBy,
+           created_at as createdAt, expires_at as expiresAt,
+           max_uses as maxUses, uses_count as usesCount
+    FROM group_invites
+    WHERE group_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(groupId) as GroupInvite | undefined
+  return row || null
+}
+
+export function getInviteByCode(code: string): (GroupInvite & { groupName: string, groupUid: string }) | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT gi.id, gi.group_id as groupId, gi.code, gi.created_by as createdBy,
+           gi.created_at as createdAt, gi.expires_at as expiresAt,
+           gi.max_uses as maxUses, gi.uses_count as usesCount,
+           g.name as groupName, g.uid as groupUid
+    FROM group_invites gi
+    JOIN groups g ON gi.group_id = g.id
+    WHERE gi.code = ?
+  `).get(code) as (GroupInvite & { groupName: string, groupUid: string }) | undefined
+  return row || null
+}
+
+export function isInviteValid(invite: GroupInvite): boolean {
+  // Vérifier l'expiration
+  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+    return false
+  }
+  // Vérifier le nombre d'utilisations
+  if (invite.maxUses !== null && invite.usesCount >= invite.maxUses) {
+    return false
+  }
+  return true
+}
+
+export function useInvite(inviteId: number): void {
+  const db = getReputationDb()
+  db.prepare(`
+    UPDATE group_invites SET uses_count = uses_count + 1 WHERE id = ?
+  `).run(inviteId)
+}
+
+export function deleteGroupInvite(groupId: number): void {
+  const db = getReputationDb()
+  db.prepare('DELETE FROM group_invites WHERE group_id = ?').run(groupId)
 }

@@ -123,6 +123,17 @@ const isImportModalOpen = ref(false)
 const importJsonText = ref('')
 const isImporting = ref(false)
 
+// Lien d'invitation
+const inviteLink = ref<{ code: string } | null>(null)
+const isLoadingInviteLink = ref(false)
+const isGeneratingInviteLink = ref(false)
+
+const fullInviteLink = computed(() => {
+  if (!inviteLink.value) return ''
+  const baseUrl = window.location.origin
+  return `${baseUrl}/invite/${inviteLink.value.code}`
+})
+
 // Labels des rôles
 const roleLabels: Record<GroupRole, string> = {
   chef: 'Chef de groupe',
@@ -521,6 +532,53 @@ async function handleImport() {
   }
 }
 
+// Fonctions pour le lien d'invitation
+async function fetchInviteLink() {
+  isLoadingInviteLink.value = true
+  try {
+    const result = await $fetch<{ invite: { code: string } | null }>(`/api/groups/${groupUid}/invite-link`)
+    inviteLink.value = result.invite
+  } catch {
+    // Pas de lien existant
+    inviteLink.value = null
+  } finally {
+    isLoadingInviteLink.value = false
+  }
+}
+
+async function generateInviteLink() {
+  isGeneratingInviteLink.value = true
+  try {
+    const result = await $fetch<{ invite: { code: string } }>(`/api/groups/${groupUid}/invite-link`, {
+      method: 'POST'
+    })
+    inviteLink.value = result.invite
+    toast.add({ title: 'Succes', description: 'Lien d\'invitation genere', color: 'success' })
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+  } finally {
+    isGeneratingInviteLink.value = false
+  }
+}
+
+async function copyInviteLink() {
+  if (!fullInviteLink.value) return
+  try {
+    await navigator.clipboard.writeText(fullInviteLink.value)
+    toast.add({ title: 'Copie !', description: 'Lien copie dans le presse-papier', color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Impossible de copier le lien', color: 'error' })
+  }
+}
+
+// Charger le lien d'invitation quand la modal s'ouvre
+watch(isMembersModalOpen, async (isOpen) => {
+  if (isOpen && canManageMembers.value && !inviteLink.value) {
+    await fetchInviteLink()
+  }
+})
+
 function openRoleModal(member: GroupMember) {
   memberToChangeRole.value = member
   newRoleSelected.value = member.role
@@ -827,22 +885,62 @@ function canKickMember(member: GroupMember): boolean {
               </div>
             </div>
 
-            <!-- Formulaire d'invitation (chef et moderateur) -->
-            <div v-if="canManageMembers" class="pt-4 border-t border-muted">
-              <h3 class="text-sm font-medium mb-2">Inviter un membre</h3>
-              <div class="flex gap-2">
-                <UInput
-                  v-model="inviteUsername"
-                  placeholder="Gamertag Xbox"
-                  icon="i-lucide-user-plus"
-                  class="flex-1"
-                />
-                <UButton
-                  label="Inviter"
-                  icon="i-lucide-plus"
-                  :loading="isInviting"
-                  @click="handleInvite"
-                />
+            <!-- Section invitation (chef et moderateur) -->
+            <div v-if="canManageMembers" class="pt-4 border-t border-muted space-y-4">
+              <!-- Lien d'invitation -->
+              <div>
+                <h3 class="text-sm font-medium mb-2">Lien d'invitation</h3>
+                <div v-if="isLoadingInviteLink" class="flex items-center gap-2 text-muted">
+                  <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+                  <span>Chargement...</span>
+                </div>
+                <div v-else-if="inviteLink" class="space-y-2">
+                  <div class="flex gap-2">
+                    <UInput
+                      :model-value="fullInviteLink"
+                      readonly
+                      icon="i-lucide-link"
+                      class="flex-1"
+                    />
+                    <UButton
+                      icon="i-lucide-copy"
+                      variant="outline"
+                      title="Copier le lien"
+                      @click="copyInviteLink"
+                    />
+                  </div>
+                  <p class="text-xs text-muted">
+                    Partagez ce lien pour inviter des pirates a rejoindre le groupe.
+                  </p>
+                </div>
+                <div v-else>
+                  <UButton
+                    label="Generer un lien d'invitation"
+                    icon="i-lucide-link"
+                    variant="outline"
+                    :loading="isGeneratingInviteLink"
+                    @click="generateInviteLink"
+                  />
+                </div>
+              </div>
+
+              <!-- Invitation par pseudo -->
+              <div>
+                <h3 class="text-sm font-medium mb-2">Inviter par Gamertag</h3>
+                <div class="flex gap-2">
+                  <UInput
+                    v-model="inviteUsername"
+                    placeholder="Gamertag Xbox"
+                    icon="i-lucide-user-plus"
+                    class="flex-1"
+                  />
+                  <UButton
+                    label="Inviter"
+                    icon="i-lucide-plus"
+                    :loading="isInviting"
+                    @click="handleInvite"
+                  />
+                </div>
               </div>
             </div>
           </div>
