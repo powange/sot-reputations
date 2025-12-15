@@ -1,4 +1,4 @@
-import { getGroupByUid, isGroupAdmin, deleteGroup } from '../../utils/reputation-db'
+import { getGroupByUid, isGroupChef, deleteGroup } from '../../utils/reputation-db'
 
 export default defineEventHandler((event) => {
   const user = event.context.user
@@ -26,11 +26,11 @@ export default defineEventHandler((event) => {
     })
   }
 
-  // Vérifier que l'utilisateur est admin du groupe
-  if (!isGroupAdmin(group.id, user.id)) {
+  // Seul le chef peut supprimer le groupe
+  if (!isGroupChef(group.id, user.id)) {
     throw createError({
       statusCode: 403,
-      message: 'Seul un admin peut supprimer le groupe'
+      message: 'Seul le chef de groupe peut supprimer le groupe'
     })
   }
 

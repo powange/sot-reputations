@@ -26,6 +26,7 @@ useSeoMeta({
 
 const navItems = computed(() => {
   const items = [
+    { label: 'Mes reputations', to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true },
     { label: 'Mes groupes', to: '/', icon: 'i-lucide-users', requiresAuth: true },
     { label: 'Tutoriel', to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false }
   ]

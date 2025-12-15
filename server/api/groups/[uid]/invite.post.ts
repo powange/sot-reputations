@@ -1,4 +1,4 @@
-import { getGroupByUid, isGroupAdmin, isGroupMember, getUserByUsername, addGroupMember } from '../../../utils/reputation-db'
+import { getGroupByUid, isGroupModerator, isGroupMember, getUserByUsername, addGroupMember } from '../../../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user
@@ -36,11 +36,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Vérifier que l'utilisateur est admin du groupe
-  if (!isGroupAdmin(group.id, user.id)) {
+  // Vérifier que l'utilisateur est chef ou modérateur du groupe
+  if (!isGroupModerator(group.id, user.id)) {
     throw createError({
       statusCode: 403,
-      message: 'Seul un admin peut inviter des membres'
+      message: 'Seul un chef ou moderateur peut inviter des membres'
     })
   }
 

@@ -6,7 +6,8 @@ let db: Database.Database | null = null
 export function getReputationDb(): Database.Database {
   if (db) return db
 
-  const dbPath = join(process.cwd(), 'data', 'reputation.db')
+  // Chemin absolu fixe pour la cohérence entre dev et prod
+  const dbPath = join('/app/data', 'reputation.db')
   db = new Database(dbPath)
 
   // Créer les tables si elles n'existent pas
@@ -140,6 +141,14 @@ export function getReputationDb(): Database.Database {
   if (!hasMicrosoftId) {
     db.exec('ALTER TABLE users ADD COLUMN microsoft_id TEXT')
     db.exec('CREATE INDEX IF NOT EXISTS idx_users_microsoft_id ON users(microsoft_id)')
+  }
+
+  // Migration: convertir les rôles 'admin' en 'chef' pour le nouveau système de grades
+  const hasAdminRole = db.prepare(`
+    SELECT id FROM group_members WHERE role = 'admin' LIMIT 1
+  `).get()
+  if (hasAdminRole) {
+    db.exec(`UPDATE group_members SET role = 'chef' WHERE role = 'admin'`)
   }
 
   return db
@@ -521,18 +530,20 @@ export interface GroupInfo {
   createdBy: number
 }
 
+export type GroupRole = 'chef' | 'moderator' | 'member'
+
 export interface GroupMemberInfo {
   id: number
   groupId: number
   userId: number
   username: string
-  role: 'admin' | 'member'
+  role: GroupRole
   joinedAt: string
   lastImportAt: string | null
 }
 
 export interface GroupWithRole extends GroupInfo {
-  role: 'admin' | 'member'
+  role: GroupRole
 }
 
 // Génère un UID court et URL-safe
@@ -562,9 +573,9 @@ export function createGroup(name: string, createdBy: number): GroupInfo {
     INSERT INTO groups (uid, name, created_by) VALUES (?, ?, ?)
   `).run(uid, name, createdBy)
 
-  // Ajouter le créateur comme admin
+  // Ajouter le créateur comme chef de groupe
   db.prepare(`
-    INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'admin')
+    INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'chef')
   `).run(result.lastInsertRowid, createdBy)
 
   return {
@@ -604,7 +615,13 @@ export function getGroupMembers(groupId: number): GroupMemberInfo[] {
     FROM group_members gm
     JOIN users u ON gm.user_id = u.id
     WHERE gm.group_id = ?
-    ORDER BY gm.role DESC, u.username
+    ORDER BY
+      CASE gm.role
+        WHEN 'chef' THEN 1
+        WHEN 'moderator' THEN 2
+        ELSE 3
+      END,
+      u.username
   `).all(groupId) as GroupMemberInfo[]
 }
 
@@ -616,23 +633,31 @@ export function isGroupMember(groupId: number, userId: number): boolean {
   return !!row
 }
 
-export function isGroupAdmin(groupId: number, userId: number): boolean {
+export function isGroupChef(groupId: number, userId: number): boolean {
   const db = getReputationDb()
   const row = db.prepare(`
-    SELECT id FROM group_members WHERE group_id = ? AND user_id = ? AND role = 'admin'
+    SELECT id FROM group_members WHERE group_id = ? AND user_id = ? AND role = 'chef'
   `).get(groupId, userId)
   return !!row
 }
 
-export function getGroupAdminCount(groupId: number): number {
+export function isGroupModerator(groupId: number, userId: number): boolean {
   const db = getReputationDb()
   const row = db.prepare(`
-    SELECT COUNT(*) as count FROM group_members WHERE group_id = ? AND role = 'admin'
-  `).get(groupId) as { count: number }
-  return row.count
+    SELECT id FROM group_members WHERE group_id = ? AND user_id = ? AND role IN ('chef', 'moderator')
+  `).get(groupId, userId)
+  return !!row
 }
 
-export function addGroupMember(groupId: number, userId: number, role: 'admin' | 'member' = 'member'): void {
+export function getMemberRole(groupId: number, userId: number): GroupRole | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT role FROM group_members WHERE group_id = ? AND user_id = ?
+  `).get(groupId, userId) as { role: GroupRole } | undefined
+  return row?.role || null
+}
+
+export function addGroupMember(groupId: number, userId: number, role: GroupRole = 'member'): void {
   const db = getReputationDb()
   db.prepare(`
     INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)
@@ -646,11 +671,26 @@ export function removeGroupMember(groupId: number, userId: number): void {
   `).run(groupId, userId)
 }
 
-export function promoteToAdmin(groupId: number, userId: number): void {
+export function setMemberRole(groupId: number, userId: number, role: GroupRole): void {
   const db = getReputationDb()
   db.prepare(`
-    UPDATE group_members SET role = 'admin' WHERE group_id = ? AND user_id = ?
-  `).run(groupId, userId)
+    UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?
+  `).run(role, groupId, userId)
+}
+
+export function transferChefRole(groupId: number, currentChefId: number, newChefId: number): void {
+  const db = getReputationDb()
+  const transaction = db.transaction(() => {
+    // L'ancien chef devient modérateur
+    db.prepare(`
+      UPDATE group_members SET role = 'moderator' WHERE group_id = ? AND user_id = ?
+    `).run(groupId, currentChefId)
+    // Le nouveau devient chef
+    db.prepare(`
+      UPDATE group_members SET role = 'chef' WHERE group_id = ? AND user_id = ?
+    `).run(groupId, newChefId)
+  })
+  transaction()
 }
 
 export function deleteGroup(groupId: number): void {

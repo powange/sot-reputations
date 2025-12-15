@@ -18,6 +18,21 @@ export default defineNuxtConfig({
     enabled: true
   },
 
+  vite: {
+    server: {
+      allowedHosts: ['dev.reputations.sot.powange.com'],
+      origin: 'https://dev.reputations.sot.powange.com',
+      hmr: {
+        protocol: 'wss',
+        host: 'dev.reputations.sot.powange.com',
+        clientPort: 443
+      },
+      fs: {
+        strict: false
+      }
+    }
+  },
+
   css: ['~/assets/css/main.css'],
 
   routeRules: {

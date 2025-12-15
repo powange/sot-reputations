@@ -39,12 +39,12 @@ export default defineEventHandler((event) => {
 
   // Trouver le rôle de l'utilisateur actuel
   const currentMember = members.find(m => m.userId === user.id)
-  const isAdmin = currentMember?.role === 'admin'
+  const userRole = currentMember?.role || 'member'
 
   return {
     group,
     members,
-    isAdmin,
+    userRole,
     reputationData
   }
 })

@@ -1,7 +1,22 @@
 <script setup lang="ts">
+type GroupRole = 'chef' | 'moderator' | 'member'
+
 const toast = useToast()
-const { user, isAuthenticated, isLoading, login, loginWithMicrosoft } = useAuth()
+const { user, isAuthenticated, isLoading, loginWithMicrosoft } = useAuth()
 const { groups, fetchGroups, createGroup } = useGroups()
+
+// Labels des rôles
+const roleLabels: Record<GroupRole, string> = {
+  chef: 'Chef de groupe',
+  moderator: 'Modérateur',
+  member: 'Membre'
+}
+
+const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
+  chef: 'primary',
+  moderator: 'info',
+  member: 'neutral'
+}
 
 // Vérifier si erreur OAuth dans l'URL
 const route = useRoute()
@@ -12,14 +27,6 @@ if (route.query.error === 'oauth') {
     color: 'error'
   })
 }
-
-// Formulaire de connexion
-const loginForm = ref({
-  username: '',
-  password: ''
-})
-const isLoggingIn = ref(false)
-const loginError = ref('')
 
 // Modal création de groupe
 const isCreateGroupModalOpen = ref(false)
@@ -32,30 +39,6 @@ watch(isAuthenticated, async (authenticated) => {
     await fetchGroups()
   }
 }, { immediate: true })
-
-async function handleLogin() {
-  if (!loginForm.value.username || !loginForm.value.password) {
-    loginError.value = 'Pseudo et mot de passe requis'
-    return
-  }
-
-  isLoggingIn.value = true
-  loginError.value = ''
-
-  try {
-    await login(loginForm.value.username, loginForm.value.password)
-    toast.add({
-      title: 'Connexion reussie',
-      description: `Bienvenue, ${loginForm.value.username} !`,
-      color: 'success'
-    })
-  } catch (error: unknown) {
-    const err = error as { data?: { message?: string }, message?: string }
-    loginError.value = err.data?.message || err.message || 'Erreur de connexion'
-  } finally {
-    isLoggingIn.value = false
-  }
-}
 
 async function handleCreateGroup() {
   if (!newGroupName.value.trim()) {
@@ -101,7 +84,7 @@ async function handleCreateGroup() {
       <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
     </div>
 
-    <!-- Non connecté : Formulaire de connexion -->
+    <!-- Non connecté : Bouton connexion Xbox -->
     <template v-else-if="!isAuthenticated">
       <div class="max-w-md mx-auto">
         <div class="text-center mb-8">
@@ -110,68 +93,27 @@ async function handleCreateGroup() {
             SoT Reputations
           </h1>
           <p class="text-muted">
-            Connectez-vous pour acceder a vos groupes de comparaison
+            Connectez-vous avec votre compte Xbox pour acceder a vos groupes de comparaison
           </p>
         </div>
 
         <UCard>
-          <form @submit.prevent="handleLogin" class="space-y-4">
-            <UAlert
-              v-if="loginError"
-              icon="i-lucide-alert-circle"
-              color="error"
-              :title="loginError"
-              class="mb-4"
-            />
-
-            <UFormField label="Pseudo">
-              <UInput
-                v-model="loginForm.username"
-                placeholder="Votre pseudo de pirate"
-                icon="i-lucide-user"
-                class="w-full"
-              />
-            </UFormField>
-
-            <UFormField label="Mot de passe">
-              <UInput
-                v-model="loginForm.password"
-                type="password"
-                placeholder="Votre mot de passe"
-                icon="i-lucide-lock"
-                class="w-full"
-              />
-            </UFormField>
-
-            <UButton
-              type="submit"
-              label="Se connecter"
-              icon="i-lucide-log-in"
-              :loading="isLoggingIn"
-              block
-            />
-
-            <div class="flex items-center gap-4 my-4">
-              <div class="flex-1 h-px bg-muted/30" />
-              <span class="text-sm text-muted">ou</span>
-              <div class="flex-1 h-px bg-muted/30" />
-            </div>
-
+          <div class="space-y-4">
             <UButton
               label="Connexion Xbox"
               icon="i-lucide-gamepad-2"
               color="success"
-              variant="outline"
+              size="lg"
               block
               @click="loginWithMicrosoft"
             />
-          </form>
+          </div>
 
           <template #footer>
             <p class="text-sm text-muted text-center">
-              Pas encore de compte ?
+              Besoin d'aide ?
               <NuxtLink to="/tutoriel" class="text-primary hover:underline">
-                Suivez le tutoriel
+                Consultez le tutoriel
               </NuxtLink>
               pour importer vos donnees.
             </p>
@@ -228,8 +170,8 @@ async function handleCreateGroup() {
                   {{ group.name }}
                 </h3>
                 <UBadge
-                  :color="group.role === 'admin' ? 'primary' : 'neutral'"
-                  :label="group.role === 'admin' ? 'Admin' : 'Membre'"
+                  :color="roleBadgeColors[group.role as GroupRole]"
+                  :label="roleLabels[group.role as GroupRole]"
                   size="sm"
                   class="mt-2"
                 />

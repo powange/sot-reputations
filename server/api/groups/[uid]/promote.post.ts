@@ -1,4 +1,4 @@
-import { getGroupByUid, isGroupAdmin, isGroupMember, getUserById, promoteToAdmin } from '../../../utils/reputation-db'
+import { getGroupByUid, isGroupChef, isGroupMember, getUserById, getMemberRole, setMemberRole, transferChefRole, type GroupRole } from '../../../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user
@@ -19,12 +19,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const { userId } = body
+  const { userId, newRole } = body as { userId: number; newRole: GroupRole }
 
   if (!userId || typeof userId !== 'number') {
     throw createError({
       statusCode: 400,
       message: 'ID de l\'utilisateur requis'
+    })
+  }
+
+  if (!newRole || !['chef', 'moderator', 'member'].includes(newRole)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Role invalide'
     })
   }
 
@@ -36,15 +43,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Vérifier que l'utilisateur courant est admin du groupe
-  if (!isGroupAdmin(group.id, user.id)) {
+  // Seul le chef peut changer les rôles
+  if (!isGroupChef(group.id, user.id)) {
     throw createError({
       statusCode: 403,
-      message: 'Seul un admin peut promouvoir des membres'
+      message: 'Seul le chef de groupe peut modifier les roles'
     })
   }
 
-  // Vérifier que l'utilisateur à promouvoir est membre du groupe
+  // Vérifier que l'utilisateur cible est membre du groupe
   if (!isGroupMember(group.id, userId)) {
     throw createError({
       statusCode: 400,
@@ -52,20 +59,42 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Vérifier qu'il n'est pas déjà admin
-  if (isGroupAdmin(group.id, userId)) {
+  // Ne peut pas changer son propre rôle (sauf pour transférer chef)
+  if (userId === user.id && newRole !== 'chef') {
     throw createError({
       statusCode: 400,
-      message: 'Cet utilisateur est deja admin'
+      message: 'Vous ne pouvez pas changer votre propre role'
     })
   }
 
-  promoteToAdmin(group.id, userId)
+  const currentRole = getMemberRole(group.id, userId)
+  if (currentRole === newRole) {
+    throw createError({
+      statusCode: 400,
+      message: 'L\'utilisateur a deja ce role'
+    })
+  }
 
-  const promotedUser = getUserById(userId)
+  const targetUser = getUserById(userId)
+  const roleLabels: Record<GroupRole, string> = {
+    chef: 'Chef de groupe',
+    moderator: 'Moderateur',
+    member: 'Membre'
+  }
+
+  // Cas spécial : transfert du rôle de chef
+  if (newRole === 'chef') {
+    transferChefRole(group.id, user.id, userId)
+    return {
+      success: true,
+      message: `${targetUser?.username} est maintenant ${roleLabels[newRole]}. Vous etes maintenant Moderateur.`
+    }
+  }
+
+  setMemberRole(group.id, userId, newRole)
 
   return {
     success: true,
-    message: `${promotedUser?.username} est maintenant admin`
+    message: `${targetUser?.username} est maintenant ${roleLabels[newRole]}`
   }
 })

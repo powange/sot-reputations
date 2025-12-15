@@ -7,12 +7,14 @@ interface UserInfo {
   lastImportAt: string | null
 }
 
+type GroupRole = 'chef' | 'moderator' | 'member'
+
 interface GroupMember {
   id: number
   groupId: number
   userId: number
   username: string
-  role: 'admin' | 'member'
+  role: GroupRole
   joinedAt: string
   lastImportAt: string | null
 }
@@ -67,7 +69,7 @@ interface GroupData {
     createdBy: number
   }
   members: GroupMember[]
-  isAdmin: boolean
+  userRole: GroupRole
   reputationData: {
     users: UserInfo[]
     factions: FactionWithCampaigns[]
@@ -98,13 +100,18 @@ if (error.value) {
 }
 
 // Modals
-const isInviteModalOpen = ref(false)
+const isMembersModalOpen = ref(false)
 const inviteUsername = ref('')
 const isInviting = ref(false)
 
-const isPromoteModalOpen = ref(false)
-const memberToPromote = ref<GroupMember | null>(null)
-const isPromoting = ref(false)
+const isRoleModalOpen = ref(false)
+const memberToChangeRole = ref<GroupMember | null>(null)
+const newRoleSelected = ref<GroupRole>('member')
+const isChangingRole = ref(false)
+
+const isKickModalOpen = ref(false)
+const memberToKick = ref<GroupMember | null>(null)
+const isKicking = ref(false)
 
 const isLeaveModalOpen = ref(false)
 const isLeaving = ref(false)
@@ -115,6 +122,41 @@ const isDeleting = ref(false)
 const isImportModalOpen = ref(false)
 const importJsonText = ref('')
 const isImporting = ref(false)
+
+// Labels des rôles
+const roleLabels: Record<GroupRole, string> = {
+  chef: 'Chef de groupe',
+  moderator: 'Modérateur',
+  member: 'Membre'
+}
+
+const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
+  chef: 'primary',
+  moderator: 'info',
+  member: 'neutral'
+}
+
+// Menu dropdown actions
+const dropdownItems = computed(() => {
+  const items = [
+    [{
+      label: 'Quitter le groupe',
+      icon: 'i-lucide-log-out',
+      onSelect: () => { isLeaveModalOpen.value = true }
+    }]
+  ]
+
+  if (isChef.value) {
+    items[0].push({
+      label: 'Supprimer le groupe',
+      icon: 'i-lucide-trash-2',
+      color: 'error' as const,
+      onSelect: () => { isDeleteModalOpen.value = true }
+    })
+  }
+
+  return items
+})
 
 // Filtres
 const selectedFactionKey = ref<string>('')
@@ -129,7 +171,10 @@ const allFactionsSelected = computed(() => selectedFactionKey.value === '')
 const users = computed(() => groupData.value?.reputationData.users || [])
 const factions = computed(() => groupData.value?.reputationData.factions || [])
 const members = computed(() => groupData.value?.members || [])
-const isAdmin = computed(() => groupData.value?.isAdmin || false)
+const userRole = computed(() => groupData.value?.userRole || 'member')
+const isChef = computed(() => userRole.value === 'chef')
+const isModerator = computed(() => userRole.value === 'chef' || userRole.value === 'moderator')
+const canManageMembers = computed(() => isModerator.value)
 
 // Initialiser les utilisateurs sélectionnés
 watch(users, (newUsers) => {
@@ -360,7 +405,6 @@ async function handleInvite() {
       body: { username: inviteUsername.value.trim() }
     })
     toast.add({ title: 'Succes', description: result.message, color: 'success' })
-    isInviteModalOpen.value = false
     inviteUsername.value = ''
     await refresh()
   } catch (error: unknown) {
@@ -371,24 +415,45 @@ async function handleInvite() {
   }
 }
 
-async function handlePromote() {
-  if (!memberToPromote.value) return
+async function handleChangeRole() {
+  if (!memberToChangeRole.value) return
 
-  isPromoting.value = true
+  isChangingRole.value = true
   try {
     const result = await $fetch<{ success: boolean, message: string }>(`/api/groups/${groupUid}/promote`, {
       method: 'POST',
-      body: { userId: memberToPromote.value.userId }
+      body: { userId: memberToChangeRole.value.userId, newRole: newRoleSelected.value }
     })
     toast.add({ title: 'Succes', description: result.message, color: 'success' })
-    isPromoteModalOpen.value = false
-    memberToPromote.value = null
+    isRoleModalOpen.value = false
+    memberToChangeRole.value = null
     await refresh()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
   } finally {
-    isPromoting.value = false
+    isChangingRole.value = false
+  }
+}
+
+async function handleKick() {
+  if (!memberToKick.value) return
+
+  isKicking.value = true
+  try {
+    const result = await $fetch<{ success: boolean, message: string }>(`/api/groups/${groupUid}/kick`, {
+      method: 'POST',
+      body: { userId: memberToKick.value.userId }
+    })
+    toast.add({ title: 'Succes', description: result.message, color: 'success' })
+    isKickModalOpen.value = false
+    memberToKick.value = null
+    await refresh()
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+  } finally {
+    isKicking.value = false
   }
 }
 
@@ -456,9 +521,37 @@ async function handleImport() {
   }
 }
 
-function openPromoteModal(member: GroupMember) {
-  memberToPromote.value = member
-  isPromoteModalOpen.value = true
+function openRoleModal(member: GroupMember) {
+  memberToChangeRole.value = member
+  newRoleSelected.value = member.role
+  isRoleModalOpen.value = true
+}
+
+function openKickModal(member: GroupMember) {
+  memberToKick.value = member
+  isKickModalOpen.value = true
+}
+
+// Vérifie si l'utilisateur courant peut modifier le rôle du membre
+function canChangeRole(member: GroupMember): boolean {
+  // Seul le chef peut modifier les rôles
+  if (!isChef.value) return false
+  // Ne peut pas modifier son propre rôle depuis la liste (sauf transfert)
+  if (member.userId === user.value?.id) return false
+  return true
+}
+
+// Vérifie si l'utilisateur courant peut retirer le membre
+function canKickMember(member: GroupMember): boolean {
+  // Doit être chef ou modérateur
+  if (!canManageMembers.value) return false
+  // Ne peut pas se retirer soi-même
+  if (member.userId === user.value?.id) return false
+  // Le chef ne peut pas être retiré
+  if (member.role === 'chef') return false
+  // Un modérateur ne peut pas retirer un autre modérateur
+  if (userRole.value === 'moderator' && member.role === 'moderator') return false
+  return true
 }
 </script>
 
@@ -476,7 +569,7 @@ function openPromoteModal(member: GroupMember) {
           </h1>
         </div>
         <div class="flex items-center gap-4">
-          <UBadge :color="isAdmin ? 'primary' : 'neutral'" :label="isAdmin ? 'Admin' : 'Membre'" />
+          <UBadge :color="roleBadgeColors[userRole]" :label="roleLabels[userRole]" />
           <span class="text-sm text-muted">{{ members.length }} membre(s)</span>
         </div>
       </div>
@@ -489,59 +582,16 @@ function openPromoteModal(member: GroupMember) {
           @click="isImportModalOpen = true"
         />
         <UButton
-          v-if="isAdmin"
-          icon="i-lucide-user-plus"
-          label="Inviter"
-          @click="isInviteModalOpen = true"
+          icon="i-lucide-users"
+          label="Membres"
+          variant="outline"
+          @click="isMembersModalOpen = true"
         />
-        <UDropdownMenu>
+        <UDropdownMenu :items="dropdownItems">
           <UButton icon="i-lucide-more-vertical" variant="ghost" />
-          <template #content>
-            <UDropdownMenuItem
-              icon="i-lucide-log-out"
-              label="Quitter le groupe"
-              @click="isLeaveModalOpen = true"
-            />
-            <UDropdownMenuItem
-              v-if="isAdmin"
-              icon="i-lucide-trash-2"
-              label="Supprimer le groupe"
-              class="text-error"
-              @click="isDeleteModalOpen = true"
-            />
-          </template>
         </UDropdownMenu>
       </div>
     </div>
-
-    <!-- Liste des membres -->
-    <UCard class="mb-6">
-      <template #header>
-        <h2 class="font-semibold">Membres du groupe</h2>
-      </template>
-      <div class="flex flex-wrap gap-2">
-        <div
-          v-for="member in members"
-          :key="member.userId"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50"
-        >
-          <span class="font-medium">{{ member.username }}</span>
-          <UBadge
-            :color="member.role === 'admin' ? 'primary' : 'neutral'"
-            :label="member.role === 'admin' ? 'Admin' : 'Membre'"
-            size="xs"
-          />
-          <UButton
-            v-if="isAdmin && member.role !== 'admin' && member.userId !== user?.id"
-            icon="i-lucide-shield"
-            size="xs"
-            variant="ghost"
-            title="Promouvoir admin"
-            @click="openPromoteModal(member)"
-          />
-        </div>
-      </div>
-    </UCard>
 
     <!-- Message si pas de données -->
     <div
@@ -725,39 +775,155 @@ function openPromoteModal(member: GroupMember) {
       </template>
     </template>
 
-    <!-- Modal Inviter -->
-    <UModal v-model:open="isInviteModalOpen">
+    <!-- Modal Membres -->
+    <UModal v-model:open="isMembersModalOpen">
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Inviter un membre</h2>
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-semibold">Membres du groupe</h2>
+              <UBadge :label="`${members.length} membre(s)`" color="neutral" />
+            </div>
           </template>
-          <UFormField label="Pseudo de l'utilisateur">
-            <UInput v-model="inviteUsername" placeholder="Pseudo exact" class="w-full" />
-          </UFormField>
+
+          <div class="space-y-4">
+            <!-- Liste des membres -->
+            <div class="space-y-2">
+              <div
+                v-for="member in members"
+                :key="member.userId"
+                class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+              >
+                <div class="flex items-center gap-3">
+                  <UIcon name="i-lucide-user" class="w-5 h-5 text-muted" />
+                  <span class="font-medium">{{ member.username }}</span>
+                  <UBadge
+                    :color="roleBadgeColors[member.role]"
+                    :label="roleLabels[member.role]"
+                    size="xs"
+                  />
+                </div>
+                <div class="flex items-center gap-1">
+                  <!-- Bouton modifier le rôle (chef uniquement) -->
+                  <UButton
+                    v-if="canChangeRole(member)"
+                    icon="i-lucide-shield"
+                    size="xs"
+                    variant="ghost"
+                    title="Modifier le role"
+                    @click="openRoleModal(member)"
+                  />
+                  <!-- Bouton retirer du groupe (chef et moderateur) -->
+                  <UButton
+                    v-if="canKickMember(member)"
+                    icon="i-lucide-user-minus"
+                    size="xs"
+                    variant="ghost"
+                    color="error"
+                    title="Retirer du groupe"
+                    @click="openKickModal(member)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Formulaire d'invitation (chef et moderateur) -->
+            <div v-if="canManageMembers" class="pt-4 border-t border-muted">
+              <h3 class="text-sm font-medium mb-2">Inviter un membre</h3>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="inviteUsername"
+                  placeholder="Gamertag Xbox"
+                  icon="i-lucide-user-plus"
+                  class="flex-1"
+                />
+                <UButton
+                  label="Inviter"
+                  icon="i-lucide-plus"
+                  :loading="isInviting"
+                  @click="handleInvite"
+                />
+              </div>
+            </div>
+          </div>
+
           <template #footer>
-            <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isInviteModalOpen = false" />
-              <UButton label="Inviter" icon="i-lucide-user-plus" :loading="isInviting" @click="handleInvite" />
+            <div class="flex justify-end">
+              <UButton label="Fermer" color="neutral" variant="outline" @click="isMembersModalOpen = false" />
             </div>
           </template>
         </UCard>
       </template>
     </UModal>
 
-    <!-- Modal Promouvoir -->
-    <UModal v-model:open="isPromoteModalOpen">
+    <!-- Modal Modifier le rôle -->
+    <UModal v-model:open="isRoleModalOpen">
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Promouvoir en admin</h2>
+            <h2 class="text-xl font-semibold">Modifier le role</h2>
           </template>
-          <p>Voulez-vous promouvoir <strong>{{ memberToPromote?.username }}</strong> en tant qu'admin ?</p>
-          <p class="text-sm text-muted mt-2">Les admins peuvent inviter des membres et promouvoir d'autres utilisateurs.</p>
+          <div class="space-y-4">
+            <p>Choisir le nouveau role pour <strong>{{ memberToChangeRole?.username }}</strong> :</p>
+
+            <div class="space-y-2">
+              <label
+                v-for="role in (['chef', 'moderator', 'member'] as const)"
+                :key="role"
+                class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                :class="newRoleSelected === role ? 'bg-primary/10 ring-1 ring-primary' : 'bg-muted/50 hover:bg-muted'"
+              >
+                <input
+                  v-model="newRoleSelected"
+                  type="radio"
+                  name="role"
+                  :value="role"
+                  class="sr-only"
+                />
+                <UBadge :color="roleBadgeColors[role]" :label="roleLabels[role]" />
+                <span class="text-sm text-muted">
+                  <template v-if="role === 'chef'">Tous les droits. Un seul chef par groupe.</template>
+                  <template v-else-if="role === 'moderator'">Peut inviter et retirer des membres.</template>
+                  <template v-else>Acces en lecture seule.</template>
+                </span>
+              </label>
+            </div>
+
+            <UAlert v-if="newRoleSelected === 'chef'" icon="i-lucide-alert-triangle" color="warning" title="Attention">
+              <template #description>
+                En transferant le role de Chef, vous deviendrez Moderateur.
+              </template>
+            </UAlert>
+          </div>
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isPromoteModalOpen = false" />
-              <UButton label="Promouvoir" icon="i-lucide-shield" :loading="isPromoting" @click="handlePromote" />
+              <UButton label="Annuler" color="neutral" variant="outline" @click="isRoleModalOpen = false" />
+              <UButton
+                label="Valider"
+                icon="i-lucide-check"
+                :loading="isChangingRole"
+                :disabled="newRoleSelected === memberToChangeRole?.role"
+                @click="handleChangeRole"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal Retirer un membre -->
+    <UModal v-model:open="isKickModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-xl font-semibold text-error">Retirer du groupe</h2>
+          </template>
+          <p>Voulez-vous vraiment retirer <strong>{{ memberToKick?.username }}</strong> du groupe ?</p>
+          <p class="text-sm text-muted mt-2">Cette personne devra etre invitee a nouveau pour rejoindre le groupe.</p>
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton label="Annuler" color="neutral" variant="outline" @click="isKickModalOpen = false" />
+              <UButton label="Retirer" color="error" icon="i-lucide-user-minus" :loading="isKicking" @click="handleKick" />
             </div>
           </template>
         </UCard>

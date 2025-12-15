@@ -1,4 +1,4 @@
-import { getGroupByUid, isGroupMember, isGroupAdmin, getGroupAdminCount, removeGroupMember } from '../../../utils/reputation-db'
+import { getGroupByUid, isGroupMember, isGroupChef, removeGroupMember } from '../../../utils/reputation-db'
 
 export default defineEventHandler((event) => {
   const user = event.context.user
@@ -34,15 +34,12 @@ export default defineEventHandler((event) => {
     })
   }
 
-  // Si l'utilisateur est admin, vérifier qu'il n'est pas le dernier admin
-  if (isGroupAdmin(group.id, user.id)) {
-    const adminCount = getGroupAdminCount(group.id)
-    if (adminCount <= 1) {
-      throw createError({
-        statusCode: 400,
-        message: 'Vous ne pouvez pas quitter le groupe car vous etes le dernier admin. Promouvez un autre membre ou supprimez le groupe.'
-      })
-    }
+  // Le chef ne peut pas quitter le groupe, il doit d'abord transférer son rôle ou supprimer le groupe
+  if (isGroupChef(group.id, user.id)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Le chef de groupe ne peut pas quitter. Transferez le role de chef a un autre membre ou supprimez le groupe.'
+    })
   }
 
   removeGroupMember(group.id, user.id)
