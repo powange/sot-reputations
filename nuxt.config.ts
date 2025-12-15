@@ -42,6 +42,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-01-15',
 
   runtimeConfig: {
+    public: {
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://reputations.sot.powange.com'
+    },
     oauth: {
       microsoft: {
         clientId: '',
