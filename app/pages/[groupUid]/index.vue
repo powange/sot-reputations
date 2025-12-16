@@ -101,6 +101,7 @@ if (error.value) {
 
 // Modals
 const isMembersModalOpen = ref(false)
+const isInviteModalOpen = ref(false)
 const inviteUsername = ref('')
 const isInviting = ref(false)
 
@@ -581,8 +582,8 @@ async function copyInviteLink() {
 }
 
 // Charger le lien d'invitation quand la modal s'ouvre
-watch(isMembersModalOpen, async (isOpen) => {
-  if (isOpen && canManageMembers.value && !inviteLink.value) {
+watch(isInviteModalOpen, async (isOpen) => {
+  if (isOpen && !inviteLink.value) {
     await fetchInviteLink()
   }
 })
@@ -898,69 +899,105 @@ function canKickMember(member: GroupMember): boolean {
               </div>
             </div>
 
-            <!-- Section invitation (chef et moderateur) -->
-            <div v-if="canManageMembers" class="pt-4 border-t border-muted space-y-4">
-              <!-- Lien d'invitation -->
-              <div>
-                <h3 class="text-sm font-medium mb-2">Lien d'invitation</h3>
-                <div v-if="isLoadingInviteLink" class="flex items-center gap-2 text-muted">
-                  <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
-                  <span>Chargement...</span>
-                </div>
-                <div v-else-if="inviteLink" class="space-y-2">
-                  <div class="flex gap-2">
-                    <UInput
-                      :model-value="fullInviteLink"
-                      readonly
-                      icon="i-lucide-link"
-                      class="flex-1"
-                    />
-                    <UButton
-                      icon="i-lucide-copy"
-                      variant="outline"
-                      title="Copier le lien"
-                      @click="copyInviteLink"
-                    />
-                  </div>
-                  <p class="text-xs text-muted">
-                    Partagez ce lien pour inviter des pirates a rejoindre le groupe.
-                  </p>
-                </div>
-                <div v-else>
-                  <UButton
-                    label="Generer un lien d'invitation"
+          </div>
+
+          <template #footer>
+            <div class="flex justify-between">
+              <UButton
+                v-if="canManageMembers"
+                label="Inviter"
+                icon="i-lucide-user-plus"
+                variant="outline"
+                @click="isInviteModalOpen = true"
+              />
+              <div v-else />
+              <UButton label="Fermer" color="neutral" variant="outline" @click="isMembersModalOpen = false" />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal Inviter -->
+    <UModal v-model:open="isInviteModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-xl font-semibold">Inviter des pirates</h2>
+          </template>
+
+          <div class="space-y-6">
+            <!-- Lien d'invitation -->
+            <div>
+              <h3 class="text-sm font-medium mb-2">Lien d'invitation</h3>
+              <div v-if="isLoadingInviteLink" class="flex items-center gap-2 text-muted">
+                <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+                <span>Chargement...</span>
+              </div>
+              <div v-else-if="inviteLink" class="space-y-2">
+                <div class="flex gap-2">
+                  <UInput
+                    :model-value="fullInviteLink"
+                    readonly
                     icon="i-lucide-link"
+                    class="flex-1"
+                  />
+                  <UButton
+                    icon="i-lucide-copy"
                     variant="outline"
+                    title="Copier le lien"
+                    @click="copyInviteLink"
+                  />
+                  <UButton
+                    icon="i-lucide-refresh-cw"
+                    variant="outline"
+                    color="warning"
+                    title="Regenerer le lien"
                     :loading="isGeneratingInviteLink"
                     @click="generateInviteLink"
                   />
                 </div>
+                <p class="text-xs text-muted">
+                  Partagez ce lien pour inviter des pirates a rejoindre le groupe.
+                </p>
               </div>
+              <div v-else>
+                <UButton
+                  label="Generer un lien d'invitation"
+                  icon="i-lucide-link"
+                  variant="outline"
+                  :loading="isGeneratingInviteLink"
+                  @click="generateInviteLink"
+                />
+              </div>
+            </div>
 
-              <!-- Invitation par pseudo -->
-              <div>
-                <h3 class="text-sm font-medium mb-2">Inviter par Gamertag</h3>
-                <div class="flex gap-2">
-                  <UInput
-                    v-model="inviteUsername"
-                    placeholder="Gamertag Xbox"
-                    icon="i-lucide-user-plus"
-                    class="flex-1"
-                  />
-                  <UButton
-                    label="Inviter"
-                    icon="i-lucide-plus"
-                    :loading="isInviting"
-                    @click="handleInvite"
-                  />
-                </div>
+            <!-- Invitation par pseudo -->
+            <div>
+              <h3 class="text-sm font-medium mb-2">Inviter par Gamertag</h3>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="inviteUsername"
+                  placeholder="Gamertag Xbox"
+                  icon="i-lucide-user-plus"
+                  class="flex-1"
+                />
+                <UButton
+                  label="Inviter"
+                  icon="i-lucide-plus"
+                  :loading="isInviting"
+                  @click="handleInvite"
+                />
               </div>
+              <p class="text-xs text-muted mt-2">
+                L'utilisateur devra accepter l'invitation pour rejoindre le groupe.
+              </p>
             </div>
           </div>
 
           <template #footer>
             <div class="flex justify-end">
-              <UButton label="Fermer" color="neutral" variant="outline" @click="isMembersModalOpen = false" />
+              <UButton label="Fermer" color="neutral" variant="outline" @click="isInviteModalOpen = false" />
             </div>
           </template>
         </UCard>
