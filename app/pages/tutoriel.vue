@@ -391,7 +391,8 @@ const activeTab = ref('bookmarklet')
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-muted/50 rounded-lg mb-4">
               <a
                 :href="bookmarkletUrl"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium cursor-move"
+                draggable="true"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium cursor-grab active:cursor-grabbing select-none"
                 @click.prevent
               >
                 <span>⚓</span>
@@ -402,9 +403,22 @@ const activeTab = ref('bookmarklet')
               </span>
             </div>
 
-            <p class="text-sm text-muted mb-2">
-              Ou copiez le code et creez un favori manuellement :
-            </p>
+            <UAlert
+              icon="i-lucide-info"
+              color="info"
+              class="mb-4"
+            >
+              <template #title>Le glisse-depose ne fonctionne pas ?</template>
+              <template #description>
+                <ol class="list-decimal list-inside space-y-1 mt-2 text-sm">
+                  <li>Cliquez sur "Copier le code" ci-dessous</li>
+                  <li>Clic droit sur votre barre de favoris → "Ajouter une page" ou "Ajouter un favori"</li>
+                  <li>Donnez un nom (ex: "SoT Reputations")</li>
+                  <li>Collez le code dans le champ URL/Adresse</li>
+                </ol>
+              </template>
+            </UAlert>
+
             <UButton
               :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
               :label="copied ? 'Copie !' : 'Copier le code'"
