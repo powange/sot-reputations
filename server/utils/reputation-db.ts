@@ -822,6 +822,29 @@ export function getPendingInvitesForUser(userId: number): PendingInvite[] {
   `).all(userId) as PendingInvite[]
 }
 
+export interface GroupPendingInvite {
+  id: number
+  username: string
+  invitedByUsername: string
+  createdAt: string
+}
+
+export function getPendingInvitesForGroup(groupId: number): GroupPendingInvite[] {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT
+      pi.id,
+      invited.username as username,
+      inviter.username as invitedByUsername,
+      pi.created_at as createdAt
+    FROM group_pending_invites pi
+    JOIN users invited ON invited.id = pi.user_id
+    JOIN users inviter ON inviter.id = pi.invited_by
+    WHERE pi.group_id = ?
+    ORDER BY pi.created_at DESC
+  `).all(groupId) as GroupPendingInvite[]
+}
+
 export function getPendingInvite(id: number): PendingInvite | null {
   const db = getReputationDb()
   const row = db.prepare(`

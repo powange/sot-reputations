@@ -135,6 +135,17 @@ const fullInviteLink = computed(() => {
   return `${baseUrl}/invite/${inviteLink.value.code}`
 })
 
+// Invitations en attente du groupe
+interface GroupPendingInvite {
+  id: number
+  username: string
+  invitedByUsername: string
+  createdAt: string
+}
+const groupPendingInvites = ref<GroupPendingInvite[]>([])
+const isLoadingGroupPendingInvites = ref(false)
+const cancellingInviteIds = ref<number[]>([])
+
 // Labels des rôles
 const roleLabels: Record<GroupRole, string> = {
   chef: 'Chef de groupe',
@@ -398,7 +409,7 @@ async function handleInvite() {
     })
     toast.add({ title: 'Succes', description: result.message, color: 'success' })
     inviteUsername.value = ''
-    await refresh()
+    await fetchGroupPendingInvites()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
@@ -553,10 +564,38 @@ async function copyInviteLink() {
   }
 }
 
-// Charger le lien d'invitation quand la modal s'ouvre
+async function fetchGroupPendingInvites() {
+  isLoadingGroupPendingInvites.value = true
+  try {
+    const result = await $fetch<{ invites: GroupPendingInvite[] }>(`/api/groups/${groupUid}/pending-invites`)
+    groupPendingInvites.value = result.invites
+  } catch {
+    groupPendingInvites.value = []
+  } finally {
+    isLoadingGroupPendingInvites.value = false
+  }
+}
+
+async function cancelPendingInvite(inviteId: number) {
+  cancellingInviteIds.value.push(inviteId)
+  try {
+    await $fetch(`/api/groups/${groupUid}/pending-invites/${inviteId}`, { method: 'DELETE' })
+    groupPendingInvites.value = groupPendingInvites.value.filter(i => i.id !== inviteId)
+    toast.add({ title: 'Invitation annulee', color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Impossible d\'annuler l\'invitation', color: 'error' })
+  } finally {
+    cancellingInviteIds.value = cancellingInviteIds.value.filter(id => id !== inviteId)
+  }
+}
+
+// Charger le lien d'invitation et les invitations en attente quand la modal s'ouvre
 watch(isInviteModalOpen, async (isOpen) => {
-  if (isOpen && !inviteLink.value) {
-    await fetchInviteLink()
+  if (isOpen) {
+    if (!inviteLink.value) {
+      await fetchInviteLink()
+    }
+    await fetchGroupPendingInvites()
   }
 })
 
@@ -896,6 +935,36 @@ function canKickMember(member: GroupMember): boolean {
               <p class="text-xs text-muted mt-2">
                 L'utilisateur devra accepter l'invitation pour rejoindre le groupe.
               </p>
+            </div>
+
+            <!-- Invitations en attente -->
+            <div v-if="isLoadingGroupPendingInvites" class="flex items-center gap-2 text-muted">
+              <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+              <span>Chargement des invitations...</span>
+            </div>
+            <div v-else-if="groupPendingInvites.length > 0">
+              <h3 class="text-sm font-medium mb-2">Invitations en attente ({{ groupPendingInvites.length }})</h3>
+              <div class="space-y-2">
+                <div
+                  v-for="invite in groupPendingInvites"
+                  :key="invite.id"
+                  class="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                >
+                  <div>
+                    <span class="font-medium">{{ invite.username }}</span>
+                    <span class="text-xs text-muted ml-2">invite par {{ invite.invitedByUsername }}</span>
+                  </div>
+                  <UButton
+                    icon="i-lucide-x"
+                    size="xs"
+                    variant="ghost"
+                    color="error"
+                    title="Annuler l'invitation"
+                    :loading="cancellingInviteIds.includes(invite.id)"
+                    @click="cancelPendingInvite(invite.id)"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
