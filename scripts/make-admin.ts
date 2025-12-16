@@ -1,14 +1,28 @@
 import Database from 'better-sqlite3'
 import { join } from 'path'
+import { existsSync } from 'fs'
 
 const username = process.argv[2]
 
 if (!username) {
-  console.error('Usage: npx tsx scripts/make-admin.ts <username>')
+  console.error('Usage: npm run make-admin <username>')
   process.exit(1)
 }
 
-const dbPath = join('/app/data', 'reputation.db')
+// Chercher la base de données dans plusieurs emplacements possibles
+const possiblePaths = [
+  join('/app/data', 'reputation.db'),           // Docker
+  join(process.cwd(), 'data', 'reputation.db'), // Local ./data
+  join(process.cwd(), 'reputation.db')          // Local racine
+]
+
+const dbPath = possiblePaths.find(p => existsSync(p))
+
+if (!dbPath) {
+  console.error('Base de donnees non trouvee. Chemins testes:')
+  possiblePaths.forEach(p => console.error(`  - ${p}`))
+  process.exit(1)
+}
 
 try {
   const db = new Database(dbPath)
