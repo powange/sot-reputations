@@ -11,7 +11,14 @@ export default defineNuxtConfig({
     families: [
       { name: 'DM Sans', provider: 'google' },
       { name: 'Pirata One', provider: 'google' }
-    ]
+    ],
+    defaults: {
+      preload: true
+    },
+    assets: {
+      // Ne pas télécharger les polices pendant le build (utilise le CDN directement)
+      strategy: 'external'
+    }
   },
 
   devtools: {
