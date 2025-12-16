@@ -174,6 +174,7 @@ const selectedFactionKey = ref<string>('')
 const selectedUserIds = ref<number[]>([])
 const selectedCampaignIds = ref<number[]>([])
 const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>('all')
+const ignoreUsersWithoutData = ref(false)
 const searchQuery = ref('')
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
@@ -271,13 +272,20 @@ function formatLastImport(dateStr: string | null): string {
 }
 
 function isEmblemCompletedByAll(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
+  let usersWithData = 0
   for (const user of selectedUsers.value) {
     const progress = emblem.userProgress[user.id]
+    // Si on ignore les utilisateurs sans données et qu'il n'y a pas de progression, on passe
+    if (ignoreUsersWithoutData.value && !progress) {
+      continue
+    }
+    usersWithData++
     if (!progress?.completed) {
       return false
     }
   }
-  return true
+  // Si aucun utilisateur avec données, considérer comme non complété
+  return usersWithData > 0
 }
 
 function filterEmblems<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
@@ -770,6 +778,11 @@ function canKickMember(member: GroupMember): boolean {
             >
               Completes
             </UButton>
+
+            <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
+              <USwitch v-model="ignoreUsersWithoutData" size="sm" />
+              <span class="text-sm text-muted">Ignorer sans donnees</span>
+            </div>
           </div>
         </div>
       </UCard>
