@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt'
-import { getReputationDb } from '../../utils/reputation-db'
+import { getReputationDb, isUserAdmin } from '../../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -45,7 +45,8 @@ export default defineEventHandler(async (event) => {
     user: {
       id: user.id,
       username: user.username,
-      microsoftId: user.microsoft_id || undefined
+      microsoftId: user.microsoft_id || undefined,
+      isAdmin: isUserAdmin(user.id)
     }
   })
 

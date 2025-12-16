@@ -1,6 +1,6 @@
 import { getQuery, sendRedirect } from 'h3'
 import { withQuery } from 'ufo'
-import { getReputationDb } from '../../utils/reputation-db'
+import { getReputationDb, isUserAdmin } from '../../utils/reputation-db'
 
 interface XboxUserTokenResponse {
   Token: string
@@ -176,7 +176,8 @@ export default defineEventHandler(async (event) => {
       user: {
         id: dbUser.id,
         username: dbUser.username,
-        microsoftId: xuid
+        microsoftId: xuid,
+        isAdmin: isUserAdmin(dbUser.id)
       }
     })
 
