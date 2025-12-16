@@ -17,8 +17,20 @@ interface GroupMember {
   lastImportAt: string | null
 }
 
+interface PendingInvite {
+  id: number
+  groupId: number
+  groupUid: string
+  groupName: string
+  userId: number
+  invitedBy: number
+  invitedByUsername: string
+  createdAt: string
+}
+
 export function useGroups() {
   const groups = useState<Group[]>('user-groups', () => [])
+  const pendingInvites = useState<PendingInvite[]>('pending-invites', () => [])
 
   async function fetchGroups() {
     try {
@@ -65,13 +77,44 @@ export function useGroups() {
     groups.value = groups.value.filter(g => g.uid !== uid)
   }
 
+  async function fetchPendingInvites() {
+    try {
+      const response = await $fetch<PendingInvite[]>('/api/me/pending-invites')
+      pendingInvites.value = response
+    } catch {
+      pendingInvites.value = []
+    }
+  }
+
+  async function acceptInvite(inviteId: number) {
+    const response = await $fetch<{ success: boolean, message: string }>(`/api/pending-invites/${inviteId}/accept`, {
+      method: 'POST'
+    })
+    pendingInvites.value = pendingInvites.value.filter(i => i.id !== inviteId)
+    // Recharger les groupes pour inclure le nouveau
+    await fetchGroups()
+    return response
+  }
+
+  async function rejectInvite(inviteId: number) {
+    const response = await $fetch<{ success: boolean, message: string }>(`/api/pending-invites/${inviteId}/reject`, {
+      method: 'POST'
+    })
+    pendingInvites.value = pendingInvites.value.filter(i => i.id !== inviteId)
+    return response
+  }
+
   return {
     groups: readonly(groups),
+    pendingInvites: readonly(pendingInvites),
     fetchGroups,
     createGroup,
     deleteGroup,
     inviteMember,
     promoteMember,
-    leaveGroup
+    leaveGroup,
+    fetchPendingInvites,
+    acceptInvite,
+    rejectInvite
   }
 }

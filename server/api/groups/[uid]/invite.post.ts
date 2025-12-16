@@ -1,4 +1,4 @@
-import { getGroupByUid, isGroupModerator, isGroupMember, getUserByUsername, addGroupMember } from '../../../utils/reputation-db'
+import { getGroupByUid, isGroupModerator, isGroupMember, getUserByUsername, createPendingInvite, hasPendingInvite } from '../../../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user
@@ -61,10 +61,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  addGroupMember(group.id, invitedUser.id, 'member')
+  // Vérifier qu'il n'a pas déjà une invitation en attente
+  if (hasPendingInvite(group.id, invitedUser.id)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Une invitation est deja en attente pour cet utilisateur'
+    })
+  }
+
+  createPendingInvite(group.id, invitedUser.id, user.id)
 
   return {
     success: true,
-    message: `${username} a ete ajoute au groupe`
+    message: `Invitation envoyee a ${username}`
   }
 })

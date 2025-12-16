@@ -116,12 +116,27 @@ export function getReputationDb(): Database.Database {
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    -- Invitations en attente (par pseudo)
+    CREATE TABLE IF NOT EXISTS group_pending_invites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      invited_by INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(group_id, user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
     CREATE INDEX IF NOT EXISTS idx_group_invites_code ON group_invites(code);
     CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
+    CREATE INDEX IF NOT EXISTS idx_group_pending_invites_user ON group_pending_invites(user_id);
+    CREATE INDEX IF NOT EXISTS idx_group_pending_invites_group ON group_pending_invites(group_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -750,6 +765,94 @@ export function getUserById(userId: number): UserInfo | null {
     SELECT id, username, last_import_at as lastImportAt FROM users WHERE id = ?
   `).get(userId) as UserInfo | undefined
   return row || null
+}
+
+// ============ INVITATIONS EN ATTENTE ============
+
+export interface PendingInvite {
+  id: number
+  groupId: number
+  groupUid: string
+  groupName: string
+  userId: number
+  invitedBy: number
+  invitedByUsername: string
+  createdAt: string
+}
+
+export function createPendingInvite(groupId: number, userId: number, invitedBy: number): void {
+  const db = getReputationDb()
+  db.prepare(`
+    INSERT INTO group_pending_invites (group_id, user_id, invited_by)
+    VALUES (?, ?, ?)
+  `).run(groupId, userId, invitedBy)
+}
+
+export function hasPendingInvite(groupId: number, userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT id FROM group_pending_invites WHERE group_id = ? AND user_id = ?
+  `).get(groupId, userId)
+  return !!row
+}
+
+export function getPendingInvitesForUser(userId: number): PendingInvite[] {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT
+      pi.id,
+      pi.group_id as groupId,
+      g.uid as groupUid,
+      g.name as groupName,
+      pi.user_id as userId,
+      pi.invited_by as invitedBy,
+      u.username as invitedByUsername,
+      pi.created_at as createdAt
+    FROM group_pending_invites pi
+    JOIN groups g ON g.id = pi.group_id
+    JOIN users u ON u.id = pi.invited_by
+    WHERE pi.user_id = ?
+    ORDER BY pi.created_at DESC
+  `).all(userId) as PendingInvite[]
+}
+
+export function getPendingInvite(id: number): PendingInvite | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT
+      pi.id,
+      pi.group_id as groupId,
+      g.uid as groupUid,
+      g.name as groupName,
+      pi.user_id as userId,
+      pi.invited_by as invitedBy,
+      u.username as invitedByUsername,
+      pi.created_at as createdAt
+    FROM group_pending_invites pi
+    JOIN groups g ON g.id = pi.group_id
+    JOIN users u ON u.id = pi.invited_by
+    WHERE pi.id = ?
+  `).get(id) as PendingInvite | undefined
+  return row || null
+}
+
+export function deletePendingInvite(id: number): void {
+  const db = getReputationDb()
+  db.prepare('DELETE FROM group_pending_invites WHERE id = ?').run(id)
+}
+
+export function acceptPendingInvite(inviteId: number): void {
+  const db = getReputationDb()
+  const invite = getPendingInvite(inviteId)
+  if (!invite) return
+
+  const transaction = db.transaction(() => {
+    // Ajouter comme membre
+    addGroupMember(invite.groupId, invite.userId, 'member')
+    // Supprimer l'invitation
+    deletePendingInvite(inviteId)
+  })
+  transaction()
 }
 
 // Récupère les réputations pour un groupe (seulement les membres du groupe)

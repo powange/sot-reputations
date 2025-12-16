@@ -3,7 +3,7 @@ type GroupRole = 'chef' | 'moderator' | 'member'
 
 const toast = useToast()
 const { user, isAuthenticated, isLoading, loginWithMicrosoft } = useAuth()
-const { groups, fetchGroups, createGroup } = useGroups()
+const { groups, pendingInvites, fetchGroups, createGroup, fetchPendingInvites, acceptInvite, rejectInvite } = useGroups()
 
 // Labels des rôles
 const roleLabels: Record<GroupRole, string> = {
@@ -33,12 +33,57 @@ const isCreateGroupModalOpen = ref(false)
 const newGroupName = ref('')
 const isCreatingGroup = ref(false)
 
-// Charger les groupes si connecté
+// Charger les groupes et invitations si connecté
 watch(isAuthenticated, async (authenticated) => {
   if (authenticated) {
-    await fetchGroups()
+    await Promise.all([fetchGroups(), fetchPendingInvites()])
   }
 }, { immediate: true })
+
+// Gestion des invitations
+const processingInvites = ref<number[]>([])
+
+async function handleAcceptInvite(inviteId: number) {
+  processingInvites.value.push(inviteId)
+  try {
+    const response = await acceptInvite(inviteId)
+    toast.add({
+      title: 'Invitation acceptee',
+      description: response.message,
+      color: 'success'
+    })
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string }, message?: string }
+    toast.add({
+      title: 'Erreur',
+      description: err.data?.message || err.message || 'Erreur lors de l\'acceptation',
+      color: 'error'
+    })
+  } finally {
+    processingInvites.value = processingInvites.value.filter(id => id !== inviteId)
+  }
+}
+
+async function handleRejectInvite(inviteId: number) {
+  processingInvites.value.push(inviteId)
+  try {
+    await rejectInvite(inviteId)
+    toast.add({
+      title: 'Invitation refusee',
+      description: 'L\'invitation a ete refusee',
+      color: 'info'
+    })
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string }, message?: string }
+    toast.add({
+      title: 'Erreur',
+      description: err.data?.message || err.message || 'Erreur lors du refus',
+      color: 'error'
+    })
+  } finally {
+    processingInvites.value = processingInvites.value.filter(id => id !== inviteId)
+  }
+}
 
 async function handleCreateGroup() {
   if (!newGroupName.value.trim()) {
@@ -138,6 +183,48 @@ async function handleCreateGroup() {
           label="Creer un groupe"
           @click="isCreateGroupModalOpen = true"
         />
+      </div>
+
+      <!-- Invitations en attente -->
+      <div v-if="pendingInvites.length > 0" class="mb-8">
+        <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+          <UIcon name="i-lucide-mail" class="w-5 h-5 text-primary" />
+          Invitations en attente
+          <UBadge :label="String(pendingInvites.length)" color="primary" size="sm" />
+        </h2>
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <UCard v-for="invite in pendingInvites" :key="invite.id" class="border-2 border-primary/30">
+            <div class="space-y-3">
+              <div>
+                <h3 class="font-semibold text-lg">
+                  {{ invite.groupName }}
+                </h3>
+                <p class="text-sm text-muted">
+                  Invite par {{ invite.invitedByUsername }}
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <UButton
+                  label="Accepter"
+                  icon="i-lucide-check"
+                  color="success"
+                  size="sm"
+                  :loading="processingInvites.includes(invite.id)"
+                  @click="handleAcceptInvite(invite.id)"
+                />
+                <UButton
+                  label="Refuser"
+                  icon="i-lucide-x"
+                  color="error"
+                  variant="outline"
+                  size="sm"
+                  :loading="processingInvites.includes(invite.id)"
+                  @click="handleRejectInvite(invite.id)"
+                />
+              </div>
+            </div>
+          </UCard>
+        </div>
       </div>
 
       <!-- Liste des groupes -->
