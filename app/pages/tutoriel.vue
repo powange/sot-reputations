@@ -228,9 +228,7 @@ const bookmarkletCode = computed(() => {
         });
         const result = await response.json();
         if (result.success && result.code) {
-          window.open(SITE_URL + '/import/' + result.code, '_blank');
-          overlay.remove();
-          style.remove();
+          window.location.href = SITE_URL + '/import/' + result.code;
         } else {
           throw new Error('Erreur serveur');
         }
