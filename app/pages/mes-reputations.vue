@@ -172,9 +172,9 @@ function filterEmblems<T extends { progress: EmblemProgress | null }>(emblems: T
     } else {
       // Non complétés
       if (!completed) {
-        // Si ignoreWithoutData, n'afficher que ceux avec une progression
+        // Si ignoreWithoutData, n'afficher que ceux avec des données (progress non null)
         if (ignoreWithoutData.value) {
-          return emblem.progress && emblem.progress.value > 0
+          return emblem.progress !== null
         }
         return true
       }
