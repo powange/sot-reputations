@@ -109,7 +109,7 @@ async function handleLogout() {
               @click="handleLogout"
             />
           </template>
-          <UColorModeButton />
+          <UColorModeSwitch />
         </div>
       </template>
     </UHeader>

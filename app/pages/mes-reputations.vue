@@ -93,6 +93,7 @@ const allFactionsSelected = computed(() => selectedFactionKey.value === '')
 
 const user = computed(() => data.value?.user)
 const factions = computed(() => data.value?.factions || [])
+const hasImportedData = computed(() => !!user.value?.lastImportAt)
 
 const selectedFaction = computed(() => {
   return factions.value.find(f => f.key === selectedFactionKey.value)
@@ -402,7 +403,7 @@ async function handleImport() {
             </UButton>
           </div>
 
-          <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
+          <div v-if="!isSearchActive && hasImportedData" class="flex items-center gap-3 flex-wrap">
             <span class="text-sm font-medium text-muted">Filtrer succes :</span>
             <UButton
               :color="emblemCompletionFilter === 'all' ? 'primary' : 'neutral'"
