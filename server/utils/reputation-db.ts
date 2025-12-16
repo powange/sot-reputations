@@ -767,6 +767,12 @@ export function getUserById(userId: number): UserInfo | null {
   return row || null
 }
 
+export function deleteUserReputationData(userId: number): void {
+  const db = getReputationDb()
+  db.prepare('DELETE FROM user_emblems WHERE user_id = ?').run(userId)
+  db.prepare('UPDATE users SET last_import_at = NULL WHERE id = ?').run(userId)
+}
+
 // ============ INVITATIONS EN ATTENTE ============
 
 export interface PendingInvite {

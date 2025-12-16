@@ -82,6 +82,10 @@ const isImportModalOpen = ref(false)
 const importJsonText = ref('')
 const isImporting = ref(false)
 
+// Modal Suppression
+const isDeleteModalOpen = ref(false)
+const isDeleting = ref(false)
+
 // Filtres
 const selectedFactionKey = ref<string>('')
 const selectedCampaignIds = ref<number[]>([])
@@ -301,6 +305,21 @@ async function handleImport() {
     isImporting.value = false
   }
 }
+
+async function handleDelete() {
+  isDeleting.value = true
+  try {
+    await $fetch('/api/my-reputations', { method: 'DELETE' })
+    toast.add({ title: 'Succes', description: 'Donnees supprimees', color: 'success' })
+    isDeleteModalOpen.value = false
+    await refresh()
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+  } finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -321,11 +340,21 @@ async function handleImport() {
         </p>
       </div>
 
-      <UButton
-        icon="i-lucide-upload"
-        label="Importer"
-        @click="isImportModalOpen = true"
-      />
+      <div class="flex gap-2">
+        <UButton
+          v-if="hasImportedData"
+          icon="i-lucide-trash-2"
+          label="Supprimer"
+          color="error"
+          variant="outline"
+          @click="isDeleteModalOpen = true"
+        />
+        <UButton
+          icon="i-lucide-upload"
+          label="Importer"
+          @click="isImportModalOpen = true"
+        />
+      </div>
     </div>
 
     <!-- Message si pas de données -->
@@ -519,6 +548,31 @@ async function handleImport() {
             <div class="flex justify-end gap-2">
               <UButton label="Annuler" color="neutral" variant="outline" @click="isImportModalOpen = false" />
               <UButton label="Importer" icon="i-lucide-upload" :loading="isImporting" @click="handleImport" />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal Suppression -->
+    <UModal v-model:open="isDeleteModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-xl font-semibold text-error">Supprimer mes donnees</h2>
+          </template>
+          <div class="space-y-4">
+            <UAlert icon="i-lucide-alert-triangle" color="error" title="Attention">
+              <template #description>
+                Cette action est irreversible. Toutes vos donnees de progression seront supprimees.
+              </template>
+            </UAlert>
+            <p>Etes-vous sur de vouloir supprimer toutes vos donnees de reputation ?</p>
+          </div>
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton label="Annuler" color="neutral" variant="outline" @click="isDeleteModalOpen = false" />
+              <UButton label="Supprimer" icon="i-lucide-trash-2" color="error" :loading="isDeleting" @click="handleDelete" />
             </div>
           </template>
         </UCard>
