@@ -36,21 +36,19 @@ watchEffect(() => {
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
-      <UCard
-        as="NuxtLink"
-        to="/admin/utilisateurs"
-        class="hover:ring-2 hover:ring-primary transition-all"
-      >
-        <div class="flex items-center gap-4">
-          <div class="p-3 rounded-lg bg-primary/10">
-            <UIcon name="i-lucide-users" class="w-6 h-6 text-primary" />
+      <NuxtLink to="/admin/utilisateurs" class="block">
+        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-lg bg-primary/10">
+              <UIcon name="i-lucide-users" class="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 class="font-semibold">Utilisateurs</h3>
+              <p class="text-sm text-muted">Voir tous les utilisateurs et leurs groupes</p>
+            </div>
           </div>
-          <div>
-            <h3 class="font-semibold">Utilisateurs</h3>
-            <p class="text-sm text-muted">Voir tous les utilisateurs et leurs groupes</p>
-          </div>
-        </div>
-      </UCard>
+        </UCard>
+      </NuxtLink>
     </div>
   </UContainer>
 </template>
