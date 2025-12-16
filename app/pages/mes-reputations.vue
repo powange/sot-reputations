@@ -186,44 +186,51 @@ function filterEmblems<T extends { progress: EmblemProgress | null }>(emblems: T
   })
 }
 
-const columns = computed<TableColumn<TableRow>[]>(() => [
-  {
-    accessorKey: 'name',
-    header: 'Succes',
-    cell: ({ row }) => {
-      const children = []
+const columns = computed<TableColumn<TableRow>[]>(() => {
+  const cols: TableColumn<TableRow>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Succes',
+      cell: ({ row }) => {
+        const children = []
 
-      if (row.original.image) {
-        children.push(h('img', {
-          src: row.original.image,
-          alt: row.original.name,
-          class: 'w-10 h-10 object-contain shrink-0'
-        }))
+        if (row.original.image) {
+          children.push(h('img', {
+            src: row.original.image,
+            alt: row.original.name,
+            class: 'w-10 h-10 object-contain shrink-0'
+          }))
+        }
+
+        children.push(h('div', {}, [
+          h('div', { class: 'font-medium' }, row.original.name),
+          h('div', { class: 'text-xs text-muted' }, row.original.description)
+        ]))
+
+        return h('div', { class: 'flex items-center gap-3' }, children)
       }
-
-      children.push(h('div', {}, [
-        h('div', { class: 'font-medium' }, row.original.name),
-        h('div', { class: 'text-xs text-muted' }, row.original.description)
-      ]))
-
-      return h('div', { class: 'flex items-center gap-3' }, children)
     }
-  },
-  {
-    accessorKey: 'progress',
-    header: 'Progression',
-    cell: ({ row }) => {
-      let colorClass = 'text-muted'
-      if (row.original.completed) {
-        colorClass = 'text-success font-medium'
-      } else if (row.original.hasProgress) {
-        colorClass = 'text-warning'
+  ]
+
+  if (hasImportedData.value) {
+    cols.push({
+      accessorKey: 'progress',
+      header: 'Progression',
+      cell: ({ row }) => {
+        let colorClass = 'text-muted'
+        if (row.original.completed) {
+          colorClass = 'text-success font-medium'
+        } else if (row.original.hasProgress) {
+          colorClass = 'text-warning'
+        }
+
+        return h('span', { class: colorClass }, row.original.progress)
       }
-
-      return h('span', { class: colorClass }, row.original.progress)
-    }
+    })
   }
-])
+
+  return cols
+})
 
 function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null }>): TableRow[] {
   const filteredEmblems = filterEmblems(emblems)
@@ -461,6 +468,21 @@ async function handleDelete() {
           </div>
         </div>
       </UCard>
+
+      <!-- Message si pas de données importées -->
+      <UAlert
+        v-if="!hasImportedData"
+        icon="i-lucide-info"
+        color="info"
+        title="Importez vos donnees"
+        class="mb-6"
+      >
+        <template #description>
+          Pour voir votre progression sur chaque succes,
+          <button class="underline font-medium" @click="isImportModalOpen = true">importez vos donnees</button>
+          ou consultez le <NuxtLink to="/tutoriel" class="underline font-medium">tutoriel</NuxtLink>.
+        </template>
+      </UAlert>
 
       <!-- Résultats de recherche -->
       <template v-if="isSearchActive">
