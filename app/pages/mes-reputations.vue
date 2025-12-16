@@ -90,6 +90,7 @@ const isDeleting = ref(false)
 const selectedFactionKey = ref<string>('')
 const selectedCampaignIds = ref<number[]>([])
 const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>('all')
+const ignoreWithoutData = ref(false)
 const searchQuery = ref('')
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
@@ -101,18 +102,6 @@ const hasImportedData = computed(() => !!user.value?.lastImportAt)
 
 const selectedFaction = computed(() => {
   return factions.value.find(f => f.key === selectedFactionKey.value)
-})
-
-watch(selectedFaction, (faction) => {
-  if (faction?.campaigns) {
-    selectedCampaignIds.value = faction.campaigns.map(c => c.id)
-  }
-}, { immediate: true })
-
-const hasMultipleCampaigns = computed(() => {
-  if (!selectedFaction.value?.campaigns) return false
-  return selectedFaction.value.campaigns.length > 1 ||
-    (selectedFaction.value.campaigns.length === 1 && selectedFaction.value.campaigns[0].key !== 'default')
 })
 
 const filteredCampaigns = computed(() => {
@@ -181,7 +170,15 @@ function filterEmblems<T extends { progress: EmblemProgress | null }>(emblems: T
     if (emblemCompletionFilter.value === 'complete') {
       return completed
     } else {
-      return !completed
+      // Non complétés
+      if (!completed) {
+        // Si ignoreWithoutData, n'afficher que ceux avec une progression
+        if (ignoreWithoutData.value) {
+          return emblem.progress && emblem.progress.value > 0
+        }
+        return true
+      }
+      return false
     }
   })
 }
@@ -259,22 +256,6 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       hasProgress
     }
   })
-}
-
-function toggleCampaign(campaignId: number) {
-  const allCampaignIds = selectedFaction.value?.campaigns.map(c => c.id) || []
-  const allSelected = selectedCampaignIds.value.length === allCampaignIds.length
-
-  if (allSelected) {
-    selectedCampaignIds.value = [campaignId]
-  } else {
-    const index = selectedCampaignIds.value.indexOf(campaignId)
-    if (index === -1) {
-      selectedCampaignIds.value.push(campaignId)
-    } else if (selectedCampaignIds.value.length > 1) {
-      selectedCampaignIds.value.splice(index, 1)
-    }
-  }
 }
 
 async function handleImport() {
@@ -388,86 +369,21 @@ async function handleDelete() {
 
     <template v-else>
       <!-- Filtres -->
-      <UCard class="mb-6">
-        <div class="space-y-4">
-          <div class="flex items-center gap-3">
-            <span class="text-sm font-medium text-muted">Recherche :</span>
-            <UInput
-              v-model="searchQuery"
-              placeholder="Rechercher un succes..."
-              icon="i-lucide-search"
-              class="max-w-xs"
-            />
+      <ReputationFilters
+        v-model:search-query="searchQuery"
+        v-model:selected-faction-key="selectedFactionKey"
+        v-model:selected-campaign-ids="selectedCampaignIds"
+        v-model:emblem-completion-filter="emblemCompletionFilter"
+        :factions="factions"
+        :show-completion-filter="hasImportedData"
+      >
+        <template #completion-extra>
+          <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
+            <USwitch v-model="ignoreWithoutData" size="sm" />
+            <span class="text-sm text-muted">Ignorer sans donnees</span>
           </div>
-
-          <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
-            <span class="text-sm font-medium text-muted">Faction :</span>
-            <UButton
-              :color="allFactionsSelected ? 'primary' : 'neutral'"
-              :variant="allFactionsSelected ? 'solid' : 'outline'"
-              size="sm"
-              @click="selectedFactionKey = ''"
-            >
-              Toutes
-            </UButton>
-            <UButton
-              v-for="faction in factions"
-              :key="faction.key"
-              :color="selectedFactionKey === faction.key ? 'primary' : 'neutral'"
-              :variant="selectedFactionKey === faction.key ? 'solid' : 'outline'"
-              size="sm"
-              @click="selectedFactionKey = faction.key"
-            >
-              {{ faction.name }}
-            </UButton>
-          </div>
-
-          <div
-            v-if="!isSearchActive && !allFactionsSelected && hasMultipleCampaigns"
-            class="flex items-center gap-3 flex-wrap"
-          >
-            <span class="text-sm font-medium text-muted">Campagnes :</span>
-            <UButton
-              v-for="campaign in selectedFaction?.campaigns"
-              :key="campaign.id"
-              :color="selectedCampaignIds.includes(campaign.id) ? 'info' : 'neutral'"
-              :variant="selectedCampaignIds.includes(campaign.id) ? 'solid' : 'outline'"
-              size="sm"
-              @click="toggleCampaign(campaign.id)"
-            >
-              {{ campaign.name }}
-            </UButton>
-          </div>
-
-          <div v-if="!isSearchActive && hasImportedData" class="flex items-center gap-3 flex-wrap">
-            <span class="text-sm font-medium text-muted">Filtrer succes :</span>
-            <UButton
-              :color="emblemCompletionFilter === 'all' ? 'primary' : 'neutral'"
-              :variant="emblemCompletionFilter === 'all' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'all'"
-            >
-              Tous
-            </UButton>
-            <UButton
-              :color="emblemCompletionFilter === 'incomplete' ? 'warning' : 'neutral'"
-              :variant="emblemCompletionFilter === 'incomplete' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'incomplete'"
-            >
-              Non completes
-            </UButton>
-            <UButton
-              :color="emblemCompletionFilter === 'complete' ? 'success' : 'neutral'"
-              :variant="emblemCompletionFilter === 'complete' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'complete'"
-            >
-              Completes
-            </UButton>
-          </div>
-        </div>
-      </UCard>
+        </template>
+      </ReputationFilters>
 
       <!-- Message si pas de données importées -->
       <UAlert

@@ -200,18 +200,6 @@ const selectedFaction = computed(() => {
   return factions.value.find(f => f.key === selectedFactionKey.value)
 })
 
-watch(selectedFaction, (faction) => {
-  if (faction?.campaigns) {
-    selectedCampaignIds.value = faction.campaigns.map(c => c.id)
-  }
-}, { immediate: true })
-
-const hasMultipleCampaigns = computed(() => {
-  if (!selectedFaction.value?.campaigns) return false
-  return selectedFaction.value.campaigns.length > 1 ||
-    (selectedFaction.value.campaigns.length === 1 && selectedFaction.value.campaigns[0].key !== 'default')
-})
-
 const filteredCampaigns = computed(() => {
   if (!selectedFaction.value?.campaigns) return []
   return selectedFaction.value.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
@@ -393,22 +381,6 @@ function toggleUser(userId: number) {
     selectedUserIds.value.push(userId)
   } else if (selectedUserIds.value.length > 1) {
     selectedUserIds.value.splice(index, 1)
-  }
-}
-
-function toggleCampaign(campaignId: number) {
-  const allCampaignIds = selectedFaction.value?.campaigns.map(c => c.id) || []
-  const allSelected = selectedCampaignIds.value.length === allCampaignIds.length
-
-  if (allSelected) {
-    selectedCampaignIds.value = [campaignId]
-  } else {
-    const index = selectedCampaignIds.value.indexOf(campaignId)
-    if (index === -1) {
-      selectedCampaignIds.value.push(campaignId)
-    } else if (selectedCampaignIds.value.length > 1) {
-      selectedCampaignIds.value.splice(index, 1)
-    }
   }
 }
 
@@ -684,58 +656,16 @@ function canKickMember(member: GroupMember): boolean {
 
     <template v-else>
       <!-- Filtres -->
-      <UCard class="mb-6">
-        <div class="space-y-4">
-          <div class="flex items-center gap-3">
-            <span class="text-sm font-medium text-muted">Recherche :</span>
-            <UInput
-              v-model="searchQuery"
-              placeholder="Rechercher un succes..."
-              icon="i-lucide-search"
-              class="max-w-xs"
-            />
-          </div>
-
-          <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
-            <span class="text-sm font-medium text-muted">Faction :</span>
-            <UButton
-              :color="allFactionsSelected ? 'primary' : 'neutral'"
-              :variant="allFactionsSelected ? 'solid' : 'outline'"
-              size="sm"
-              @click="selectedFactionKey = ''"
-            >
-              Toutes
-            </UButton>
-            <UButton
-              v-for="faction in factions"
-              :key="faction.key"
-              :color="selectedFactionKey === faction.key ? 'primary' : 'neutral'"
-              :variant="selectedFactionKey === faction.key ? 'solid' : 'outline'"
-              size="sm"
-              @click="selectedFactionKey = faction.key"
-            >
-              {{ faction.name }}
-            </UButton>
-          </div>
-
-          <div
-            v-if="!isSearchActive && !allFactionsSelected && hasMultipleCampaigns"
-            class="flex items-center gap-3 flex-wrap"
-          >
-            <span class="text-sm font-medium text-muted">Campagnes :</span>
-            <UButton
-              v-for="campaign in selectedFaction?.campaigns"
-              :key="campaign.id"
-              :color="selectedCampaignIds.includes(campaign.id) ? 'info' : 'neutral'"
-              :variant="selectedCampaignIds.includes(campaign.id) ? 'solid' : 'outline'"
-              size="sm"
-              @click="toggleCampaign(campaign.id)"
-            >
-              {{ campaign.name }}
-            </UButton>
-          </div>
-
-          <div class="flex items-center gap-3 flex-wrap">
+      <ReputationFilters
+        v-model:search-query="searchQuery"
+        v-model:selected-faction-key="selectedFactionKey"
+        v-model:selected-campaign-ids="selectedCampaignIds"
+        v-model:emblem-completion-filter="emblemCompletionFilter"
+        :factions="factions"
+        :show-completion-filter="true"
+      >
+        <template #extra-filters="{ isSearchActive: searchActive }">
+          <div v-if="!searchActive" class="flex items-center gap-3 flex-wrap">
             <span class="text-sm font-medium text-muted">Utilisateurs :</span>
             <UTooltip
               v-for="u in users"
@@ -752,41 +682,15 @@ function canKickMember(member: GroupMember): boolean {
               </UButton>
             </UTooltip>
           </div>
+        </template>
 
-          <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
-            <span class="text-sm font-medium text-muted">Filtrer succes :</span>
-            <UButton
-              :color="emblemCompletionFilter === 'all' ? 'primary' : 'neutral'"
-              :variant="emblemCompletionFilter === 'all' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'all'"
-            >
-              Tous
-            </UButton>
-            <UButton
-              :color="emblemCompletionFilter === 'incomplete' ? 'warning' : 'neutral'"
-              :variant="emblemCompletionFilter === 'incomplete' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'incomplete'"
-            >
-              Non completes
-            </UButton>
-            <UButton
-              :color="emblemCompletionFilter === 'complete' ? 'success' : 'neutral'"
-              :variant="emblemCompletionFilter === 'complete' ? 'solid' : 'outline'"
-              size="sm"
-              @click="emblemCompletionFilter = 'complete'"
-            >
-              Completes
-            </UButton>
-
-            <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
-              <USwitch v-model="ignoreUsersWithoutData" size="sm" />
-              <span class="text-sm text-muted">Ignorer sans donnees</span>
-            </div>
+        <template #completion-extra>
+          <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
+            <USwitch v-model="ignoreUsersWithoutData" size="sm" />
+            <span class="text-sm text-muted">Ignorer sans donnees</span>
           </div>
-        </div>
-      </UCard>
+        </template>
+      </ReputationFilters>
 
       <!-- Résultats de recherche -->
       <template v-if="isSearchActive">
