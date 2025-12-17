@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt'
-import { getReputationDb, importReputationData } from '../utils/reputation-db'
+import { getReputationDb, importReputationData, getGroupsByUserId } from '../utils/reputation-db'
+import { broadcastToGroups } from '../utils/sse'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -72,6 +73,18 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: isValidationError ? 400 : 500,
       message
+    })
+  }
+
+  // Notifier les groupes de l'utilisateur via SSE
+  const userGroups = getGroupsByUserId(userId)
+  if (userGroups.length > 0) {
+    const groupUids = userGroups.map(g => g.uid)
+    const importerUsername = sessionUser?.username || username
+    broadcastToGroups(groupUids, 'member-updated', {
+      userId,
+      username: importerUsername,
+      timestamp: Date.now()
     })
   }
 

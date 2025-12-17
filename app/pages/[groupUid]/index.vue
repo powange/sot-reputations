@@ -631,6 +631,44 @@ function canKickMember(member: GroupMember): boolean {
   if (userRole.value === 'moderator' && member.role === 'moderator') return false
   return true
 }
+
+// Connexion SSE pour les mises à jour en temps réel
+const eventSource = ref<EventSource | null>(null)
+
+function connectSSE() {
+  if (!import.meta.client) return
+
+  eventSource.value = new EventSource(`/api/sse/groups/${groupUid}`)
+
+  eventSource.value.addEventListener('member-updated', async (event) => {
+    const data = JSON.parse(event.data)
+    // Ne pas rafraîchir si c'est nous qui avons importé
+    if (data.userId !== user.value?.id) {
+      toast.add({
+        title: 'Donnees mises a jour',
+        description: `${data.username} a importe ses donnees`,
+        color: 'info'
+      })
+      await refresh()
+    }
+  })
+
+  eventSource.value.addEventListener('error', () => {
+    // Reconnexion automatique après 5 secondes en cas d'erreur
+    eventSource.value?.close()
+    setTimeout(() => {
+      connectSSE()
+    }, 5000)
+  })
+}
+
+onMounted(() => {
+  connectSSE()
+})
+
+onUnmounted(() => {
+  eventSource.value?.close()
+})
 </script>
 
 <template>
