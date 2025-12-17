@@ -85,6 +85,7 @@ interface TableRow {
 }
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const { user, isAuthenticated } = useAuth()
 const { leaveGroup } = useGroups()
@@ -181,13 +182,28 @@ const dropdownItems = computed(() => {
   return items
 })
 
-// Filtres
-const selectedFactionKey = ref<string>('')
-const selectedUserIds = ref<number[]>([])
-const selectedCampaignIds = ref<number[]>([])
-const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>('all')
-const ignoreUsersWithoutData = ref(false)
-const searchQuery = ref('')
+// Filtres - initialisés depuis l'URL
+const selectedFactionKey = ref<string>((route.query.faction as string) || '')
+const selectedUserIds = ref<number[]>(
+  route.query.users
+    ? (route.query.users as string).split(',').map(Number).filter(n => !isNaN(n))
+    : []
+)
+const selectedCampaignIds = ref<number[]>(
+  route.query.campaigns
+    ? (route.query.campaigns as string).split(',').map(Number).filter(n => !isNaN(n))
+    : []
+)
+const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>(
+  (['all', 'incomplete', 'complete'].includes(route.query.completion as string)
+    ? route.query.completion as 'all' | 'incomplete' | 'complete'
+    : 'all')
+)
+const ignoreUsersWithoutData = ref(route.query.ignoreEmpty === '1')
+const searchQuery = ref((route.query.search as string) || '')
+
+// Flag pour savoir si les users ont été initialisés depuis l'URL
+const usersInitializedFromUrl = route.query.users !== undefined
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
 const allFactionsSelected = computed(() => selectedFactionKey.value === '')
@@ -200,12 +216,47 @@ const isChef = computed(() => userRole.value === 'chef')
 const isModerator = computed(() => userRole.value === 'chef' || userRole.value === 'moderator')
 const canManageMembers = computed(() => isModerator.value)
 
-// Initialiser les utilisateurs sélectionnés
+// Initialiser les utilisateurs sélectionnés (si pas déjà initialisé depuis l'URL)
 watch(users, (newUsers) => {
-  if (newUsers.length > 0 && selectedUserIds.value.length === 0) {
+  if (newUsers.length > 0 && selectedUserIds.value.length === 0 && !usersInitializedFromUrl) {
     selectedUserIds.value = newUsers.map(u => u.id)
   }
 }, { immediate: true })
+
+// Synchroniser les filtres avec l'URL
+watch(
+  [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, selectedUserIds],
+  () => {
+    const query: Record<string, string> = {}
+
+    if (searchQuery.value.trim()) {
+      query.search = searchQuery.value.trim()
+    }
+    if (selectedFactionKey.value) {
+      query.faction = selectedFactionKey.value
+    }
+    if (selectedCampaignIds.value.length > 0) {
+      query.campaigns = selectedCampaignIds.value.join(',')
+    }
+    if (emblemCompletionFilter.value !== 'all') {
+      query.completion = emblemCompletionFilter.value
+    }
+    if (ignoreUsersWithoutData.value) {
+      query.ignoreEmpty = '1'
+    }
+    // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
+    const allUserIds = users.value.map(u => u.id)
+    const allUsersSelected = allUserIds.length > 0 &&
+      selectedUserIds.value.length === allUserIds.length &&
+      allUserIds.every(id => selectedUserIds.value.includes(id))
+    if (!allUsersSelected && selectedUserIds.value.length > 0) {
+      query.users = selectedUserIds.value.join(',')
+    }
+
+    router.replace({ query })
+  },
+  { deep: true }
+)
 
 const selectedFaction = computed(() => {
   return factions.value.find(f => f.key === selectedFactionKey.value)
