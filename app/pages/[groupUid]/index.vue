@@ -200,10 +200,14 @@ const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>(
     : 'all')
 )
 const ignoreUsersWithoutData = ref(route.query.ignoreEmpty === '1')
+const onlyNotCompletedByAnyone = ref(route.query.noOneCompleted === '1')
 const searchQuery = ref((route.query.search as string) || '')
 
 // Flag pour savoir si les users ont été initialisés depuis l'URL
 const usersInitializedFromUrl = route.query.users !== undefined
+
+// Campagnes repliées
+const collapsedCampaigns = ref<Set<number>>(new Set())
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
 const allFactionsSelected = computed(() => selectedFactionKey.value === '')
@@ -225,7 +229,7 @@ watch(users, (newUsers) => {
 
 // Synchroniser les filtres avec l'URL
 watch(
-  [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, selectedUserIds],
+  [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, onlyNotCompletedByAnyone, selectedUserIds],
   () => {
     const query: Record<string, string> = {}
 
@@ -243,6 +247,9 @@ watch(
     }
     if (ignoreUsersWithoutData.value) {
       query.ignoreEmpty = '1'
+    }
+    if (onlyNotCompletedByAnyone.value) {
+      query.noOneCompleted = '1'
     }
     // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
     const allUserIds = users.value.map(u => u.id)
@@ -310,6 +317,120 @@ const selectedUsers = computed(() => {
   return users.value.filter(u => selectedUserIds.value.includes(u.id))
 })
 
+// Fonctions pour sélectionner tous/aucun utilisateur
+function selectAllUsers() {
+  selectedUserIds.value = users.value.map(u => u.id)
+}
+
+function selectNoUsers() {
+  // Garder au moins un utilisateur sélectionné
+  if (users.value.length > 0) {
+    selectedUserIds.value = [users.value[0].id]
+  }
+}
+
+const allUsersSelected = computed(() => {
+  return users.value.length > 0 && selectedUserIds.value.length === users.value.length
+})
+
+// Calculer le nombre total d'emblèmes
+const totalEmblems = computed(() => {
+  let count = 0
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      count += campaign.emblems.length
+    }
+  }
+  return count
+})
+
+// Statistiques de complétion par utilisateur
+const userCompletionStats = computed(() => {
+  const stats: Record<number, { completed: number; total: number; percentage: number }> = {}
+
+  for (const user of users.value) {
+    let completed = 0
+    let total = 0
+
+    for (const faction of factions.value) {
+      for (const campaign of faction.campaigns) {
+        for (const emblem of campaign.emblems) {
+          total++
+          const progress = emblem.userProgress[user.id]
+          if (progress?.completed) {
+            completed++
+          }
+        }
+      }
+    }
+
+    stats[user.id] = {
+      completed,
+      total,
+      percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+    }
+  }
+
+  return stats
+})
+
+// Statistiques du groupe
+const groupStats = computed(() => {
+  const selectedUserList = selectedUsers.value
+  if (selectedUserList.length === 0 || totalEmblems.value === 0) {
+    return { completedByAll: 0, averageCompletion: 0, totalEmblems: 0 }
+  }
+
+  let completedByAll = 0
+  let totalCompletions = 0
+
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      for (const emblem of campaign.emblems) {
+        let allCompleted = true
+        let completionCount = 0
+
+        for (const user of selectedUserList) {
+          const progress = emblem.userProgress[user.id]
+          if (progress?.completed) {
+            completionCount++
+          } else {
+            allCompleted = false
+          }
+        }
+
+        if (allCompleted) {
+          completedByAll++
+        }
+        totalCompletions += completionCount
+      }
+    }
+  }
+
+  const averageCompletion = Math.round(
+    (totalCompletions / (totalEmblems.value * selectedUserList.length)) * 100
+  )
+
+  return {
+    completedByAll,
+    averageCompletion,
+    totalEmblems: totalEmblems.value
+  }
+})
+
+// Fonction pour replier/déplier une campagne
+function toggleCampaignCollapse(campaignId: number) {
+  if (collapsedCampaigns.value.has(campaignId)) {
+    collapsedCampaigns.value.delete(campaignId)
+  } else {
+    collapsedCampaigns.value.add(campaignId)
+  }
+}
+
+function isCampaignCollapsed(campaignId: number): boolean {
+  return collapsedCampaigns.value.has(campaignId)
+}
+
 function formatLastImport(dateStr: string | null): string {
   if (!dateStr) return 'Jamais importe'
   const date = new Date(dateStr)
@@ -339,6 +460,16 @@ function isEmblemCompletedByAll(emblem: { userProgress: Record<number, UserEmble
   return usersWithData > 0
 }
 
+function isEmblemCompletedByNone(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
+  for (const user of selectedUsers.value) {
+    const progress = emblem.userProgress[user.id]
+    if (progress?.completed) {
+      return false
+    }
+  }
+  return true
+}
+
 function filterEmblems<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
   if (emblemCompletionFilter.value === 'all') {
     return emblems
@@ -349,7 +480,15 @@ function filterEmblems<T extends { userProgress: Record<number, UserEmblemProgre
     if (emblemCompletionFilter.value === 'complete') {
       return completedByAll
     } else {
-      return !completedByAll
+      // Non complétés
+      if (!completedByAll) {
+        // Si le switch "non complétés par personne" est activé
+        if (onlyNotCompletedByAnyone.value) {
+          return isEmblemCompletedByNone(emblem)
+        }
+        return true
+      }
+      return false
     }
   })
 }
@@ -783,6 +922,22 @@ onUnmounted(() => {
     </div>
 
     <template v-else>
+      <!-- Statistiques du groupe -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-muted/30 rounded-lg p-4">
+          <div class="text-2xl font-bold text-success">{{ groupStats.completedByAll }}</div>
+          <div class="text-sm text-muted">Completes par tous</div>
+        </div>
+        <div class="bg-muted/30 rounded-lg p-4">
+          <div class="text-2xl font-bold text-primary">{{ groupStats.averageCompletion }}%</div>
+          <div class="text-sm text-muted">Completion moyenne</div>
+        </div>
+        <div class="bg-muted/30 rounded-lg p-4">
+          <div class="text-2xl font-bold">{{ groupStats.totalEmblems }}</div>
+          <div class="text-sm text-muted">Emblemes au total</div>
+        </div>
+      </div>
+
       <!-- Filtres -->
       <ReputationFilters
         v-model:search-query="searchQuery"
@@ -795,10 +950,28 @@ onUnmounted(() => {
         <template #extra-filters="{ isSearchActive: searchActive }">
           <div v-if="!searchActive" class="flex items-center gap-3 flex-wrap">
             <span class="text-sm font-medium text-muted">Utilisateurs :</span>
+            <div class="flex gap-1">
+              <UButton
+                size="xs"
+                variant="ghost"
+                :disabled="allUsersSelected"
+                @click="selectAllUsers"
+              >
+                Tous
+              </UButton>
+              <UButton
+                size="xs"
+                variant="ghost"
+                :disabled="selectedUserIds.length <= 1"
+                @click="selectNoUsers"
+              >
+                Aucun
+              </UButton>
+            </div>
             <UTooltip
               v-for="u in users"
               :key="u.id"
-              :text="`Dernier import : ${formatLastImport(u.lastImportAt)}`"
+              :text="`${userCompletionStats[u.id]?.completed || 0}/${userCompletionStats[u.id]?.total || 0} - Dernier import : ${formatLastImport(u.lastImportAt)}`"
             >
               <UButton
                 :color="selectedUserIds.includes(u.id) ? 'success' : 'neutral'"
@@ -807,6 +980,12 @@ onUnmounted(() => {
                 @click="toggleUser(u.id)"
               >
                 {{ u.username }}
+                <UBadge
+                  :label="`${userCompletionStats[u.id]?.percentage || 0}%`"
+                  size="xs"
+                  :color="selectedUserIds.includes(u.id) ? 'white' : 'neutral'"
+                  class="ml-1"
+                />
               </UButton>
             </UTooltip>
           </div>
@@ -816,6 +995,10 @@ onUnmounted(() => {
           <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
             <USwitch v-model="ignoreUsersWithoutData" size="sm" />
             <span class="text-sm text-muted">Ignorer sans donnees</span>
+          </div>
+          <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
+            <USwitch v-model="onlyNotCompletedByAnyone" size="sm" color="warning" />
+            <span class="text-sm text-muted">Non completes par personne</span>
           </div>
         </template>
       </ReputationFilters>
@@ -849,11 +1032,24 @@ onUnmounted(() => {
 
             <template v-for="campaign in campaigns" :key="campaign.id">
               <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-6">
-                <div v-if="campaign.key !== 'default'" class="mb-4">
-                  <h3 class="text-lg font-semibold">{{ campaign.name }}</h3>
-                  <p v-if="campaign.description" class="text-sm text-muted italic">{{ campaign.description }}</p>
+                <div
+                  v-if="campaign.key !== 'default'"
+                  class="mb-4 flex items-center gap-2 cursor-pointer select-none"
+                  @click="toggleCampaignCollapse(campaign.id)"
+                >
+                  <UIcon
+                    :name="isCampaignCollapsed(campaign.id) ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
+                    class="w-5 h-5 text-muted"
+                  />
+                  <div>
+                    <h3 class="text-lg font-semibold">
+                      {{ campaign.name }}
+                      <span class="text-sm font-normal text-muted">({{ filterEmblems(campaign.emblems).length }})</span>
+                    </h3>
+                    <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
+                  </div>
                 </div>
-                <UTable :data="getTableData(campaign.emblems)" :columns="columns" />
+                <UTable v-if="!isCampaignCollapsed(campaign.id)" :data="getTableData(campaign.emblems)" :columns="columns" />
               </div>
             </template>
           </div>
@@ -869,11 +1065,24 @@ onUnmounted(() => {
 
         <template v-for="campaign in filteredCampaigns" :key="campaign.id">
           <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-8">
-            <div v-if="campaign.key !== 'default'" class="mb-4">
-              <h3 class="text-lg font-semibold">{{ campaign.name }}</h3>
-              <p v-if="campaign.description" class="text-sm text-muted italic">{{ campaign.description }}</p>
+            <div
+              v-if="campaign.key !== 'default'"
+              class="mb-4 flex items-center gap-2 cursor-pointer select-none"
+              @click="toggleCampaignCollapse(campaign.id)"
+            >
+              <UIcon
+                :name="isCampaignCollapsed(campaign.id) ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
+                class="w-5 h-5 text-muted"
+              />
+              <div>
+                <h3 class="text-lg font-semibold">
+                  {{ campaign.name }}
+                  <span class="text-sm font-normal text-muted">({{ filterEmblems(campaign.emblems).length }})</span>
+                </h3>
+                <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
+              </div>
             </div>
-            <UTable :data="getTableData(campaign.emblems)" :columns="columns" />
+            <UTable v-if="!isCampaignCollapsed(campaign.id)" :data="getTableData(campaign.emblems)" :columns="columns" />
           </div>
         </template>
       </template>
