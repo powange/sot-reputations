@@ -71,7 +71,8 @@ if (!isAuthenticated.value) {
 }
 
 // Récupérer les données
-const { data, error, refresh } = await useFetch<MyReputationsData>('/api/my-reputations')
+const { data, error, refresh, status } = await useFetch<MyReputationsData>('/api/my-reputations')
+const isLoading = computed(() => status.value === 'pending')
 
 if (error.value) {
   navigateTo('/')
@@ -312,8 +313,14 @@ async function handleDelete() {
 
 <template>
   <UContainer class="py-8">
-    <!-- Header -->
-    <div class="flex justify-between items-start mb-8">
+    <!-- Chargement -->
+    <div v-if="isLoading" class="flex justify-center py-16">
+      <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+    </div>
+
+    <template v-else>
+      <!-- Header -->
+      <div class="flex justify-between items-start mb-8">
       <div>
         <div class="flex items-center gap-2 mb-2">
           <NuxtLink to="/" class="text-muted hover:text-foreground">
@@ -490,31 +497,32 @@ async function handleDelete() {
           </template>
         </UCard>
       </template>
-    </UModal>
+      </UModal>
 
-    <!-- Modal Suppression -->
-    <UModal v-model:open="isDeleteModalOpen">
-      <template #content>
-        <UCard>
-          <template #header>
-            <h2 class="text-xl font-semibold text-error">Supprimer mes donnees</h2>
-          </template>
-          <div class="space-y-4">
-            <UAlert icon="i-lucide-alert-triangle" color="error" title="Attention">
-              <template #description>
-                Cette action est irreversible. Toutes vos donnees de progression seront supprimees.
-              </template>
-            </UAlert>
-            <p>Etes-vous sur de vouloir supprimer toutes vos donnees de reputation ?</p>
-          </div>
-          <template #footer>
-            <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isDeleteModalOpen = false" />
-              <UButton label="Supprimer" icon="i-lucide-trash-2" color="error" :loading="isDeleting" @click="handleDelete" />
+      <!-- Modal Suppression -->
+      <UModal v-model:open="isDeleteModalOpen">
+        <template #content>
+          <UCard>
+            <template #header>
+              <h2 class="text-xl font-semibold text-error">Supprimer mes donnees</h2>
+            </template>
+            <div class="space-y-4">
+              <UAlert icon="i-lucide-alert-triangle" color="error" title="Attention">
+                <template #description>
+                  Cette action est irreversible. Toutes vos donnees de progression seront supprimees.
+                </template>
+              </UAlert>
+              <p>Etes-vous sur de vouloir supprimer toutes vos donnees de reputation ?</p>
             </div>
-          </template>
-        </UCard>
-      </template>
-    </UModal>
+            <template #footer>
+              <div class="flex justify-end gap-2">
+                <UButton label="Annuler" color="neutral" variant="outline" @click="isDeleteModalOpen = false" />
+                <UButton label="Supprimer" icon="i-lucide-trash-2" color="error" :loading="isDeleting" @click="handleDelete" />
+              </div>
+            </template>
+          </UCard>
+        </template>
+      </UModal>
+    </template>
   </UContainer>
 </template>
