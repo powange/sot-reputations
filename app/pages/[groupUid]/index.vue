@@ -227,40 +227,53 @@ watch(users, (newUsers) => {
   }
 }, { immediate: true })
 
-// Synchroniser les filtres avec l'URL
+// Synchroniser les filtres avec l'URL (mise à jour légère sans Vue Router)
+let urlUpdateTimeout: ReturnType<typeof setTimeout> | null = null
+
+function updateUrlWithFilters() {
+  if (!import.meta.client) return
+
+  const params = new URLSearchParams()
+
+  if (searchQuery.value.trim()) {
+    params.set('search', searchQuery.value.trim())
+  }
+  if (selectedFactionKey.value) {
+    params.set('faction', selectedFactionKey.value)
+  }
+  if (selectedCampaignIds.value.length > 0) {
+    params.set('campaigns', selectedCampaignIds.value.join(','))
+  }
+  if (emblemCompletionFilter.value !== 'all') {
+    params.set('completion', emblemCompletionFilter.value)
+  }
+  if (ignoreUsersWithoutData.value) {
+    params.set('ignoreEmpty', '1')
+  }
+  if (onlyNotCompletedByAnyone.value) {
+    params.set('noOneCompleted', '1')
+  }
+  // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
+  const allUserIds = users.value.map(u => u.id)
+  const allUsersSelected = allUserIds.length > 0 &&
+    selectedUserIds.value.length === allUserIds.length &&
+    allUserIds.every(id => selectedUserIds.value.includes(id))
+  if (!allUsersSelected && selectedUserIds.value.length > 0) {
+    params.set('users', selectedUserIds.value.join(','))
+  }
+
+  const queryString = params.toString()
+  const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname
+  window.history.replaceState({}, '', newUrl)
+}
+
 watch(
   [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, onlyNotCompletedByAnyone, selectedUserIds],
   () => {
-    const query: Record<string, string> = {}
-
-    if (searchQuery.value.trim()) {
-      query.search = searchQuery.value.trim()
+    if (urlUpdateTimeout) {
+      clearTimeout(urlUpdateTimeout)
     }
-    if (selectedFactionKey.value) {
-      query.faction = selectedFactionKey.value
-    }
-    if (selectedCampaignIds.value.length > 0) {
-      query.campaigns = selectedCampaignIds.value.join(',')
-    }
-    if (emblemCompletionFilter.value !== 'all') {
-      query.completion = emblemCompletionFilter.value
-    }
-    if (ignoreUsersWithoutData.value) {
-      query.ignoreEmpty = '1'
-    }
-    if (onlyNotCompletedByAnyone.value) {
-      query.noOneCompleted = '1'
-    }
-    // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
-    const allUserIds = users.value.map(u => u.id)
-    const allUsersSelected = allUserIds.length > 0 &&
-      selectedUserIds.value.length === allUserIds.length &&
-      allUserIds.every(id => selectedUserIds.value.includes(id))
-    if (!allUsersSelected && selectedUserIds.value.length > 0) {
-      query.users = selectedUserIds.value.join(',')
-    }
-
-    router.replace({ query })
+    urlUpdateTimeout = setTimeout(updateUrlWithFilters, 300)
   },
   { deep: true }
 )
@@ -470,7 +483,7 @@ function isEmblemCompletedByNone(emblem: { userProgress: Record<number, UserEmbl
   return true
 }
 
-function filterEmblems<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
+function filterEmblemsArray<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
   if (emblemCompletionFilter.value === 'all') {
     return emblems
   }
@@ -491,6 +504,23 @@ function filterEmblems<T extends { userProgress: Record<number, UserEmblemProgre
       return false
     }
   })
+}
+
+// Mémoiser les emblèmes filtrés par campagne
+const filteredEmblemsByCampaign = computed(() => {
+  const result: Record<number, Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>> = {}
+
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      result[campaign.id] = filterEmblemsArray(campaign.emblems)
+    }
+  }
+
+  return result
+})
+
+function getFilteredEmblems(campaignId: number) {
+  return filteredEmblemsByCampaign.value[campaignId] || []
 }
 
 const columns = computed<TableColumn<TableRow>[]>(() => {
@@ -547,9 +577,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
 })
 
 function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>): TableRow[] {
-  const filteredEmblems = filterEmblems(emblems)
-
-  return filteredEmblems.map(emblem => {
+  return emblems.map(emblem => {
     const row: TableRow = {
       id: emblem.id,
       name: emblem.name,
@@ -950,43 +978,27 @@ onUnmounted(() => {
         <template #extra-filters="{ isSearchActive: searchActive }">
           <div v-if="!searchActive" class="flex items-center gap-3 flex-wrap">
             <span class="text-sm font-medium text-muted">Utilisateurs :</span>
-            <div class="flex gap-1">
-              <UButton
-                size="xs"
-                variant="ghost"
-                :disabled="allUsersSelected"
-                @click="selectAllUsers"
-              >
-                Tous
-              </UButton>
-              <UButton
-                size="xs"
-                variant="ghost"
-                :disabled="selectedUserIds.length <= 1"
-                @click="selectNoUsers"
-              >
-                Aucun
-              </UButton>
-            </div>
+            <UButton
+              size="xs"
+              variant="ghost"
+              :disabled="allUsersSelected"
+              @click="selectAllUsers"
+            >
+              Tous
+            </UButton>
             <UTooltip
               v-for="u in users"
               :key="u.id"
               :text="`${userCompletionStats[u.id]?.completed || 0}/${userCompletionStats[u.id]?.total || 0} - Dernier import : ${formatLastImport(u.lastImportAt)}`"
             >
-              <UButton
-                :color="selectedUserIds.includes(u.id) ? 'success' : 'neutral'"
-                :variant="selectedUserIds.includes(u.id) ? 'solid' : 'outline'"
-                size="sm"
+              <div
+                class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                :class="selectedUserIds.includes(u.id) ? 'bg-success text-white' : 'bg-muted/50 hover:bg-muted'"
                 @click="toggleUser(u.id)"
               >
-                {{ u.username }}
-                <UBadge
-                  :label="`${userCompletionStats[u.id]?.percentage || 0}%`"
-                  size="xs"
-                  :color="selectedUserIds.includes(u.id) ? 'white' : 'neutral'"
-                  class="ml-1"
-                />
-              </UButton>
+                <span class="font-medium">{{ u.username }}</span>
+                <span class="font-bold">{{ userCompletionStats[u.id]?.percentage || 0 }}%</span>
+              </div>
             </UTooltip>
           </div>
         </template>
@@ -1019,19 +1031,21 @@ onUnmounted(() => {
               / {{ result.campaignName }}
             </span>
           </h3>
-          <UTable :data="getTableData(result.emblems)" :columns="columns" />
+          <TableLoader>
+            <UTable :data="getTableData(filterEmblemsArray(result.emblems))" :columns="columns" />
+          </TableLoader>
         </div>
       </template>
 
       <!-- Toutes les factions -->
       <template v-else-if="allFactionsSelected">
         <template v-for="{ faction, campaigns } in allFactionsCampaigns" :key="faction.key">
-          <div v-if="campaigns.some(c => filterEmblems(c.emblems).length > 0)" class="mb-8">
+          <div v-if="campaigns.some(c => getFilteredEmblems(c.id).length > 0)" class="mb-8">
             <h2 class="text-2xl font-pirate">{{ faction.name }}</h2>
             <p v-if="faction.motto" class="text-muted italic mb-4">« {{ faction.motto }} »</p>
 
             <template v-for="campaign in campaigns" :key="campaign.id">
-              <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-6">
+              <div v-if="getFilteredEmblems(campaign.id).length > 0" class="mb-6">
                 <div
                   v-if="campaign.key !== 'default'"
                   class="mb-4 flex items-center gap-2 cursor-pointer select-none"
@@ -1044,12 +1058,14 @@ onUnmounted(() => {
                   <div>
                     <h3 class="text-lg font-semibold">
                       {{ campaign.name }}
-                      <span class="text-sm font-normal text-muted">({{ filterEmblems(campaign.emblems).length }})</span>
+                      <span class="text-sm font-normal text-muted">({{ getFilteredEmblems(campaign.id).length }})</span>
                     </h3>
                     <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
                   </div>
                 </div>
-                <UTable v-if="!isCampaignCollapsed(campaign.id)" :data="getTableData(campaign.emblems)" :columns="columns" />
+                <TableLoader v-if="!isCampaignCollapsed(campaign.id)">
+                  <UTable :data="getTableData(getFilteredEmblems(campaign.id))" :columns="columns" />
+                </TableLoader>
               </div>
             </template>
           </div>
@@ -1064,7 +1080,7 @@ onUnmounted(() => {
         </div>
 
         <template v-for="campaign in filteredCampaigns" :key="campaign.id">
-          <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-8">
+          <div v-if="getFilteredEmblems(campaign.id).length > 0" class="mb-8">
             <div
               v-if="campaign.key !== 'default'"
               class="mb-4 flex items-center gap-2 cursor-pointer select-none"
@@ -1077,12 +1093,14 @@ onUnmounted(() => {
               <div>
                 <h3 class="text-lg font-semibold">
                   {{ campaign.name }}
-                  <span class="text-sm font-normal text-muted">({{ filterEmblems(campaign.emblems).length }})</span>
+                  <span class="text-sm font-normal text-muted">({{ getFilteredEmblems(campaign.id).length }})</span>
                 </h3>
                 <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
               </div>
             </div>
-            <UTable v-if="!isCampaignCollapsed(campaign.id)" :data="getTableData(campaign.emblems)" :columns="columns" />
+            <TableLoader v-if="!isCampaignCollapsed(campaign.id)">
+              <UTable :data="getTableData(getFilteredEmblems(campaign.id))" :columns="columns" />
+            </TableLoader>
           </div>
         </template>
       </template>

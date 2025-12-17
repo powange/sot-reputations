@@ -107,29 +107,42 @@ const searchQuery = ref((route.query.search as string) || '')
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
 const allFactionsSelected = computed(() => selectedFactionKey.value === '')
 
-// Synchroniser les filtres avec l'URL
+// Synchroniser les filtres avec l'URL (mise à jour légère sans Vue Router)
+let urlUpdateTimeout: ReturnType<typeof setTimeout> | null = null
+
+function updateUrlWithFilters() {
+  if (!import.meta.client) return
+
+  const params = new URLSearchParams()
+
+  if (searchQuery.value.trim()) {
+    params.set('search', searchQuery.value.trim())
+  }
+  if (selectedFactionKey.value) {
+    params.set('faction', selectedFactionKey.value)
+  }
+  if (selectedCampaignIds.value.length > 0) {
+    params.set('campaigns', selectedCampaignIds.value.join(','))
+  }
+  if (emblemCompletionFilter.value !== 'all') {
+    params.set('completion', emblemCompletionFilter.value)
+  }
+  if (ignoreWithoutData.value) {
+    params.set('ignoreEmpty', '1')
+  }
+
+  const queryString = params.toString()
+  const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname
+  window.history.replaceState({}, '', newUrl)
+}
+
 watch(
   [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreWithoutData],
   () => {
-    const query: Record<string, string> = {}
-
-    if (searchQuery.value.trim()) {
-      query.search = searchQuery.value.trim()
+    if (urlUpdateTimeout) {
+      clearTimeout(urlUpdateTimeout)
     }
-    if (selectedFactionKey.value) {
-      query.faction = selectedFactionKey.value
-    }
-    if (selectedCampaignIds.value.length > 0) {
-      query.campaigns = selectedCampaignIds.value.join(',')
-    }
-    if (emblemCompletionFilter.value !== 'all') {
-      query.completion = emblemCompletionFilter.value
-    }
-    if (ignoreWithoutData.value) {
-      query.ignoreEmpty = '1'
-    }
-
-    router.replace({ query })
+    urlUpdateTimeout = setTimeout(updateUrlWithFilters, 300)
   },
   { deep: true }
 )
