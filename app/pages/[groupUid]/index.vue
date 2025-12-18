@@ -399,7 +399,7 @@ const userCompletionStats = computed(() => {
     stats[user.id] = {
       completed,
       total,
-      percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+      percentage: total > 0 ? (completed === total ? 100 : Math.floor((completed / total) * 100)) : 0
     }
   }
 
@@ -444,9 +444,10 @@ const groupStats = computed(() => {
     }
   }
 
-  const averageCompletion = Math.round(
-    (totalCompletions / (totalEmblems.value * selectedUserList.length)) * 100
-  )
+  const totalPossible = totalEmblems.value * selectedUserList.length
+  const averageCompletion = totalCompletions === totalPossible
+    ? 100
+    : Math.floor((totalCompletions / totalPossible) * 100)
 
   return {
     completedByAll,
