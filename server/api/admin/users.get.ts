@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
       id,
       username,
       is_admin as isAdmin,
+      is_moderator as isModerator,
       microsoft_id as microsoftId,
       created_at as createdAt,
       last_import_at as lastImportAt
@@ -21,6 +22,7 @@ export default defineEventHandler(async (event) => {
     id: number
     username: string
     isAdmin: number
+    isModerator: number
     microsoftId: string | null
     createdAt: string
     lastImportAt: string | null
@@ -59,6 +61,7 @@ export default defineEventHandler(async (event) => {
   return users.map(user => ({
     ...user,
     isAdmin: user.isAdmin === 1,
+    isModerator: user.isModerator === 1,
     groups: groupsByUser.get(user.id) || []
   }))
 })

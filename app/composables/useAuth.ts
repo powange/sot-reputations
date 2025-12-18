@@ -39,10 +39,19 @@ export function useAuth() {
     return u?.isAdmin === true
   })
 
+  const isModerator = computed(() => {
+    const u = user.value as { isModerator?: boolean } | null
+    return u?.isModerator === true
+  })
+
+  const isAdminOrModerator = computed(() => isAdmin.value || isModerator.value)
+
   return {
-    user: computed(() => user.value as { id: number, username: string, microsoftId?: string, isAdmin?: boolean } | null),
+    user: computed(() => user.value as { id: number, username: string, microsoftId?: string, isAdmin?: boolean, isModerator?: boolean } | null),
     isAuthenticated,
     isAdmin,
+    isModerator,
+    isAdminOrModerator,
     isLoading: readonly(isLoading),
     fetchUser,
     login,

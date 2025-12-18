@@ -531,7 +531,7 @@ async function handleDelete() {
               / {{ result.campaignName }}
             </span>
           </h3>
-          <TableLoader sticky-header max-height="70vh">
+          <TableLoader sticky-header>
             <UTable :data="getTableData(result.emblems)" :columns="columns" />
           </TableLoader>
         </div>
@@ -550,7 +550,7 @@ async function handleDelete() {
                   <h3 class="text-lg font-semibold">{{ campaign.name }}</h3>
                   <p v-if="campaign.description" class="text-sm text-muted italic">{{ campaign.description }}</p>
                 </div>
-                <TableLoader sticky-header max-height="70vh">
+                <TableLoader sticky-header>
                   <UTable :data="getTableData(campaign.emblems)" :columns="columns" />
                 </TableLoader>
               </div>

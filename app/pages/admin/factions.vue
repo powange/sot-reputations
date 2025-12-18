@@ -1,14 +1,14 @@
 <script setup lang="ts">
-const { isAdmin, isAuthenticated } = useAuth()
+const { isAdminOrModerator, isAuthenticated } = useAuth()
 
 useSeoMeta({
   title: 'Factions - Administration'
 })
 
-// Redirection si non admin
+// Redirection si non admin/moderateur
 watchEffect(() => {
   if (import.meta.client) {
-    if (!isAuthenticated.value || !isAdmin.value) {
+    if (!isAuthenticated.value || !isAdminOrModerator.value) {
       navigateTo('/')
     }
   }

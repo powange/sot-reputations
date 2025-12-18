@@ -1,7 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
   minHeight?: string
-  maxHeight?: string
   stickyHeader?: boolean
 }>()
 
@@ -37,9 +36,7 @@ onMounted(() => {
     class="table-loader"
     :class="{ 'sticky-header': props.stickyHeader }"
     :style="{
-      minHeight: !isVisible ? (props.minHeight || '100px') : undefined,
-      maxHeight: props.maxHeight,
-      overflowY: props.maxHeight ? 'auto' : undefined
+      minHeight: !isVisible ? (props.minHeight || '100px') : undefined
     }"
   >
     <slot v-if="isVisible" />

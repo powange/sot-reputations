@@ -1,4 +1,4 @@
-import { requireAdmin } from '../../../../utils/admin'
+import { requireAdminOrModerator } from '../../../../utils/admin'
 import { getReputationDb } from '../../../../utils/reputation-db'
 
 interface GradeThreshold {
@@ -7,7 +7,7 @@ interface GradeThreshold {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  await requireAdminOrModerator(event)
 
   const id = Number(getRouterParam(event, 'id'))
   if (isNaN(id)) {

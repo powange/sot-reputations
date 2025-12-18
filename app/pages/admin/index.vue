@@ -1,16 +1,16 @@
 <script setup lang="ts">
-const { isAdmin, isAuthenticated } = useAuth()
+const { isAdmin, isAdminOrModerator, isAuthenticated } = useAuth()
 
 useSeoMeta({
   title: 'Administration - SoT Reputations'
 })
 
-// Redirection si non admin
+// Redirection si non admin/moderateur
 watchEffect(() => {
   if (import.meta.client) {
     if (!isAuthenticated.value) {
       navigateTo('/')
-    } else if (!isAdmin.value) {
+    } else if (!isAdminOrModerator.value) {
       navigateTo('/')
     }
   }
@@ -36,7 +36,8 @@ watchEffect(() => {
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
-      <NuxtLink to="/admin/utilisateurs" class="block">
+      <!-- Utilisateurs - Admin seulement -->
+      <NuxtLink v-if="isAdmin" to="/admin/utilisateurs" class="block">
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-primary/10">
@@ -50,6 +51,7 @@ watchEffect(() => {
         </UCard>
       </NuxtLink>
 
+      <!-- Factions - Admin et Moderateurs -->
       <NuxtLink to="/admin/factions" class="block">
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">

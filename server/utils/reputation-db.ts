@@ -192,6 +192,12 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
   }
 
+  // Migration: ajouter is_moderator aux utilisateurs
+  const hasIsModerator = userColumnsForAdmin.some(col => col.name === 'is_moderator')
+  if (!hasIsModerator) {
+    db.exec('ALTER TABLE users ADD COLUMN is_moderator INTEGER DEFAULT 0')
+  }
+
   // Migration: convertir les rôles 'admin' en 'chef' pour le nouveau système de grades
   const hasAdminRole = db.prepare(`
     SELECT id FROM group_members WHERE role = 'admin' LIMIT 1
@@ -654,6 +660,23 @@ export function isUserAdmin(userId: number): boolean {
 export function setUserAdmin(userId: number, isAdmin: boolean): void {
   const db = getReputationDb()
   db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(isAdmin ? 1 : 0, userId)
+}
+
+export function isUserModerator(userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT is_moderator FROM users WHERE id = ?').get(userId) as { is_moderator: number } | undefined
+  return row?.is_moderator === 1
+}
+
+export function setUserModerator(userId: number, isModerator: boolean): void {
+  const db = getReputationDb()
+  db.prepare('UPDATE users SET is_moderator = ? WHERE id = ?').run(isModerator ? 1 : 0, userId)
+}
+
+export function isUserAdminOrModerator(userId: number): boolean {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT is_admin, is_moderator FROM users WHERE id = ?').get(userId) as { is_admin: number; is_moderator: number } | undefined
+  return row?.is_admin === 1 || row?.is_moderator === 1
 }
 
 // ============ GROUPES ============

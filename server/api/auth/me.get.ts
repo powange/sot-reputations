@@ -1,4 +1,4 @@
-import { isUserAdmin } from '../../utils/reputation-db'
+import { isUserAdmin, isUserModerator } from '../../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const session = await getUserSession(event)
@@ -10,7 +10,8 @@ export default defineEventHandler(async (event) => {
   return {
     user: {
       ...session.user,
-      isAdmin: isUserAdmin(session.user.id)
+      isAdmin: isUserAdmin(session.user.id),
+      isModerator: isUserModerator(session.user.id)
     }
   }
 })

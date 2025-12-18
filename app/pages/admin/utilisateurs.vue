@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const { isAdmin, isAuthenticated } = useAuth()
+const { isAdmin, isAuthenticated, user: currentUser } = useAuth()
+const toast = useToast()
 
 useSeoMeta({
   title: 'Utilisateurs - Administration'
@@ -24,13 +25,14 @@ interface User {
   id: number
   username: string
   isAdmin: boolean
+  isModerator: boolean
   microsoftId: string | null
   createdAt: string
   lastImportAt: string | null
   groups: UserGroup[]
 }
 
-const { data: users, status } = await useFetch<User[]>('/api/admin/users')
+const { data: users, status, refresh } = await useFetch<User[]>('/api/admin/users')
 
 const roleLabels: Record<string, string> = {
   chef: 'Chef',
@@ -42,6 +44,52 @@ const roleColors: Record<string, string> = {
   chef: 'warning',
   moderator: 'info',
   member: 'neutral'
+}
+
+const siteRoleOptions = [
+  { label: 'Utilisateur', value: 'user' },
+  { label: 'Moderateur', value: 'moderator' },
+  { label: 'Administrateur', value: 'admin' }
+]
+
+function getUserSiteRole(user: User): string {
+  if (user.isAdmin) return 'admin'
+  if (user.isModerator) return 'moderator'
+  return 'user'
+}
+
+function getSiteRoleLabel(user: User): string {
+  if (user.isAdmin) return 'Admin'
+  if (user.isModerator) return 'Moderateur'
+  return 'Utilisateur'
+}
+
+function getSiteRoleColor(user: User): string {
+  if (user.isAdmin) return 'warning'
+  if (user.isModerator) return 'info'
+  return 'neutral'
+}
+
+async function changeUserRole(user: User, newRole: string) {
+  try {
+    await $fetch(`/api/admin/users/${user.id}/role`, {
+      method: 'PUT',
+      body: { role: newRole }
+    })
+    toast.add({
+      title: 'Droits modifies',
+      description: `${user.username} est maintenant ${newRole === 'admin' ? 'administrateur' : newRole === 'moderator' ? 'moderateur' : 'utilisateur'}`,
+      color: 'success'
+    })
+    await refresh()
+  }
+  catch (e) {
+    toast.add({
+      title: 'Erreur',
+      description: 'Impossible de modifier les droits',
+      color: 'error'
+    })
+  }
 }
 
 function formatDate(date: string | null): string {
@@ -82,6 +130,7 @@ function formatDate(date: string | null): string {
           <thead>
             <tr class="border-b border-muted">
               <th class="text-left py-3 px-4 font-medium">Utilisateur</th>
+              <th class="text-left py-3 px-4 font-medium">Droits</th>
               <th class="text-left py-3 px-4 font-medium">Groupes</th>
               <th class="text-left py-3 px-4 font-medium">Inscription</th>
               <th class="text-left py-3 px-4 font-medium">Dernier import</th>
@@ -89,18 +138,15 @@ function formatDate(date: string | null): string {
           </thead>
           <tbody>
             <tr
-              v-for="user in users"
-              :key="user.id"
+              v-for="u in users"
+              :key="u.id"
               class="border-b border-muted/50 hover:bg-muted/20"
             >
               <td class="py-3 px-4">
                 <div class="flex items-center gap-2">
-                  <span class="font-medium">{{ user.username }}</span>
-                  <UBadge v-if="user.isAdmin" color="warning" size="xs">
-                    Admin
-                  </UBadge>
+                  <span class="font-medium">{{ u.username }}</span>
                   <UIcon
-                    v-if="user.microsoftId"
+                    v-if="u.microsoftId"
                     name="i-simple-icons-xbox"
                     class="w-4 h-4 text-green-500"
                     title="Compte Xbox"
@@ -108,9 +154,37 @@ function formatDate(date: string | null): string {
                 </div>
               </td>
               <td class="py-3 px-4">
-                <div v-if="user.groups.length > 0" class="flex flex-wrap gap-1">
+                <UDropdownMenu
+                  v-if="u.id !== currentUser?.id"
+                  :items="[[
+                    ...siteRoleOptions.map(opt => ({
+                      label: opt.label,
+                      icon: getUserSiteRole(u) === opt.value ? 'i-lucide-check' : undefined,
+                      onSelect: () => changeUserRole(u, opt.value)
+                    }))
+                  ]]"
+                >
+                  <UButton
+                    :color="getSiteRoleColor(u)"
+                    size="xs"
+                    variant="subtle"
+                    trailing-icon="i-lucide-chevron-down"
+                  >
+                    {{ getSiteRoleLabel(u) }}
+                  </UButton>
+                </UDropdownMenu>
+                <UBadge
+                  v-else
+                  :color="getSiteRoleColor(u)"
+                  size="xs"
+                >
+                  {{ getSiteRoleLabel(u) }} (vous)
+                </UBadge>
+              </td>
+              <td class="py-3 px-4">
+                <div v-if="u.groups.length > 0" class="flex flex-wrap gap-1">
                   <UBadge
-                    v-for="group in user.groups"
+                    v-for="group in u.groups"
                     :key="group.uid"
                     :color="roleColors[group.role] || 'neutral'"
                     size="xs"
@@ -122,10 +196,10 @@ function formatDate(date: string | null): string {
                 <span v-else class="text-muted">-</span>
               </td>
               <td class="py-3 px-4 text-muted">
-                {{ formatDate(user.createdAt) }}
+                {{ formatDate(u.createdAt) }}
               </td>
               <td class="py-3 px-4 text-muted">
-                {{ formatDate(user.lastImportAt) }}
+                {{ formatDate(u.lastImportAt) }}
               </td>
             </tr>
           </tbody>
