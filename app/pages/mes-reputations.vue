@@ -244,7 +244,6 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     {
       accessorKey: 'name',
       header: 'Succes',
-      size: 400,
       cell: ({ row }) => {
         const children = []
 
@@ -267,7 +266,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     {
       accessorKey: 'maxThreshold',
       header: 'Max',
-      size: 70,
+      meta: { class: { th: 'w-16', td: 'w-16' } },
       cell: ({ row }) => {
         const maxThreshold = row.original.maxThreshold as number | null
         const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
@@ -303,7 +302,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     cols.push({
       accessorKey: 'progress',
       header: 'Progression',
-      size: 120,
+      meta: { class: { th: 'w-28', td: 'w-28' } },
       cell: ({ row }) => {
         let colorClass = 'text-muted'
         if (row.original.completed) {

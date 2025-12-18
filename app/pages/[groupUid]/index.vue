@@ -575,7 +575,6 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     {
       accessorKey: 'name',
       header: 'Succes',
-      size: 400,
       cell: ({ row }) => {
         const children = []
 
@@ -598,7 +597,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     {
       accessorKey: 'maxThreshold',
       header: 'Max',
-      size: 70,
+      meta: { class: { th: 'w-16', td: 'w-16' } },
       cell: ({ row }) => {
         const maxThreshold = row.original.maxThreshold as number | null
         const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
@@ -633,7 +632,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
   for (const user of selectedUsers.value) {
     cols.push({
       accessorKey: `user_${user.id}`,
-      size: 120,
+      meta: { class: { th: 'w-28', td: 'w-28' } },
       header: () => h('div', {}, [
         h('div', { class: 'font-medium' }, user.username),
         h('div', { class: 'text-xs text-muted font-normal' }, formatLastImport(user.lastImportAt))
