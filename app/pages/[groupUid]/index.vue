@@ -681,7 +681,7 @@ function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number,
       const progress = emblem.userProgress[user.id]
       if (progress) {
         row[`user_${user.id}_display`] = progress.threshold > 0
-          ? `${progress.value}/${progress.threshold}`
+          ? progress.value.toString()
           : (progress.completed ? 'Oui' : 'Non')
         row[`user_${user.id}_completed`] = progress.completed
         row[`user_${user.id}_hasProgress`] = progress.value > 0
