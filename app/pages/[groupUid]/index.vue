@@ -1132,7 +1132,7 @@ onUnmounted(() => {
               / {{ result.campaignName }}
             </span>
           </h3>
-          <TableLoader>
+          <TableLoader sticky-header max-height="70vh">
             <UTable :data="getTableData(filterEmblemsArray(result.emblems))" :columns="columns" />
           </TableLoader>
         </div>
@@ -1164,7 +1164,7 @@ onUnmounted(() => {
                     <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
                   </div>
                 </div>
-                <TableLoader v-if="!isCampaignCollapsed(campaign.id)">
+                <TableLoader v-if="!isCampaignCollapsed(campaign.id)" sticky-header max-height="70vh">
                   <UTable :data="getTableData(getFilteredEmblems(campaign.id))" :columns="columns" />
                 </TableLoader>
               </div>
