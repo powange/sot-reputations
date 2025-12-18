@@ -1076,8 +1076,8 @@ onUnmounted(() => {
         :factions="factions"
         :show-completion-filter="true"
       >
-        <template #extra-filters="{ isSearchActive: searchActive }">
-          <div v-if="!searchActive" class="flex items-center gap-3 flex-wrap">
+        <template #extra-filters>
+          <div class="flex items-center gap-3 flex-wrap">
             <span class="text-sm font-medium text-muted">Utilisateurs :</span>
             <UButton
               size="xs"

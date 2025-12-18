@@ -89,7 +89,7 @@ function toggleCampaign(campaignId: number) {
           v-model="searchQuery"
           placeholder="Rechercher un succes..."
           icon="i-lucide-search"
-          class="max-w-xs"
+          class="max-w-md"
         />
       </div>
 
