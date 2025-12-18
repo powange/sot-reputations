@@ -31,13 +31,17 @@ interface PendingInvite {
 export function useGroups() {
   const groups = useState<Group[]>('user-groups', () => [])
   const pendingInvites = useState<PendingInvite[]>('pending-invites', () => [])
+  const isLoadingGroups = useState<boolean>('loading-groups', () => false)
 
   async function fetchGroups() {
+    isLoadingGroups.value = true
     try {
       const response = await $fetch<{ groups: Group[] }>('/api/groups')
       groups.value = response.groups
     } catch {
       groups.value = []
+    } finally {
+      isLoadingGroups.value = false
     }
   }
 
@@ -107,6 +111,7 @@ export function useGroups() {
   return {
     groups: readonly(groups),
     pendingInvites: readonly(pendingInvites),
+    isLoadingGroups: readonly(isLoadingGroups),
     fetchGroups,
     createGroup,
     deleteGroup,

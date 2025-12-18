@@ -3,7 +3,7 @@ type GroupRole = 'chef' | 'moderator' | 'member'
 
 const toast = useToast()
 const { user, isAuthenticated, isLoading, loginWithMicrosoft } = useAuth()
-const { groups, pendingInvites, fetchGroups, createGroup, fetchPendingInvites, acceptInvite, rejectInvite } = useGroups()
+const { groups, pendingInvites, isLoadingGroups, fetchGroups, createGroup, fetchPendingInvites, acceptInvite, rejectInvite } = useGroups()
 
 // Labels des rôles
 const roleLabels: Record<GroupRole, string> = {
@@ -228,7 +228,11 @@ async function handleCreateGroup() {
       </div>
 
       <!-- Liste des groupes -->
-      <div v-if="groups.length === 0" class="text-center py-16">
+      <div v-if="isLoadingGroups" class="flex justify-center py-16">
+        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+      </div>
+
+      <div v-else-if="groups.length === 0" class="text-center py-16">
         <UIcon name="i-lucide-users" class="w-16 h-16 text-muted mx-auto mb-4" />
         <h2 class="text-xl font-semibold mb-2">
           Aucun groupe
