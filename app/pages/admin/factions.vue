@@ -286,12 +286,16 @@ function onGradesSaved() {
 
     <!-- Modal edition grades -->
     <UModal v-model:open="isEditModalOpen">
-      <EmblemGradesEditor
-        v-if="editingEmblem"
-        :emblem="editingEmblem"
-        @close="editingEmblem = null"
-        @saved="onGradesSaved"
-      />
+      <template #content>
+        <UCard>
+          <EmblemGradesEditor
+            v-if="editingEmblem"
+            :emblem="editingEmblem"
+            @close="editingEmblem = null"
+            @saved="onGradesSaved"
+          />
+        </UCard>
+      </template>
     </UModal>
   </UContainer>
 </template>
