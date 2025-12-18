@@ -36,3 +36,22 @@
 .font-pirate {
   font-family: 'Pirata One', cursive;
 }
+
+/* Sticky table headers */
+.sticky-table {
+  overflow: visible !important;
+}
+
+.sticky-table table thead {
+  position: sticky;
+  top: var(--ui-header-height);
+  z-index: 50;
+}
+
+.sticky-table table thead th {
+  background-color: white;
+}
+
+.dark .sticky-table table thead th {
+  background-color: rgb(17 24 39);
+}

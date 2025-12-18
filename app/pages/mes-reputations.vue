@@ -315,7 +315,7 @@ async function handleDelete() {
               <UTable
                 :data="getTableData(result.emblems)"
                 :columns="columns"
-                :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+                class="sticky-table"
               />
             </TableLoader>
           </div>
@@ -367,7 +367,7 @@ async function handleDelete() {
                     <UTable
                       :data="getTableData(campaign.emblems)"
                       :columns="columns"
-                      :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+                      class="sticky-table"
                     />
                   </TableLoader>
                 </div>

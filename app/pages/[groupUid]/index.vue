@@ -938,7 +938,7 @@ onUnmounted(() => {
             <UTable
               :data="getTableData(filterEmblemsArray(result.emblems))"
               :columns="columns"
-              :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+              class="sticky-table"
             />
           </TableLoader>
         </div>
@@ -998,7 +998,7 @@ onUnmounted(() => {
                   <UTable
                     :data="getTableData(getFilteredEmblems(campaign.id))"
                     :columns="columns"
-                    :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+                    class="sticky-table"
                   />
                 </TableLoader>
               </div>
