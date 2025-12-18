@@ -643,7 +643,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
       accessorKey: `user_${user.id}`,
       header: () => h('div', {}, [
         h('div', { class: 'font-medium' }, user.username),
-        h('div', { class: 'text-xs text-muted font-normal' }, formatLastImport(user.lastImportAt))
+        h('div', { class: 'text-xs text-muted font-normal whitespace-nowrap' }, formatLastImport(user.lastImportAt))
       ]),
       cell: ({ row }) => {
         const value = row.original[`user_${user.id}_display`] as string
