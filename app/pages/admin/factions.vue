@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { isAdminOrModerator, isAuthenticated } = useAuth()
+const toast = useToast()
 
 useSeoMeta({
   title: 'Factions - Administration'
@@ -23,6 +24,7 @@ interface Emblem {
   maxGrade: number
   sortOrder: number
   userCount: number
+  validated: number
 }
 
 interface Campaign {
@@ -42,7 +44,7 @@ interface Faction {
   campaigns: Campaign[]
 }
 
-const { data: factions, status } = await useFetch<Faction[]>('/api/admin/factions')
+const { data: factions, status, refresh } = await useFetch<Faction[]>('/api/admin/factions')
 
 // Compteurs
 const stats = computed(() => {
@@ -111,6 +113,86 @@ function editEmblemGrades(emblem: Emblem) {
 function onGradesSaved() {
   // On pourrait rafraîchir les données ici si nécessaire
 }
+
+// Validation des emblèmes
+const validatingEmblems = ref<number[]>([])
+
+async function validateEmblem(emblem: Emblem) {
+  validatingEmblems.value.push(emblem.id)
+  try {
+    await $fetch(`/api/admin/emblems/${emblem.id}/validate`, { method: 'POST' })
+    toast.add({
+      title: 'Embleme valide',
+      description: `"${emblem.name}" est maintenant visible`,
+      color: 'success'
+    })
+    await refresh()
+  } catch {
+    toast.add({
+      title: 'Erreur',
+      description: 'Impossible de valider l\'embleme',
+      color: 'error'
+    })
+  } finally {
+    validatingEmblems.value = validatingEmblems.value.filter(id => id !== emblem.id)
+  }
+}
+
+// Filtre emblèmes non validés
+const showOnlyUnvalidated = ref(false)
+
+// Compteur d'emblèmes non validés
+const unvalidatedCount = computed(() => {
+  if (!factions.value) return 0
+  let count = 0
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      count += campaign.emblems.filter(e => e.validated === 0).length
+    }
+  }
+  return count
+})
+
+// Toggle filtre et ouvrir les accordéons contenant des non validés
+function toggleUnvalidatedFilter() {
+  showOnlyUnvalidated.value = !showOnlyUnvalidated.value
+
+  if (showOnlyUnvalidated.value && factions.value) {
+    // Ouvrir automatiquement les factions/campagnes avec des emblèmes non validés
+    for (const faction of factions.value) {
+      const hasUnvalidated = faction.campaigns.some(c => c.emblems.some(e => e.validated === 0))
+      if (hasUnvalidated) {
+        if (!openFactions.value.includes(faction.key)) {
+          openFactions.value.push(faction.key)
+        }
+        for (const campaign of faction.campaigns) {
+          const campaignKey = `${faction.key}-${campaign.key}`
+          if (campaign.emblems.some(e => e.validated === 0) && !openCampaigns.value.includes(campaignKey)) {
+            openCampaigns.value.push(campaignKey)
+          }
+        }
+      }
+    }
+  }
+}
+
+// Factions filtrées
+const filteredFactions = computed(() => {
+  if (!factions.value) return []
+  if (!showOnlyUnvalidated.value) return factions.value
+
+  return factions.value
+    .map(faction => ({
+      ...faction,
+      campaigns: faction.campaigns
+        .map(campaign => ({
+          ...campaign,
+          emblems: campaign.emblems.filter(e => e.validated === 0)
+        }))
+        .filter(campaign => campaign.emblems.length > 0)
+    }))
+    .filter(faction => faction.campaigns.length > 0)
+})
 </script>
 
 <template>
@@ -132,7 +214,7 @@ function onGradesSaved() {
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-4 gap-4 mb-8">
       <UCard>
         <div class="text-center">
           <div class="text-3xl font-bold text-primary">{{ stats.factions }}</div>
@@ -151,6 +233,23 @@ function onGradesSaved() {
           <div class="text-sm text-muted">Emblemes</div>
         </div>
       </UCard>
+      <UCard
+        :class="[
+          unvalidatedCount > 0 ? 'ring-2 ring-warning cursor-pointer hover:bg-muted/10' : '',
+          showOnlyUnvalidated ? 'bg-warning/10' : ''
+        ]"
+        @click="unvalidatedCount > 0 && toggleUnvalidatedFilter()"
+      >
+        <div class="text-center">
+          <div class="text-3xl font-bold" :class="unvalidatedCount > 0 ? 'text-warning' : 'text-success'">
+            {{ unvalidatedCount }}
+          </div>
+          <div class="text-sm text-muted flex items-center justify-center gap-1">
+            <span>A valider</span>
+            <UIcon v-if="showOnlyUnvalidated" name="i-lucide-filter" class="w-3 h-3" />
+          </div>
+        </div>
+      </UCard>
     </div>
 
     <!-- Loading -->
@@ -159,8 +258,8 @@ function onGradesSaved() {
     </div>
 
     <!-- Factions -->
-    <div v-else-if="factions && factions.length > 0" class="space-y-4">
-      <UCard v-for="faction in factions" :key="faction.id">
+    <div v-else-if="filteredFactions && filteredFactions.length > 0" class="space-y-4">
+      <UCard v-for="faction in filteredFactions" :key="faction.id">
         <!-- Header Faction -->
         <div
           class="flex items-center justify-between cursor-pointer"
@@ -237,7 +336,12 @@ function onGradesSaved() {
                           <UIcon name="i-lucide-image-off" class="w-4 h-4 text-muted" />
                         </div>
                         <div>
-                          <div class="font-medium">{{ emblem.name }}</div>
+                          <div class="flex items-center gap-2">
+                            <span class="font-medium">{{ emblem.name }}</span>
+                            <UBadge v-if="emblem.validated === 0" color="warning" size="xs">
+                              Non valide
+                            </UBadge>
+                          </div>
                           <div v-if="emblem.description" class="text-xs text-muted truncate max-w-xs">
                             {{ emblem.description }}
                           </div>
@@ -257,14 +361,25 @@ function onGradesSaved() {
                       <span v-else class="text-muted">-</span>
                     </td>
                     <td class="py-2 px-2 text-center">
-                      <UButton
-                        v-if="emblem.maxGrade > 1"
-                        icon="i-lucide-pencil"
-                        size="xs"
-                        variant="ghost"
-                        color="neutral"
-                        @click.stop="editEmblemGrades(emblem)"
-                      />
+                      <div class="flex items-center justify-center gap-1">
+                        <UButton
+                          v-if="emblem.validated === 0"
+                          icon="i-lucide-check"
+                          size="xs"
+                          variant="ghost"
+                          color="success"
+                          :loading="validatingEmblems.includes(emblem.id)"
+                          @click.stop="validateEmblem(emblem)"
+                        />
+                        <UButton
+                          v-if="emblem.maxGrade > 1"
+                          icon="i-lucide-pencil"
+                          size="xs"
+                          variant="ghost"
+                          color="neutral"
+                          @click.stop="editEmblemGrades(emblem)"
+                        />
+                      </div>
                     </td>
                   </tr>
                 </tbody>

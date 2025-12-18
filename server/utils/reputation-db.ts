@@ -198,6 +198,14 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE users ADD COLUMN is_moderator INTEGER DEFAULT 0')
   }
 
+  // Migration: ajouter validated aux emblèmes (nouveaux emblèmes non validés par défaut)
+  const emblemColumnsForValidated = db.prepare("PRAGMA table_info(emblems)").all() as Array<{ name: string }>
+  const hasValidated = emblemColumnsForValidated.some(col => col.name === 'validated')
+  if (!hasValidated) {
+    db.exec('ALTER TABLE emblems ADD COLUMN validated INTEGER DEFAULT 0')
+    db.exec('UPDATE emblems SET validated = 1') // Valider tous les emblèmes existants
+  }
+
   // Migration: convertir les rôles 'admin' en 'chef' pour le nouveau système de grades
   const hasAdminRole = db.prepare(`
     SELECT id FROM group_members WHERE role = 'admin' LIMIT 1
@@ -299,8 +307,8 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
   `)
 
   const insertEmblem = db.prepare(`
-    INSERT INTO emblems (campaign_id, key, name, description, image, max_grade, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO emblems (campaign_id, key, name, description, image, max_grade, sort_order, validated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     ON CONFLICT(campaign_id, key) DO UPDATE SET
       image = COALESCE(excluded.image, emblems.image),
       sort_order = excluded.sort_order
@@ -549,7 +557,7 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
     FROM emblems e
     JOIN campaigns c ON e.campaign_id = c.id
     JOIN factions f ON c.faction_id = f.id
-    WHERE f.key = ?
+    WHERE f.key = ? AND e.validated = 1
     ORDER BY c.sort_order, c.id, e.sort_order, e.id
   `).all(factionKey) as Array<Omit<EmblemInfo, 'gradeThresholds'>>
 
@@ -614,7 +622,7 @@ export function getFullReputationData() {
           e.campaign_id as campaignId,
           (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
         FROM emblems e
-        WHERE e.campaign_id = ?
+        WHERE e.campaign_id = ? AND e.validated = 1
         ORDER BY e.sort_order, e.id
       `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 
@@ -1042,7 +1050,7 @@ export function getGroupReputationData(groupId: number) {
           e.campaign_id as campaignId,
           (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
         FROM emblems e
-        WHERE e.campaign_id = ?
+        WHERE e.campaign_id = ? AND e.validated = 1
         ORDER BY e.sort_order, e.id
       `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 

@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
           e.campaign_id as campaignId,
           (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
         FROM emblems e
-        WHERE e.campaign_id = ?
+        WHERE e.campaign_id = ? AND e.validated = 1
         ORDER BY e.sort_order, e.id
       `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 

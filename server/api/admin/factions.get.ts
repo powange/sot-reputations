@@ -34,9 +34,9 @@ export default defineEventHandler(async (event) => {
 
   // Récupérer tous les emblèmes
   const emblems = db.prepare(`
-    SELECT id, campaign_id as campaignId, key, name, description, image, max_grade as maxGrade, sort_order as sortOrder
+    SELECT id, campaign_id as campaignId, key, name, description, image, max_grade as maxGrade, sort_order as sortOrder, validated
     FROM emblems
-    ORDER BY sort_order, name
+    ORDER BY validated ASC, sort_order, name
   `).all() as Array<{
     id: number
     campaignId: number
@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
     image: string | null
     maxGrade: number
     sortOrder: number
+    validated: number
   }>
 
   // Compter les progressions par emblème
