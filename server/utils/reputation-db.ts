@@ -381,11 +381,14 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
               const grade = emblem.Grade || 0
               const threshold = emblem.Threshold || 0
               const value = emblem.Value || 0
-              if (grade > 0 && threshold > 0) {
-                upsertGradeThreshold.run(emblemRow.id, grade, threshold)
-              } else if (emblem.Completed && grade > 0 && value > 0) {
-                // Pour les emblèmes complétés avec threshold=0, utiliser value comme seuil
-                upsertGradeThreshold.run(emblemRow.id, grade, value)
+              const maxGrade = emblem.MaxGrade || 1
+
+              // Pour max_grade=1 complétés, Grade reste à 0 mais c'est effectivement grade 1
+              const gradeToStore = (emblem.Completed && maxGrade === 1 && grade === 0) ? 1 : grade
+              const thresholdToStore = threshold > 0 ? threshold : value
+
+              if (gradeToStore > 0 && thresholdToStore > 0) {
+                upsertGradeThreshold.run(emblemRow.id, gradeToStore, thresholdToStore)
               }
             }
           }
@@ -427,11 +430,14 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
           const grade = emblem.Grade || 0
           const threshold = emblem.Threshold || 0
           const value = emblem.Value || 0
-          if (grade > 0 && threshold > 0) {
-            upsertGradeThreshold.run(emblemRow.id, grade, threshold)
-          } else if (emblem.Completed && grade > 0 && value > 0) {
-            // Pour les emblèmes complétés avec threshold=0, utiliser value comme seuil
-            upsertGradeThreshold.run(emblemRow.id, grade, value)
+          const maxGrade = emblem.MaxGrade || 1
+
+          // Pour max_grade=1 complétés, Grade reste à 0 mais c'est effectivement grade 1
+          const gradeToStore = (emblem.Completed && maxGrade === 1 && grade === 0) ? 1 : grade
+          const thresholdToStore = threshold > 0 ? threshold : value
+
+          if (gradeToStore > 0 && thresholdToStore > 0) {
+            upsertGradeThreshold.run(emblemRow.id, gradeToStore, thresholdToStore)
           }
         }
       }
