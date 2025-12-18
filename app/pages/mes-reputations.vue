@@ -21,6 +21,7 @@ interface EmblemInfo {
   description: string
   image: string
   maxGrade: number
+  maxThreshold: number | null
   campaignId: number
   factionKey: string
   campaignName: string
@@ -57,6 +58,7 @@ interface TableRow {
   name: string
   description: string
   image: string
+  maxThreshold: number | null
   progress: string
   completed: boolean
   hasProgress: boolean
@@ -253,6 +255,17 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
 
         return h('div', { class: 'flex items-center gap-3' }, children)
       }
+    },
+    {
+      accessorKey: 'maxThreshold',
+      header: 'Max',
+      cell: ({ row }) => {
+        const maxThreshold = row.original.maxThreshold as number | null
+        if (maxThreshold === null) {
+          return h('span', { class: 'text-muted' }, '?')
+        }
+        return h('span', {}, maxThreshold.toString())
+      }
     }
   ]
 
@@ -298,6 +311,7 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       name: emblem.name,
       description: emblem.description,
       image: emblem.image || '',
+      maxThreshold: emblem.maxThreshold,
       progress: progressDisplay,
       completed,
       hasProgress

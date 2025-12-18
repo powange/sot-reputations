@@ -461,6 +461,7 @@ export interface EmblemInfo {
   description: string
   image: string
   maxGrade: number
+  maxThreshold: number | null
   campaignId: number
   factionKey: string
   campaignName: string
@@ -507,7 +508,8 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
       e.max_grade as maxGrade,
       e.campaign_id as campaignId,
       f.key as factionKey,
-      c.name as campaignName
+      c.name as campaignName,
+      (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
     FROM emblems e
     JOIN campaigns c ON e.campaign_id = c.id
     JOIN factions f ON c.faction_id = f.id
@@ -563,10 +565,12 @@ export function getFullReputationData() {
     for (const campaign of campaigns) {
       const emblems = db.prepare(`
         SELECT
-          id, key, name, description, image, max_grade as maxGrade, campaign_id as campaignId
-        FROM emblems
-        WHERE campaign_id = ?
-        ORDER BY sort_order, id
+          e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
+          e.campaign_id as campaignId,
+          (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
+        FROM emblems e
+        WHERE e.campaign_id = ?
+        ORDER BY e.sort_order, e.id
       `).all(campaign.id) as EmblemInfo[]
 
       const emblemsWithProgress = emblems.map((emblem) => {
@@ -962,10 +966,12 @@ export function getGroupReputationData(groupId: number) {
     for (const campaign of campaigns) {
       const emblems = db.prepare(`
         SELECT
-          id, key, name, description, image, max_grade as maxGrade, campaign_id as campaignId
-        FROM emblems
-        WHERE campaign_id = ?
-        ORDER BY sort_order, id
+          e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
+          e.campaign_id as campaignId,
+          (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
+        FROM emblems e
+        WHERE e.campaign_id = ?
+        ORDER BY e.sort_order, e.id
       `).all(campaign.id) as EmblemInfo[]
 
       const emblemsWithProgress = emblems.map((emblem) => {

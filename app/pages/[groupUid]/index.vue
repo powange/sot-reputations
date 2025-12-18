@@ -33,6 +33,7 @@ interface EmblemInfo {
   description: string
   image: string
   maxGrade: number
+  maxThreshold: number | null
   campaignId: number
   factionKey: string
   campaignName: string
@@ -81,7 +82,8 @@ interface TableRow {
   name: string
   description: string
   image: string
-  [key: string]: string | number | boolean | undefined
+  maxThreshold: number | null
+  [key: string]: string | number | boolean | null | undefined
 }
 
 const route = useRoute()
@@ -584,6 +586,17 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
 
         return h('div', { class: 'flex items-center gap-3' }, children)
       }
+    },
+    {
+      accessorKey: 'maxThreshold',
+      header: 'Max',
+      cell: ({ row }) => {
+        const maxThreshold = row.original.maxThreshold as number | null
+        if (maxThreshold === null) {
+          return h('span', { class: 'text-muted' }, '?')
+        }
+        return h('span', {}, maxThreshold.toString())
+      }
     }
   ]
 
@@ -615,12 +628,13 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
 })
 
 function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>): TableRow[] {
-  return emblems.map(emblem => {
+  return emblems.map((emblem) => {
     const row: TableRow = {
       id: emblem.id,
       name: emblem.name,
       description: emblem.description,
-      image: emblem.image || ''
+      image: emblem.image || '',
+      maxThreshold: emblem.maxThreshold
     }
 
     for (const user of selectedUsers.value) {
