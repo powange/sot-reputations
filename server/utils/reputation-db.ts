@@ -129,6 +129,15 @@ export function getReputationDb(): Database.Database {
       UNIQUE(group_id, user_id)
     );
 
+    -- Seuils de grades des emblemes (collectes lors des imports)
+    CREATE TABLE IF NOT EXISTS emblem_grade_thresholds (
+      emblem_id INTEGER NOT NULL,
+      grade INTEGER NOT NULL,
+      threshold INTEGER NOT NULL,
+      PRIMARY KEY (emblem_id, grade),
+      FOREIGN KEY (emblem_id) REFERENCES emblems(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -137,6 +146,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_pending_invites_user ON group_pending_invites(user_id);
     CREATE INDEX IF NOT EXISTS idx_group_pending_invites_group ON group_pending_invites(group_id);
+    CREATE INDEX IF NOT EXISTS idx_emblem_grade_thresholds_emblem ON emblem_grade_thresholds(emblem_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -304,6 +314,13 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
       completed = excluded.completed
   `)
 
+  const upsertGradeThreshold = db.prepare(`
+    INSERT INTO emblem_grade_thresholds (emblem_id, grade, threshold)
+    VALUES (?, ?, ?)
+    ON CONFLICT(emblem_id, grade) DO UPDATE SET
+      threshold = excluded.threshold
+  `)
+
   const updateLastImport = db.prepare(`
     UPDATE users SET last_import_at = CURRENT_TIMESTAMP WHERE id = ?
   `)
@@ -359,6 +376,13 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
                 emblem.Grade || 0,
                 emblem.Completed ? 1 : 0
               )
+
+              // Enregistrer le seuil du grade actuel
+              const grade = emblem.Grade || 0
+              const threshold = emblem.Threshold || 0
+              if (grade > 0 && threshold > 0) {
+                upsertGradeThreshold.run(emblemRow.id, grade, threshold)
+              }
             }
           }
         }
@@ -394,6 +418,13 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
             emblem.Grade || 0,
             emblem.Completed ? 1 : 0
           )
+
+          // Enregistrer le seuil du grade actuel
+          const grade = emblem.Grade || 0
+          const threshold = emblem.Threshold || 0
+          if (grade > 0 && threshold > 0) {
+            upsertGradeThreshold.run(emblemRow.id, grade, threshold)
+          }
         }
       }
     }
@@ -1075,4 +1106,77 @@ export function useInvite(inviteId: number): void {
 export function deleteGroupInvite(groupId: number): void {
   const db = getReputationDb()
   db.prepare('DELETE FROM group_invites WHERE group_id = ?').run(groupId)
+}
+
+// ============ GRADE THRESHOLDS ============
+
+export interface EmblemGradeThreshold {
+  emblemId: number
+  grade: number
+  threshold: number
+}
+
+/**
+ * Enregistre ou met a jour le seuil d'un grade pour un embleme
+ */
+export function upsertEmblemGradeThreshold(emblemId: number, grade: number, threshold: number): void {
+  if (grade <= 0 || threshold <= 0) return // Ignorer les valeurs invalides
+
+  const db = getReputationDb()
+  db.prepare(`
+    INSERT INTO emblem_grade_thresholds (emblem_id, grade, threshold)
+    VALUES (?, ?, ?)
+    ON CONFLICT(emblem_id, grade) DO UPDATE SET
+      threshold = excluded.threshold
+  `).run(emblemId, grade, threshold)
+}
+
+/**
+ * Recupere tous les seuils de grades connus pour un embleme
+ */
+export function getEmblemGradeThresholds(emblemId: number): EmblemGradeThreshold[] {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT emblem_id as emblemId, grade, threshold
+    FROM emblem_grade_thresholds
+    WHERE emblem_id = ?
+    ORDER BY grade
+  `).all(emblemId) as EmblemGradeThreshold[]
+}
+
+/**
+ * Recupere le seuil du grade maximum connu pour un embleme
+ */
+export function getMaxKnownThreshold(emblemId: number): number | null {
+  const db = getReputationDb()
+  const row = db.prepare(`
+    SELECT threshold
+    FROM emblem_grade_thresholds
+    WHERE emblem_id = ?
+    ORDER BY grade DESC
+    LIMIT 1
+  `).get(emblemId) as { threshold: number } | undefined
+  return row?.threshold || null
+}
+
+/**
+ * Recupere les seuils max connus pour plusieurs emblemes
+ */
+export function getMaxKnownThresholds(emblemIds: number[]): Record<number, number> {
+  if (emblemIds.length === 0) return {}
+
+  const db = getReputationDb()
+  const placeholders = emblemIds.map(() => '?').join(',')
+  const rows = db.prepare(`
+    SELECT emblem_id as emblemId, MAX(threshold) as maxThreshold
+    FROM emblem_grade_thresholds
+    WHERE emblem_id IN (${placeholders})
+    GROUP BY emblem_id
+  `).all(...emblemIds) as Array<{ emblemId: number, maxThreshold: number }>
+
+  const result: Record<number, number> = {}
+  for (const row of rows) {
+    result[row.emblemId] = row.maxThreshold
+  }
+  return result
 }
