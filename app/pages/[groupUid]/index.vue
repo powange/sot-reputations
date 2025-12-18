@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-
-interface UserInfo {
-  id: number
-  username: string
-  lastImportAt: string | null
-}
+import type {
+  UserInfo,
+  EmblemInfo,
+  UserEmblemProgress,
+  FactionWithUserCampaigns,
+  MultiUserTableRow
+} from '~/types/reputation'
+import { formatLastImport } from '~/utils/format'
+import { createSuccessColumn, createMaxColumn, createUserColumn } from '~/utils/emblem-columns'
 
 type GroupRole = 'chef' | 'moderator' | 'member'
 
@@ -17,54 +20,6 @@ interface GroupMember {
   role: GroupRole
   joinedAt: string
   lastImportAt: string | null
-}
-
-interface FactionInfo {
-  id: number
-  key: string
-  name: string
-  motto: string
-}
-
-interface GradeThreshold {
-  grade: number
-  threshold: number
-}
-
-interface EmblemInfo {
-  id: number
-  key: string
-  name: string
-  description: string
-  image: string
-  maxGrade: number
-  maxThreshold: number | null
-  gradeThresholds: GradeThreshold[]
-  campaignId: number
-  factionKey: string
-  campaignName: string
-}
-
-interface UserEmblemProgress {
-  userId: number
-  username: string
-  value: number
-  threshold: number
-  grade: number
-  completed: boolean
-}
-
-interface CampaignWithEmblems {
-  id: number
-  key: string
-  name: string
-  description: string
-  factionId: number
-  emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>
-}
-
-interface FactionWithCampaigns extends FactionInfo {
-  campaigns: CampaignWithEmblems[]
 }
 
 interface GroupData {
@@ -79,25 +34,13 @@ interface GroupData {
   userRole: GroupRole
   reputationData: {
     users: UserInfo[]
-    factions: FactionWithCampaigns[]
+    factions: FactionWithUserCampaigns[]
   }
 }
 
-interface TableRow {
-  id: number
-  name: string
-  description: string
-  image: string
-  maxGrade: number
-  maxThreshold: number | null
-  gradeThresholds: GradeThreshold[]
-  [key: string]: string | number | boolean | null | undefined | GradeThreshold[]
-}
-
 const route = useRoute()
-const router = useRouter()
 const toast = useToast()
-const { user, isAuthenticated } = useAuth()
+const { user } = useAuth()
 const { leaveGroup } = useGroups()
 
 const groupUid = route.params.groupUid as string
@@ -132,8 +75,6 @@ const isDeleteModalOpen = ref(false)
 const isDeleting = ref(false)
 
 const isImportModalOpen = ref(false)
-const importJsonText = ref('')
-const isImporting = ref(false)
 
 // Lien d'invitation
 const inviteLink = ref<{ code: string } | null>(null)
@@ -192,39 +133,19 @@ const dropdownItems = computed(() => {
   return items
 })
 
-// Filtres - initialisés depuis l'URL
-const selectedFactionKeys = ref<string[]>(
-  route.query.factions
-    ? (route.query.factions as string).split(',').filter(k => k)
-    : []
-)
+// Filtre utilisateurs spécifique au groupe
 const selectedUserIds = ref<number[]>(
   route.query.users
     ? (route.query.users as string).split(',').map(Number).filter(n => !isNaN(n))
     : []
 )
-const selectedCampaignIds = ref<number[]>(
-  route.query.campaigns
-    ? (route.query.campaigns as string).split(',').map(Number).filter(n => !isNaN(n))
-    : []
-)
-const emblemCompletionFilter = ref<'all' | 'incomplete' | 'complete'>(
-  (['all', 'incomplete', 'complete'].includes(route.query.completion as string)
-    ? route.query.completion as 'all' | 'incomplete' | 'complete'
-    : 'all')
-)
-const ignoreUsersWithoutData = ref(route.query.ignoreEmpty === '1')
 const onlyNotCompletedByAnyone = ref(route.query.noOneCompleted === '1')
-const searchQuery = ref((route.query.search as string) || '')
 
 // Flag pour savoir si les users ont été initialisés depuis l'URL
 const usersInitializedFromUrl = route.query.users !== undefined
 
 // Campagnes repliées
 const collapsedCampaigns = ref<Set<number>>(new Set())
-
-const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
-const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
 
 const users = computed(() => groupData.value?.reputationData.users || [])
 const factions = computed(() => groupData.value?.reputationData.factions || [])
@@ -235,6 +156,39 @@ const isChef = computed(() => userRole.value === 'chef')
 const isModerator = computed(() => userRole.value === 'chef' || userRole.value === 'moderator')
 const canManageMembers = computed(() => isModerator.value)
 
+// Utiliser le composable de filtres avec paramètres supplémentaires
+const {
+  searchQuery,
+  selectedFactionKeys,
+  selectedCampaignIds,
+  emblemCompletionFilter,
+  ignoreWithoutData: ignoreUsersWithoutData,
+  isSearchActive,
+  selectedFactions,
+  filteredFactionsCampaigns,
+  updateUrlWithFilters
+} = useEmblemFilters({
+  factions,
+  extraUrlParams: () => {
+    const params: Record<string, string | undefined> = {}
+
+    if (onlyNotCompletedByAnyone.value) {
+      params.noOneCompleted = '1'
+    }
+
+    // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
+    const allUserIds = users.value.map(u => u.id)
+    const allUsersSelected = allUserIds.length > 0 &&
+      selectedUserIds.value.length === allUserIds.length &&
+      allUserIds.every(id => selectedUserIds.value.includes(id))
+    if (!allUsersSelected && selectedUserIds.value.length > 0) {
+      params.users = selectedUserIds.value.join(',')
+    }
+
+    return params
+  }
+})
+
 // Initialiser les utilisateurs sélectionnés (si pas déjà initialisé depuis l'URL)
 watch(users, (newUsers) => {
   if (newUsers.length > 0 && selectedUserIds.value.length === 0 && !usersInitializedFromUrl) {
@@ -242,82 +196,16 @@ watch(users, (newUsers) => {
   }
 }, { immediate: true })
 
-// Synchroniser les filtres avec l'URL (mise à jour légère sans Vue Router)
-let urlUpdateTimeout: ReturnType<typeof setTimeout> | null = null
-
-function updateUrlWithFilters() {
-  if (!import.meta.client) return
-
-  const params = new URLSearchParams()
-
-  if (searchQuery.value.trim()) {
-    params.set('search', searchQuery.value.trim())
-  }
-  if (selectedFactionKeys.value.length > 0) {
-    params.set('factions', selectedFactionKeys.value.join(','))
-  }
-  if (selectedCampaignIds.value.length > 0 && !allCampaignsSelected.value) {
-    params.set('campaigns', selectedCampaignIds.value.join(','))
-  }
-  if (emblemCompletionFilter.value !== 'all') {
-    params.set('completion', emblemCompletionFilter.value)
-  }
-  if (ignoreUsersWithoutData.value) {
-    params.set('ignoreEmpty', '1')
-  }
-  if (onlyNotCompletedByAnyone.value) {
-    params.set('noOneCompleted', '1')
-  }
-  // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
-  const allUserIds = users.value.map(u => u.id)
-  const allUsersSelected = allUserIds.length > 0 &&
-    selectedUserIds.value.length === allUserIds.length &&
-    allUserIds.every(id => selectedUserIds.value.includes(id))
-  if (!allUsersSelected && selectedUserIds.value.length > 0) {
-    params.set('users', selectedUserIds.value.join(','))
-  }
-
-  const queryString = params.toString()
-  const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname
-  window.history.replaceState({}, '', newUrl)
-}
-
+// Synchroniser les filtres supplémentaires avec l'URL
 watch(
-  [searchQuery, selectedFactionKeys, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, onlyNotCompletedByAnyone, selectedUserIds],
+  [onlyNotCompletedByAnyone, selectedUserIds],
   () => {
-    if (urlUpdateTimeout) {
-      clearTimeout(urlUpdateTimeout)
-    }
-    urlUpdateTimeout = setTimeout(updateUrlWithFilters, 300)
+    updateUrlWithFilters()
   },
   { deep: true }
 )
 
-// Factions sélectionnées (filtrées par selectedFactionKeys si défini)
-const selectedFactions = computed(() => {
-  if (allFactionsSelected.value) return factions.value
-  return factions.value.filter(f => selectedFactionKeys.value.includes(f.key))
-})
-
-// Toutes les campagnes des factions sélectionnées
-const selectedFactionCampaignIds = computed(() =>
-  selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
-)
-const allCampaignsSelected = computed(() =>
-  areAllSelected(selectedCampaignIds.value, selectedFactionCampaignIds.value)
-)
-
-// Factions avec leurs campagnes filtrées
-const filteredFactionsCampaigns = computed(() => {
-  return selectedFactions.value.map(faction => ({
-    faction,
-    campaigns: faction.campaigns.filter(c =>
-      selectedCampaignIds.value.includes(c.id) &&
-      (c.key !== 'default' || faction.campaigns.length === 1)
-    )
-  }))
-})
-
+// Résultats de recherche
 const searchResults = computed(() => {
   if (!isSearchActive.value) return []
 
@@ -359,7 +247,7 @@ function selectAllUsers() {
   selectedUserIds.value = users.value.map(u => u.id)
 }
 
-function selectNoUsers() {
+function _selectNoUsers() {
   // Garder au moins un utilisateur sélectionné
   if (users.value.length > 0) {
     selectedUserIds.value = [users.value[0].id]
@@ -377,7 +265,7 @@ const totalEmblems = computed(() => {
   for (const faction of selectedFactions.value) {
     // Déterminer les campagnes à considérer
     const campaignsToCount = selectedCampaignIds.value.length > 0
-      ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+      ? faction.campaigns.filter((c: { id: number }) => selectedCampaignIds.value.includes(c.id))
       : faction.campaigns
 
     for (const campaign of campaignsToCount) {
@@ -391,19 +279,19 @@ const totalEmblems = computed(() => {
 const userCompletionStats = computed(() => {
   const stats: Record<number, { completed: number; total: number; percentage: number }> = {}
 
-  for (const user of users.value) {
+  for (const u of users.value) {
     let completed = 0
     let total = 0
 
     for (const faction of selectedFactions.value) {
       // Déterminer les campagnes à considérer
       const campaignsToCount = selectedCampaignIds.value.length > 0
-        ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+        ? faction.campaigns.filter((c: { id: number }) => selectedCampaignIds.value.includes(c.id))
         : faction.campaigns
 
       for (const campaign of campaignsToCount) {
         for (const emblem of campaign.emblems) {
-          const progress = emblem.userProgress[user.id]
+          const progress = emblem.userProgress[u.id]
           // Ne compter que les emblèmes avec des données de progression (exclure null/undefined)
           if (progress !== null && progress !== undefined) {
             total++
@@ -415,7 +303,7 @@ const userCompletionStats = computed(() => {
       }
     }
 
-    stats[user.id] = {
+    stats[u.id] = {
       completed,
       total,
       percentage: total > 0 ? (completed === total ? 100 : Math.floor((completed / total) * 100)) : 0
@@ -438,7 +326,7 @@ const groupStats = computed(() => {
   for (const faction of selectedFactions.value) {
     // Déterminer les campagnes à considérer
     const campaignsToCount = selectedCampaignIds.value.length > 0
-      ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+      ? faction.campaigns.filter((c: { id: number }) => selectedCampaignIds.value.includes(c.id))
       : faction.campaigns
 
     for (const campaign of campaignsToCount) {
@@ -446,8 +334,8 @@ const groupStats = computed(() => {
         let allCompleted = true
         let completionCount = 0
 
-        for (const user of selectedUserList) {
-          const progress = emblem.userProgress[user.id]
+        for (const u of selectedUserList) {
+          const progress = emblem.userProgress[u.id]
           if (progress?.completed) {
             completionCount++
           } else {
@@ -488,22 +376,10 @@ function isCampaignCollapsed(campaignId: number): boolean {
   return collapsedCampaigns.value.has(campaignId)
 }
 
-function formatLastImport(dateStr: string | null): string {
-  if (!dateStr) return 'Jamais importe'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 function isEmblemCompletedByAll(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
   let usersWithData = 0
-  for (const user of selectedUsers.value) {
-    const progress = emblem.userProgress[user.id]
+  for (const u of selectedUsers.value) {
+    const progress = emblem.userProgress[u.id]
     // Si on ignore les utilisateurs sans données et qu'il n'y a pas de progression, on passe
     if (ignoreUsersWithoutData.value && !progress) {
       continue
@@ -518,8 +394,8 @@ function isEmblemCompletedByAll(emblem: { userProgress: Record<number, UserEmble
 }
 
 function isEmblemCompletedByNone(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
-  for (const user of selectedUsers.value) {
-    const progress = emblem.userProgress[user.id]
+  for (const u of selectedUsers.value) {
+    const progress = emblem.userProgress[u.id]
     if (progress?.completed) {
       return false
     }
@@ -529,8 +405,8 @@ function isEmblemCompletedByNone(emblem: { userProgress: Record<number, UserEmbl
 
 // Vérifie si au moins un utilisateur sélectionné a des données pour cet emblème
 function hasAnyUserData(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
-  for (const user of selectedUsers.value) {
-    const progress = emblem.userProgress[user.id]
+  for (const u of selectedUsers.value) {
+    const progress = emblem.userProgress[u.id]
     if (progress !== null && progress !== undefined) {
       return true
     }
@@ -558,7 +434,7 @@ function filterEmblemsArray<T extends { userProgress: Record<number, UserEmblemP
 // Note: On accède explicitement aux refs de filtre pour que Vue les détecte comme dépendances
 const filteredEmblemsByCampaign = computed(() => {
   // Dépendances explicites pour la réactivité
-  const _ = [
+  void [
     emblemCompletionFilter.value,
     ignoreUsersWithoutData.value,
     onlyNotCompletedByAnyone.value,
@@ -580,103 +456,22 @@ function getFilteredEmblems(campaignId: number) {
   return filteredEmblemsByCampaign.value[campaignId] || []
 }
 
-const columns = computed<TableColumn<TableRow>[]>(() => {
-  const cols: TableColumn<TableRow>[] = [
-    {
-      accessorKey: 'name',
-      header: 'Succes',
-      cell: ({ row }) => {
-        const children = []
-
-        if (row.original.image) {
-          children.push(h('img', {
-            src: row.original.image,
-            alt: row.original.name,
-            class: 'w-10 h-10 object-contain shrink-0'
-          }))
-        }
-
-        children.push(h('div', {}, [
-          h('div', { class: 'font-medium' }, row.original.name),
-          h('div', { class: 'text-xs text-muted' }, row.original.description)
-        ]))
-
-        return h('div', { class: 'flex items-center gap-3' }, children)
-      }
-    },
-    {
-      accessorKey: 'maxThreshold',
-      header: 'Max',
-      meta: { class: { th: 'w-full', td: 'w-full' } },
-      cell: ({ row }) => {
-        const maxThreshold = row.original.maxThreshold as number | null
-        const maxGrade = row.original.maxGrade as number
-        const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
-
-        const displayValue = maxThreshold === null ? '?' : maxThreshold.toString()
-        // Afficher popover seulement si maxGrade >= 2 et qu'il y a des seuils
-        const hasMultipleGrades = maxGrade >= 2 && gradeThresholds && gradeThresholds.length > 0
-
-        if (!hasMultipleGrades) {
-          return h('span', { class: maxThreshold === null ? 'text-muted' : '' }, displayValue)
-        }
-
-        // Créer le contenu du popover avec tous les grades
-        const thresholdsMap = new Map(gradeThresholds.map(gt => [gt.grade, gt.threshold]))
-        const popoverContent: ReturnType<typeof h>[] = []
-        for (let grade = 1; grade <= maxGrade; grade++) {
-          const threshold = thresholdsMap.get(grade)
-          popoverContent.push(
-            h('div', { class: 'flex justify-between gap-4 text-sm' }, [
-              h('span', { class: 'text-muted' }, `Grade ${grade}`),
-              h('span', { class: threshold !== undefined ? 'font-medium' : 'text-muted' },
-                threshold !== undefined ? threshold.toString() : '?')
-            ])
-          )
-        }
-
-        return h(
-          resolveComponent('UPopover'),
-          { mode: 'hover' },
-          {
-            default: () => h('span', { class: 'cursor-help underline decoration-dotted' }, displayValue),
-            content: () => h('div', { class: 'p-2 space-y-1' }, popoverContent)
-          }
-        )
-      }
-    }
+const columns = computed<TableColumn<MultiUserTableRow>[]>(() => {
+  const cols: TableColumn<MultiUserTableRow>[] = [
+    createSuccessColumn<MultiUserTableRow>(),
+    createMaxColumn<MultiUserTableRow>()
   ]
 
-  for (const user of selectedUsers.value) {
-    cols.push({
-      accessorKey: `user_${user.id}`,
-      header: () => h('div', {}, [
-        h('div', { class: 'font-medium' }, user.username),
-        h('div', { class: 'text-xs text-muted font-normal whitespace-nowrap' }, formatLastImport(user.lastImportAt))
-      ]),
-      cell: ({ row }) => {
-        const value = row.original[`user_${user.id}_display`] as string
-        const completed = row.original[`user_${user.id}_completed`] as boolean
-        const hasProgress = row.original[`user_${user.id}_hasProgress`] as boolean
-
-        let colorClass = 'text-muted'
-        if (completed) {
-          colorClass = 'text-success font-medium'
-        } else if (hasProgress) {
-          colorClass = 'text-warning'
-        }
-
-        return h('span', { class: colorClass }, value)
-      }
-    })
+  for (const u of selectedUsers.value) {
+    cols.push(createUserColumn<MultiUserTableRow>(u.id, u.username, u.lastImportAt, formatLastImport))
   }
 
   return cols
 })
 
-function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>): TableRow[] {
+function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>): MultiUserTableRow[] {
   return emblems.map((emblem) => {
-    const row: TableRow = {
+    const row: MultiUserTableRow = {
       id: emblem.id,
       name: emblem.name,
       description: emblem.description,
@@ -686,18 +481,18 @@ function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number,
       gradeThresholds: emblem.gradeThresholds || []
     }
 
-    for (const user of selectedUsers.value) {
-      const progress = emblem.userProgress[user.id]
+    for (const u of selectedUsers.value) {
+      const progress = emblem.userProgress[u.id]
       if (progress) {
-        row[`user_${user.id}_display`] = progress.threshold > 0
+        row[`user_${u.id}_display`] = progress.threshold > 0
           ? progress.value.toString()
           : (progress.completed ? 'Oui' : 'Non')
-        row[`user_${user.id}_completed`] = progress.completed
-        row[`user_${user.id}_hasProgress`] = progress.value > 0
+        row[`user_${u.id}_completed`] = progress.completed
+        row[`user_${u.id}_hasProgress`] = progress.value > 0
       } else {
-        row[`user_${user.id}_display`] = '-'
-        row[`user_${user.id}_completed`] = false
-        row[`user_${user.id}_hasProgress`] = false
+        row[`user_${u.id}_display`] = '-'
+        row[`user_${u.id}_completed`] = false
+        row[`user_${u.id}_hasProgress`] = false
       }
     }
 
@@ -726,7 +521,7 @@ async function handleInvite() {
       method: 'POST',
       body: { username: inviteUsername.value.trim() }
     })
-    toast.add({ title: 'Succes', description: result.message, color: 'success' })
+    toast.add({ title: 'Succès', description: result.message, color: 'success' })
     inviteUsername.value = ''
     await fetchGroupPendingInvites()
   } catch (error: unknown) {
@@ -746,7 +541,7 @@ async function handleChangeRole() {
       method: 'POST',
       body: { userId: memberToChangeRole.value.userId, newRole: newRoleSelected.value }
     })
-    toast.add({ title: 'Succes', description: result.message, color: 'success' })
+    toast.add({ title: 'Succès', description: result.message, color: 'success' })
     isRoleModalOpen.value = false
     memberToChangeRole.value = null
     await refresh()
@@ -767,7 +562,7 @@ async function handleKick() {
       method: 'POST',
       body: { userId: memberToKick.value.userId }
     })
-    toast.add({ title: 'Succes', description: result.message, color: 'success' })
+    toast.add({ title: 'Succès', description: result.message, color: 'success' })
     isKickModalOpen.value = false
     memberToKick.value = null
     await refresh()
@@ -783,7 +578,7 @@ async function handleLeave() {
   isLeaving.value = true
   try {
     await leaveGroup(groupUid)
-    toast.add({ title: 'Succes', description: 'Vous avez quitte le groupe', color: 'success' })
+    toast.add({ title: 'Succès', description: 'Vous avez quitté le groupe', color: 'success' })
     navigateTo('/')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -797,49 +592,13 @@ async function handleDelete() {
   isDeleting.value = true
   try {
     await $fetch(`/api/groups/${groupUid}`, { method: 'DELETE' })
-    toast.add({ title: 'Succes', description: 'Groupe supprime', color: 'success' })
+    toast.add({ title: 'Succès', description: 'Groupe supprimé', color: 'success' })
     navigateTo('/')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
   } finally {
     isDeleting.value = false
-  }
-}
-
-async function handleImport() {
-  if (!importJsonText.value.trim()) {
-    toast.add({ title: 'Erreur', description: 'JSON requis', color: 'error' })
-    return
-  }
-
-  let jsonData: unknown
-  try {
-    jsonData = JSON.parse(importJsonText.value)
-  } catch {
-    toast.add({ title: 'Erreur', description: 'JSON invalide', color: 'error' })
-    return
-  }
-
-  isImporting.value = true
-  try {
-    await $fetch('/api/import', {
-      method: 'POST',
-      body: {
-        username: user.value?.username,
-        password: '', // Le mot de passe n'est plus nécessaire si on est connecté
-        jsonData
-      }
-    })
-    toast.add({ title: 'Succes', description: 'Donnees importees', color: 'success' })
-    isImportModalOpen.value = false
-    importJsonText.value = ''
-    await refresh()
-  } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
-  } finally {
-    isImporting.value = false
   }
 }
 
@@ -864,7 +623,7 @@ async function generateInviteLink() {
       method: 'POST'
     })
     inviteLink.value = result.invite
-    toast.add({ title: 'Succes', description: 'Lien d\'invitation genere', color: 'success' })
+    toast.add({ title: 'Succès', description: 'Lien d\'invitation généré', color: 'success' })
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
@@ -877,7 +636,7 @@ async function copyInviteLink() {
   if (!fullInviteLink.value) return
   try {
     await navigator.clipboard.writeText(fullInviteLink.value)
-    toast.add({ title: 'Copie !', description: 'Lien copie dans le presse-papier', color: 'success' })
+    toast.add({ title: 'Copié !', description: 'Lien copié dans le presse-papier', color: 'success' })
   } catch {
     toast.add({ title: 'Erreur', description: 'Impossible de copier le lien', color: 'error' })
   }
@@ -900,7 +659,7 @@ async function cancelPendingInvite(inviteId: number) {
   try {
     await $fetch(`/api/groups/${groupUid}/pending-invites/${inviteId}`, { method: 'DELETE' })
     groupPendingInvites.value = groupPendingInvites.value.filter(i => i.id !== inviteId)
-    toast.add({ title: 'Invitation annulee', color: 'success' })
+    toast.add({ title: 'Invitation annulée', color: 'success' })
   } catch {
     toast.add({ title: 'Erreur', description: 'Impossible d\'annuler l\'invitation', color: 'error' })
   } finally {
@@ -964,8 +723,8 @@ function connectSSE() {
     // Ne pas rafraîchir si c'est nous qui avons importé
     if (data.userId !== user.value?.id) {
       toast.add({
-        title: 'Donnees mises a jour',
-        description: `${data.username} a importe ses donnees`,
+        title: 'Données mises à jour',
+        description: `${data.username} a importé ses données`,
         color: 'info'
       })
       await refresh()
@@ -996,15 +755,24 @@ onUnmounted(() => {
     <div class="flex justify-between items-start mb-8">
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <NuxtLink to="/" class="text-muted hover:text-foreground">
-            <UIcon name="i-lucide-arrow-left" class="w-5 h-5" />
+          <NuxtLink
+            to="/"
+            class="text-muted hover:text-foreground"
+          >
+            <UIcon
+              name="i-lucide-arrow-left"
+              class="w-5 h-5"
+            />
           </NuxtLink>
           <h1 class="text-3xl font-pirate">
             {{ groupData?.group.name }}
           </h1>
         </div>
         <div class="flex items-center gap-4">
-          <UBadge :color="roleBadgeColors[userRole]" :label="roleLabels[userRole]" />
+          <UBadge
+            :color="roleBadgeColors[userRole]"
+            :label="roleLabels[userRole]"
+          />
           <span class="text-sm text-muted">{{ members.length }} membre(s)</span>
         </div>
       </div>
@@ -1023,7 +791,10 @@ onUnmounted(() => {
           @click="isMembersModalOpen = true"
         />
         <UDropdownMenu :items="dropdownItems">
-          <UButton icon="i-lucide-more-vertical" variant="ghost" />
+          <UButton
+            icon="i-lucide-more-vertical"
+            variant="ghost"
+          />
         </UDropdownMenu>
       </div>
     </div>
@@ -1038,14 +809,14 @@ onUnmounted(() => {
         class="w-16 h-16 text-muted mx-auto mb-4"
       />
       <h2 class="text-xl font-semibold mb-2">
-        Aucune donnee de reputation
+        Aucune donnée de réputation
       </h2>
       <p class="text-muted mb-4">
-        Les membres du groupe doivent importer leurs donnees de reputation.
+        Les membres du groupe doivent importer leurs données de réputation.
       </p>
       <UButton
         icon="i-lucide-upload"
-        label="Importer mes donnees"
+        label="Importer mes données"
         @click="isImportModalOpen = true"
       />
     </div>
@@ -1054,16 +825,28 @@ onUnmounted(() => {
       <!-- Statistiques du groupe -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-muted/30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-success">{{ groupStats.completedByAll }}</div>
-          <div class="text-sm text-muted">Completes par tous</div>
+          <div class="text-2xl font-bold text-success">
+            {{ groupStats.completedByAll }}
+          </div>
+          <div class="text-sm text-muted">
+            Complétés par tous
+          </div>
         </div>
         <div class="bg-muted/30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-primary">{{ groupStats.averageCompletion }}%</div>
-          <div class="text-sm text-muted">Completion moyenne</div>
+          <div class="text-2xl font-bold text-primary">
+            {{ groupStats.averageCompletion }}%
+          </div>
+          <div class="text-sm text-muted">
+            Complétion moyenne
+          </div>
         </div>
         <div class="bg-muted/30 rounded-lg p-4">
-          <div class="text-2xl font-bold">{{ groupStats.totalEmblems }}</div>
-          <div class="text-sm text-muted">Emblemes au total</div>
+          <div class="text-2xl font-bold">
+            {{ groupStats.totalEmblems }}
+          </div>
+          <div class="text-sm text-muted">
+            Emblèmes au total
+          </div>
         </div>
       </div>
 
@@ -1105,21 +888,37 @@ onUnmounted(() => {
         </template>
 
         <template #completion-extra>
-          <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
-            <USwitch v-model="ignoreUsersWithoutData" size="sm" />
-            <span class="text-sm text-muted">Ignorer sans donnees</span>
+          <div
+            v-if="emblemCompletionFilter === 'incomplete'"
+            class="flex items-center gap-2 ml-4 pl-4 border-l border-muted"
+          >
+            <USwitch
+              v-model="ignoreUsersWithoutData"
+              size="sm"
+            />
+            <span class="text-sm text-muted">Ignorer sans données</span>
           </div>
-          <div v-if="emblemCompletionFilter === 'incomplete'" class="flex items-center gap-2 ml-4 pl-4 border-l border-muted">
-            <USwitch v-model="onlyNotCompletedByAnyone" size="sm" color="warning" />
-            <span class="text-sm text-muted">Non completes par personne</span>
+          <div
+            v-if="emblemCompletionFilter === 'incomplete'"
+            class="flex items-center gap-2 ml-4 pl-4 border-l border-muted"
+          >
+            <USwitch
+              v-model="onlyNotCompletedByAnyone"
+              size="sm"
+              color="warning"
+            />
+            <span class="text-sm text-muted">Non complétés par personne</span>
           </div>
         </template>
       </ReputationFilters>
 
       <!-- Résultats de recherche -->
       <template v-if="isSearchActive">
-        <div v-if="searchResults.length === 0" class="text-center py-8 text-muted">
-          Aucun succes trouve pour "{{ searchQuery }}"
+        <div
+          v-if="searchResults.length === 0"
+          class="text-center py-8 text-muted"
+        >
+          Aucun succès trouvé pour "{{ searchQuery }}"
         </div>
         <div
           v-for="(result, index) in searchResults"
@@ -1128,25 +927,51 @@ onUnmounted(() => {
         >
           <h3 class="text-lg font-semibold mb-4">
             {{ result.factionName }}
-            <span v-if="result.campaignKey !== 'default'" class="text-muted font-normal">
+            <span
+              v-if="result.campaignKey !== 'default'"
+              class="text-muted font-normal"
+            >
               / {{ result.campaignName }}
             </span>
           </h3>
-          <TableLoader sticky-header>
-            <UTable :data="getTableData(filterEmblemsArray(result.emblems))" :columns="columns" />
+          <TableLoader>
+            <UTable
+              :data="getTableData(filterEmblemsArray(result.emblems))"
+              :columns="columns"
+              :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+            />
           </TableLoader>
         </div>
       </template>
 
       <!-- Factions (toutes ou filtrées) -->
       <template v-else>
-        <template v-for="{ faction, campaigns } in filteredFactionsCampaigns" :key="faction.key">
-          <div v-if="campaigns.some(c => getFilteredEmblems(c.id).length > 0)" class="mb-8">
-            <h2 class="text-2xl font-pirate">{{ faction.name }}</h2>
-            <p v-if="faction.motto" class="text-muted italic mb-4">« {{ faction.motto }} »</p>
+        <template
+          v-for="{ faction, campaigns } in filteredFactionsCampaigns"
+          :key="faction.key"
+        >
+          <div
+            v-if="campaigns.some((c: { id: number }) => getFilteredEmblems(c.id).length > 0)"
+            class="mb-8"
+          >
+            <h2 class="text-2xl font-pirate">
+              {{ faction.name }}
+            </h2>
+            <p
+              v-if="faction.motto"
+              class="text-muted italic mb-4"
+            >
+              « {{ faction.motto }} »
+            </p>
 
-            <template v-for="campaign in campaigns" :key="campaign.id">
-              <div v-if="getFilteredEmblems(campaign.id).length > 0" class="mb-6">
+            <template
+              v-for="campaign in campaigns"
+              :key="campaign.id"
+            >
+              <div
+                v-if="getFilteredEmblems(campaign.id).length > 0"
+                class="mb-6"
+              >
                 <div
                   v-if="campaign.key !== 'default'"
                   class="mb-4 flex items-center gap-2 cursor-pointer select-none"
@@ -1161,11 +986,20 @@ onUnmounted(() => {
                       {{ campaign.name }}
                       <span class="text-sm font-normal text-muted">({{ getFilteredEmblems(campaign.id).length }})</span>
                     </h3>
-                    <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
+                    <p
+                      v-if="campaign.description && !isCampaignCollapsed(campaign.id)"
+                      class="text-sm text-muted italic"
+                    >
+                      {{ campaign.description }}
+                    </p>
                   </div>
                 </div>
-                <TableLoader v-if="!isCampaignCollapsed(campaign.id)" sticky-header>
-                  <UTable :data="getTableData(getFilteredEmblems(campaign.id))" :columns="columns" />
+                <TableLoader v-if="!isCampaignCollapsed(campaign.id)">
+                  <UTable
+                    :data="getTableData(getFilteredEmblems(campaign.id))"
+                    :columns="columns"
+                    :ui="{ thead: 'sticky top-16 bg-[var(--ui-bg)] z-10' }"
+                  />
                 </TableLoader>
               </div>
             </template>
@@ -1180,8 +1014,13 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
-              <h2 class="text-xl font-semibold">Membres du groupe</h2>
-              <UBadge :label="`${members.length} membre(s)`" color="neutral" />
+              <h2 class="text-xl font-semibold">
+                Membres du groupe
+              </h2>
+              <UBadge
+                :label="`${members.length} membre(s)`"
+                color="neutral"
+              />
             </div>
           </template>
 
@@ -1194,7 +1033,10 @@ onUnmounted(() => {
                 class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
               >
                 <div class="flex items-center gap-3">
-                  <UIcon name="i-lucide-user" class="w-5 h-5 text-muted" />
+                  <UIcon
+                    name="i-lucide-user"
+                    class="w-5 h-5 text-muted"
+                  />
                   <span class="font-medium">{{ member.username }}</span>
                   <UBadge
                     :color="roleBadgeColors[member.role]"
@@ -1209,7 +1051,7 @@ onUnmounted(() => {
                     icon="i-lucide-shield"
                     size="xs"
                     variant="ghost"
-                    title="Modifier le role"
+                    title="Modifier le rôle"
                     @click="openRoleModal(member)"
                   />
                   <!-- Bouton retirer du groupe (chef et moderateur) -->
@@ -1225,7 +1067,6 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-
           </div>
 
           <template #footer>
@@ -1238,7 +1079,12 @@ onUnmounted(() => {
                 @click="isInviteModalOpen = true"
               />
               <div v-else />
-              <UButton label="Fermer" color="neutral" variant="outline" @click="isMembersModalOpen = false" />
+              <UButton
+                label="Fermer"
+                color="neutral"
+                variant="outline"
+                @click="isMembersModalOpen = false"
+              />
             </div>
           </template>
         </UCard>
@@ -1250,18 +1096,31 @@ onUnmounted(() => {
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Inviter des pirates</h2>
+            <h2 class="text-xl font-semibold">
+              Inviter des pirates
+            </h2>
           </template>
 
           <div class="space-y-6">
             <!-- Lien d'invitation -->
             <div>
-              <h3 class="text-sm font-medium mb-2">Lien d'invitation</h3>
-              <div v-if="isLoadingInviteLink" class="flex items-center gap-2 text-muted">
-                <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+              <h3 class="text-sm font-medium mb-2">
+                Lien d'invitation
+              </h3>
+              <div
+                v-if="isLoadingInviteLink"
+                class="flex items-center gap-2 text-muted"
+              >
+                <UIcon
+                  name="i-lucide-loader-2"
+                  class="w-4 h-4 animate-spin"
+                />
                 <span>Chargement...</span>
               </div>
-              <div v-else-if="inviteLink" class="space-y-2">
+              <div
+                v-else-if="inviteLink"
+                class="space-y-2"
+              >
                 <div class="flex gap-2">
                   <UInput
                     :model-value="fullInviteLink"
@@ -1279,18 +1138,18 @@ onUnmounted(() => {
                     icon="i-lucide-refresh-cw"
                     variant="outline"
                     color="warning"
-                    title="Regenerer le lien"
+                    title="Régénérer le lien"
                     :loading="isGeneratingInviteLink"
                     @click="generateInviteLink"
                   />
                 </div>
                 <p class="text-xs text-muted">
-                  Partagez ce lien pour inviter des pirates a rejoindre le groupe.
+                  Partagez ce lien pour inviter des pirates à rejoindre le groupe.
                 </p>
               </div>
               <div v-else>
                 <UButton
-                  label="Generer un lien d'invitation"
+                  label="Générer un lien d'invitation"
                   icon="i-lucide-link"
                   variant="outline"
                   :loading="isGeneratingInviteLink"
@@ -1301,7 +1160,9 @@ onUnmounted(() => {
 
             <!-- Invitation par pseudo -->
             <div>
-              <h3 class="text-sm font-medium mb-2">Inviter par Gamertag</h3>
+              <h3 class="text-sm font-medium mb-2">
+                Inviter par Gamertag
+              </h3>
               <div class="flex gap-2">
                 <UInput
                   v-model="inviteUsername"
@@ -1322,12 +1183,20 @@ onUnmounted(() => {
             </div>
 
             <!-- Invitations en attente -->
-            <div v-if="isLoadingGroupPendingInvites" class="flex items-center gap-2 text-muted">
-              <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+            <div
+              v-if="isLoadingGroupPendingInvites"
+              class="flex items-center gap-2 text-muted"
+            >
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-4 h-4 animate-spin"
+              />
               <span>Chargement des invitations...</span>
             </div>
             <div v-else-if="groupPendingInvites.length > 0">
-              <h3 class="text-sm font-medium mb-2">Invitations en attente ({{ groupPendingInvites.length }})</h3>
+              <h3 class="text-sm font-medium mb-2">
+                Invitations en attente ({{ groupPendingInvites.length }})
+              </h3>
               <div class="space-y-2">
                 <div
                   v-for="invite in groupPendingInvites"
@@ -1336,7 +1205,7 @@ onUnmounted(() => {
                 >
                   <div>
                     <span class="font-medium">{{ invite.username }}</span>
-                    <span class="text-xs text-muted ml-2">invite par {{ invite.invitedByUsername }}</span>
+                    <span class="text-xs text-muted ml-2">invité par {{ invite.invitedByUsername }}</span>
                   </div>
                   <UButton
                     icon="i-lucide-x"
@@ -1354,7 +1223,12 @@ onUnmounted(() => {
 
           <template #footer>
             <div class="flex justify-end">
-              <UButton label="Fermer" color="neutral" variant="outline" @click="isInviteModalOpen = false" />
+              <UButton
+                label="Fermer"
+                color="neutral"
+                variant="outline"
+                @click="isInviteModalOpen = false"
+              />
             </div>
           </template>
         </UCard>
@@ -1366,10 +1240,12 @@ onUnmounted(() => {
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Modifier le role</h2>
+            <h2 class="text-xl font-semibold">
+              Modifier le rôle
+            </h2>
           </template>
           <div class="space-y-4">
-            <p>Choisir le nouveau role pour <strong>{{ memberToChangeRole?.username }}</strong> :</p>
+            <p>Choisir le nouveau rôle pour <strong>{{ memberToChangeRole?.username }}</strong> :</p>
 
             <div class="space-y-2">
               <label
@@ -1384,25 +1260,38 @@ onUnmounted(() => {
                   name="role"
                   :value="role"
                   class="sr-only"
+                >
+                <UBadge
+                  :color="roleBadgeColors[role]"
+                  :label="roleLabels[role]"
                 />
-                <UBadge :color="roleBadgeColors[role]" :label="roleLabels[role]" />
                 <span class="text-sm text-muted">
                   <template v-if="role === 'chef'">Tous les droits. Un seul chef par groupe.</template>
                   <template v-else-if="role === 'moderator'">Peut inviter et retirer des membres.</template>
-                  <template v-else>Acces en lecture seule.</template>
+                  <template v-else>Accès en lecture seule.</template>
                 </span>
               </label>
             </div>
 
-            <UAlert v-if="newRoleSelected === 'chef'" icon="i-lucide-alert-triangle" color="warning" title="Attention">
+            <UAlert
+              v-if="newRoleSelected === 'chef'"
+              icon="i-lucide-alert-triangle"
+              color="warning"
+              title="Attention"
+            >
               <template #description>
-                En transferant le role de Chef, vous deviendrez Moderateur.
+                En transférant le rôle de Chef, vous deviendrez Modérateur.
               </template>
             </UAlert>
           </div>
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isRoleModalOpen = false" />
+              <UButton
+                label="Annuler"
+                color="neutral"
+                variant="outline"
+                @click="isRoleModalOpen = false"
+              />
               <UButton
                 label="Valider"
                 icon="i-lucide-check"
@@ -1421,14 +1310,29 @@ onUnmounted(() => {
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold text-error">Retirer du groupe</h2>
+            <h2 class="text-xl font-semibold text-error">
+              Retirer du groupe
+            </h2>
           </template>
           <p>Voulez-vous vraiment retirer <strong>{{ memberToKick?.username }}</strong> du groupe ?</p>
-          <p class="text-sm text-muted mt-2">Cette personne devra etre invitee a nouveau pour rejoindre le groupe.</p>
+          <p class="text-sm text-muted mt-2">
+            Cette personne devra être invitée à nouveau pour rejoindre le groupe.
+          </p>
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isKickModalOpen = false" />
-              <UButton label="Retirer" color="error" icon="i-lucide-user-minus" :loading="isKicking" @click="handleKick" />
+              <UButton
+                label="Annuler"
+                color="neutral"
+                variant="outline"
+                @click="isKickModalOpen = false"
+              />
+              <UButton
+                label="Retirer"
+                color="error"
+                icon="i-lucide-user-minus"
+                :loading="isKicking"
+                @click="handleKick"
+              />
             </div>
           </template>
         </UCard>
@@ -1440,13 +1344,26 @@ onUnmounted(() => {
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Quitter le groupe</h2>
+            <h2 class="text-xl font-semibold">
+              Quitter le groupe
+            </h2>
           </template>
           <p>Voulez-vous vraiment quitter le groupe <strong>{{ groupData?.group.name }}</strong> ?</p>
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isLeaveModalOpen = false" />
-              <UButton label="Quitter" color="warning" icon="i-lucide-log-out" :loading="isLeaving" @click="handleLeave" />
+              <UButton
+                label="Annuler"
+                color="neutral"
+                variant="outline"
+                @click="isLeaveModalOpen = false"
+              />
+              <UButton
+                label="Quitter"
+                color="warning"
+                icon="i-lucide-log-out"
+                :loading="isLeaving"
+                @click="handleLeave"
+              />
             </div>
           </template>
         </UCard>
@@ -1458,17 +1375,34 @@ onUnmounted(() => {
       <template #content>
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold text-error">Supprimer le groupe</h2>
+            <h2 class="text-xl font-semibold text-error">
+              Supprimer le groupe
+            </h2>
           </template>
-          <UAlert icon="i-lucide-alert-triangle" color="error" title="Attention">
+          <UAlert
+            icon="i-lucide-alert-triangle"
+            color="error"
+            title="Attention"
+          >
             <template #description>
-              Cette action est irreversible. Tous les membres seront retires du groupe.
+              Cette action est irréversible. Tous les membres seront retirés du groupe.
             </template>
           </UAlert>
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isDeleteModalOpen = false" />
-              <UButton label="Supprimer" color="error" icon="i-lucide-trash-2" :loading="isDeleting" @click="handleDelete" />
+              <UButton
+                label="Annuler"
+                color="neutral"
+                variant="outline"
+                @click="isDeleteModalOpen = false"
+              />
+              <UButton
+                label="Supprimer"
+                color="error"
+                icon="i-lucide-trash-2"
+                :loading="isDeleting"
+                @click="handleDelete"
+              />
             </div>
           </template>
         </UCard>
@@ -1476,36 +1410,10 @@ onUnmounted(() => {
     </UModal>
 
     <!-- Modal Import -->
-    <UModal v-model:open="isImportModalOpen">
-      <template #content>
-        <UCard>
-          <template #header>
-            <h2 class="text-xl font-semibold">Importer mes donnees</h2>
-          </template>
-          <div class="space-y-4">
-            <UAlert icon="i-lucide-info" color="info" title="Astuce">
-              <template #description>
-                <NuxtLink to="/tutoriel" class="underline" target="_blank">Voir le tutoriel</NuxtLink>
-                pour savoir comment recuperer vos donnees.
-              </template>
-            </UAlert>
-            <UFormField label="Donnees JSON">
-              <UTextarea
-                v-model="importJsonText"
-                placeholder="Collez ici le JSON..."
-                :rows="10"
-                class="w-full"
-              />
-            </UFormField>
-          </div>
-          <template #footer>
-            <div class="flex justify-end gap-2">
-              <UButton label="Annuler" color="neutral" variant="outline" @click="isImportModalOpen = false" />
-              <UButton label="Importer" icon="i-lucide-upload" :loading="isImporting" @click="handleImport" />
-            </div>
-          </template>
-        </UCard>
-      </template>
-    </UModal>
+    <ImportModal
+      v-model:open="isImportModalOpen"
+      :username="user?.username || ''"
+      @imported="refresh()"
+    />
   </UContainer>
 </template>

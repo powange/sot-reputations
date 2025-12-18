@@ -1,7 +1,6 @@
 <script setup lang="ts">
-const props = defineProps<{
+const { minHeight } = defineProps<{
   minHeight?: string
-  stickyHeader?: boolean
 }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -34,9 +33,8 @@ onMounted(() => {
   <div
     ref="container"
     class="table-loader"
-    :class="{ 'sticky-header': props.stickyHeader }"
     :style="{
-      minHeight: !isVisible ? (props.minHeight || '100px') : undefined
+      minHeight: !isVisible ? (minHeight || '100px') : undefined
     }"
   >
     <slot v-if="isVisible" />
@@ -56,12 +54,5 @@ onMounted(() => {
 .table-loader {
   content-visibility: auto;
   contain-intrinsic-size: auto 300px;
-}
-
-.sticky-header :deep(thead th) {
-  position: sticky;
-  top: 0;
-  background-color: var(--ui-bg);
-  z-index: 10;
 }
 </style>
