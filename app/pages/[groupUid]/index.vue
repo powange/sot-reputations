@@ -1029,14 +1029,14 @@ onUnmounted(() => {
               :key="u.id"
               :text="`${userCompletionStats[u.id]?.completed || 0}/${userCompletionStats[u.id]?.total || 0} - Dernier import : ${formatLastImport(u.lastImportAt)}`"
             >
-              <div
-                class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                :class="selectedUserIds.includes(u.id) ? 'bg-success text-white' : 'bg-muted/50 hover:bg-muted'"
+              <UButton
+                :color="selectedUserIds.includes(u.id) ? 'primary' : 'neutral'"
+                :variant="selectedUserIds.includes(u.id) ? 'solid' : 'outline'"
+                size="sm"
                 @click="toggleUser(u.id)"
               >
-                <span class="font-medium">{{ u.username }}</span>
-                <span class="font-bold">{{ userCompletionStats[u.id]?.percentage || 0 }}%</span>
-              </div>
+                {{ u.username }} - {{ userCompletionStats[u.id]?.percentage || 0 }}%
+              </UButton>
             </UTooltip>
           </div>
         </template>
