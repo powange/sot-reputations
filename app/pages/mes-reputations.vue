@@ -216,27 +216,18 @@ function formatLastImport(dateStr: string | null): string {
   })
 }
 
-function filterEmblems<T extends { progress: EmblemProgress | null }>(emblems: T[]): T[] {
-  if (emblemCompletionFilter.value === 'all') {
-    return emblems
-  }
-
-  return emblems.filter(emblem => {
-    const completed = emblem.progress?.completed || false
-    if (emblemCompletionFilter.value === 'complete') {
-      return completed
-    } else {
-      // Non complétés
-      if (!completed) {
-        // Si ignoreWithoutData, n'afficher que ceux avec des données (progress non null)
-        if (ignoreWithoutData.value) {
-          return emblem.progress !== null
-        }
-        return true
-      }
-      return false
+function filterEmblemsList<T extends { progress: EmblemProgress | null }>(emblems: T[]): T[] {
+  return filterEmblems(
+    emblems,
+    {
+      completionFilter: emblemCompletionFilter.value,
+      ignoreWithoutData: ignoreWithoutData.value
+    },
+    {
+      isCompleted: (emblem) => emblem.progress?.completed || false,
+      hasData: (emblem) => emblem.progress !== null
     }
-  })
+  )
 }
 
 const columns = computed<TableColumn<TableRow>[]>(() => {
@@ -286,7 +277,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
 })
 
 function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null }>): TableRow[] {
-  const filteredEmblems = filterEmblems(emblems)
+  const filteredEmblems = filterEmblemsList(emblems)
 
   return filteredEmblems.map(emblem => {
     const progress = emblem.progress
@@ -485,12 +476,12 @@ async function handleDelete() {
       <!-- Factions (toutes ou filtrées) -->
       <template v-else>
         <template v-for="{ faction, campaigns } in filteredFactionsCampaigns" :key="faction.key">
-          <div v-if="campaigns.some(c => filterEmblems(c.emblems).length > 0)" class="mb-8">
+          <div v-if="campaigns.some(c => filterEmblemsList(c.emblems).length > 0)" class="mb-8">
             <h2 class="text-2xl font-pirate">{{ faction.name }}</h2>
             <p v-if="faction.motto" class="text-muted italic mb-4">« {{ faction.motto }} »</p>
 
             <template v-for="campaign in campaigns" :key="campaign.id">
-              <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-6">
+              <div v-if="filterEmblemsList(campaign.emblems).length > 0" class="mb-6">
                 <div v-if="campaign.key !== 'default'" class="mb-4">
                   <h3 class="text-lg font-semibold">{{ campaign.name }}</h3>
                   <p v-if="campaign.description" class="text-sm text-muted italic">{{ campaign.description }}</p>

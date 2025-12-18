@@ -519,31 +519,19 @@ function hasAnyUserData(emblem: { userProgress: Record<number, UserEmblemProgres
 }
 
 function filterEmblemsArray<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
-  if (emblemCompletionFilter.value === 'all') {
-    return emblems
-  }
-
-  return emblems.filter(emblem => {
-    // Si "Ignorer sans données" est activé, cacher les emblèmes sans aucune donnée
-    if (ignoreUsersWithoutData.value && !hasAnyUserData(emblem)) {
-      return false
+  return filterEmblems(
+    emblems,
+    {
+      completionFilter: emblemCompletionFilter.value,
+      ignoreWithoutData: ignoreUsersWithoutData.value,
+      onlyNotCompletedByAnyone: onlyNotCompletedByAnyone.value
+    },
+    {
+      isCompleted: isEmblemCompletedByAll,
+      hasData: hasAnyUserData,
+      isCompletedByNone: isEmblemCompletedByNone
     }
-
-    const completedByAll = isEmblemCompletedByAll(emblem)
-    if (emblemCompletionFilter.value === 'complete') {
-      return completedByAll
-    } else {
-      // Non complétés
-      if (!completedByAll) {
-        // Si le switch "non complétés par personne" est activé
-        if (onlyNotCompletedByAnyone.value) {
-          return isEmblemCompletedByNone(emblem)
-        }
-        return true
-      }
-      return false
-    }
-  })
+  )
 }
 
 // Mémoiser les emblèmes filtrés par campagne
