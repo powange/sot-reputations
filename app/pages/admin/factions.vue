@@ -94,6 +94,23 @@ function isFactionOpen(key: string) {
 function isCampaignOpen(key: string) {
   return openCampaigns.value.includes(key)
 }
+
+// Edition des grades
+const editingEmblem = ref<Emblem | null>(null)
+const isEditModalOpen = computed({
+  get: () => editingEmblem.value !== null,
+  set: (value) => {
+    if (!value) editingEmblem.value = null
+  }
+})
+
+function editEmblemGrades(emblem: Emblem) {
+  editingEmblem.value = emblem
+}
+
+function onGradesSaved() {
+  // On pourrait rafraîchir les données ici si nécessaire
+}
 </script>
 
 <template>
@@ -199,6 +216,7 @@ function isCampaignOpen(key: string) {
                     <th class="text-left py-2 px-2 font-medium">Key</th>
                     <th class="text-center py-2 px-2 font-medium">Grades</th>
                     <th class="text-center py-2 px-2 font-medium">Joueurs</th>
+                    <th class="w-10" />
                   </tr>
                 </thead>
                 <tbody>
@@ -238,6 +256,16 @@ function isCampaignOpen(key: string) {
                       </UBadge>
                       <span v-else class="text-muted">-</span>
                     </td>
+                    <td class="py-2 px-2 text-center">
+                      <UButton
+                        v-if="emblem.maxGrade > 1"
+                        icon="i-lucide-pencil"
+                        size="xs"
+                        variant="ghost"
+                        color="neutral"
+                        @click.stop="editEmblemGrades(emblem)"
+                      />
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -255,5 +283,15 @@ function isCampaignOpen(key: string) {
     <div v-else class="text-center py-8 text-muted">
       Aucune faction
     </div>
+
+    <!-- Modal edition grades -->
+    <UModal v-model:open="isEditModalOpen">
+      <EmblemGradesEditor
+        v-if="editingEmblem"
+        :emblem="editingEmblem"
+        @close="editingEmblem = null"
+        @saved="onGradesSaved"
+      />
+    </UModal>
   </UContainer>
 </template>
