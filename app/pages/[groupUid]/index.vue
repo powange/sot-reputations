@@ -385,8 +385,8 @@ const userCompletionStats = computed(() => {
       for (const campaign of campaignsToCount) {
         for (const emblem of campaign.emblems) {
           const progress = emblem.userProgress[user.id]
-          // Ne compter que les emblèmes avec des données de progression
-          if (progress) {
+          // Ne compter que les emblèmes avec des données de progression (exclure null/undefined)
+          if (progress !== null && progress !== undefined) {
             total++
             if (progress.completed) {
               completed++
