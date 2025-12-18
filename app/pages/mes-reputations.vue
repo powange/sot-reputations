@@ -272,9 +272,10 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
         const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
 
         const displayValue = maxThreshold === null ? '?' : maxThreshold.toString()
-        const hasThresholds = gradeThresholds && gradeThresholds.length > 0
+        // Afficher popover seulement si plusieurs grades (plus d'un seuil)
+        const hasMultipleGrades = gradeThresholds && gradeThresholds.length > 1
 
-        if (!hasThresholds) {
+        if (!hasMultipleGrades) {
           return h('span', { class: maxThreshold === null ? 'text-muted' : '' }, displayValue)
         }
 
