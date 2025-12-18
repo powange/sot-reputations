@@ -507,12 +507,28 @@ function isEmblemCompletedByNone(emblem: { userProgress: Record<number, UserEmbl
   return true
 }
 
+// Vérifie si au moins un utilisateur sélectionné a des données pour cet emblème
+function hasAnyUserData(emblem: { userProgress: Record<number, UserEmblemProgress> }): boolean {
+  for (const user of selectedUsers.value) {
+    const progress = emblem.userProgress[user.id]
+    if (progress !== null && progress !== undefined) {
+      return true
+    }
+  }
+  return false
+}
+
 function filterEmblemsArray<T extends { userProgress: Record<number, UserEmblemProgress> }>(emblems: T[]): T[] {
   if (emblemCompletionFilter.value === 'all') {
     return emblems
   }
 
   return emblems.filter(emblem => {
+    // Si "Ignorer sans données" est activé, cacher les emblèmes sans aucune donnée
+    if (ignoreUsersWithoutData.value && !hasAnyUserData(emblem)) {
+      return false
+    }
+
     const completedByAll = isEmblemCompletedByAll(emblem)
     if (emblemCompletionFilter.value === 'complete') {
       return completedByAll
