@@ -228,6 +228,13 @@ const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 
 
 const users = computed(() => groupData.value?.reputationData.users || [])
 const factions = computed(() => groupData.value?.reputationData.factions || [])
+
+const allCampaignIds = computed(() => factions.value.flatMap(f => f.campaigns.map(c => c.id)))
+const allCampaignsSelected = computed(() => {
+  if (selectedCampaignIds.value.length === 0) return true
+  if (selectedCampaignIds.value.length !== allCampaignIds.value.length) return false
+  return allCampaignIds.value.every(id => selectedCampaignIds.value.includes(id))
+})
 const members = computed(() => groupData.value?.members || [])
 const userRole = computed(() => groupData.value?.userRole || 'member')
 const isChef = computed(() => userRole.value === 'chef')
@@ -255,7 +262,7 @@ function updateUrlWithFilters() {
   if (selectedFactionKeys.value.length > 0) {
     params.set('factions', selectedFactionKeys.value.join(','))
   }
-  if (selectedCampaignIds.value.length > 0) {
+  if (selectedCampaignIds.value.length > 0 && !allCampaignsSelected.value) {
     params.set('campaigns', selectedCampaignIds.value.join(','))
   }
   if (emblemCompletionFilter.value !== 'all') {
