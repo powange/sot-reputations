@@ -1,4 +1,4 @@
-import { getReputationDb, getAllFactions, getCampaignsByFaction, getUserProgressForEmblem } from '../utils/reputation-db'
+import { getReputationDb, getAllFactions, getCampaignsByFaction, getUserProgressForEmblem, getAllGradeThresholdsForEmblems } from '../utils/reputation-db'
 import type { UserInfo, FactionInfo, CampaignInfo, EmblemInfo, UserEmblemProgress } from '../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     }
 
     for (const campaign of campaigns) {
-      const emblems = db.prepare(`
+      const emblemRows = db.prepare(`
         SELECT
           e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
           e.campaign_id as campaignId,
@@ -58,9 +58,13 @@ export default defineEventHandler(async (event) => {
         FROM emblems e
         WHERE e.campaign_id = ?
         ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as EmblemInfo[]
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 
-      const emblemsWithProgress = emblems.map((emblem) => {
+      // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
+      const emblemIds = emblemRows.map(e => e.id)
+      const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
+
+      const emblemsWithProgress = emblemRows.map((emblem) => {
         const progress = db.prepare(`
           SELECT
             user_id as userId,
@@ -76,6 +80,7 @@ export default defineEventHandler(async (event) => {
           ...emblem,
           factionKey: faction.key,
           campaignName: campaign.name,
+          gradeThresholds: allGradeThresholds[emblem.id] || [],
           progress: progress || null
         }
       })

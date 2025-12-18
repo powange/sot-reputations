@@ -454,6 +454,11 @@ export interface CampaignInfo {
   factionId: number
 }
 
+export interface GradeThreshold {
+  grade: number
+  threshold: number
+}
+
 export interface EmblemInfo {
   id: number
   key: string
@@ -462,6 +467,7 @@ export interface EmblemInfo {
   image: string
   maxGrade: number
   maxThreshold: number | null
+  gradeThresholds: GradeThreshold[]
   campaignId: number
   factionKey: string
   campaignName: string
@@ -498,7 +504,7 @@ export function getCampaignsByFaction(factionId: number): CampaignInfo[] {
 
 export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
   const db = getReputationDb()
-  return db.prepare(`
+  const emblemRows = db.prepare(`
     SELECT
       e.id,
       e.key,
@@ -515,7 +521,16 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
     JOIN factions f ON c.faction_id = f.id
     WHERE f.key = ?
     ORDER BY c.sort_order, c.id, e.sort_order, e.id
-  `).all(factionKey) as EmblemInfo[]
+  `).all(factionKey) as Array<Omit<EmblemInfo, 'gradeThresholds'>>
+
+  // Récupérer tous les seuils de grades pour ces emblèmes
+  const emblemIds = emblemRows.map(e => e.id)
+  const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
+
+  return emblemRows.map(emblem => ({
+    ...emblem,
+    gradeThresholds: allGradeThresholds[emblem.id] || []
+  }))
 }
 
 export function getUserProgressForEmblem(emblemId: number): UserEmblemProgress[] {
@@ -563,7 +578,7 @@ export function getFullReputationData() {
     }
 
     for (const campaign of campaigns) {
-      const emblems = db.prepare(`
+      const emblemRows = db.prepare(`
         SELECT
           e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
           e.campaign_id as campaignId,
@@ -571,15 +586,25 @@ export function getFullReputationData() {
         FROM emblems e
         WHERE e.campaign_id = ?
         ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as EmblemInfo[]
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 
-      const emblemsWithProgress = emblems.map((emblem) => {
+      // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
+      const emblemIds = emblemRows.map(e => e.id)
+      const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
+
+      const emblemsWithProgress = emblemRows.map((emblem) => {
         const progress = getUserProgressForEmblem(emblem.id)
         const userProgress: Record<number, UserEmblemProgress> = {}
         for (const p of progress) {
           userProgress[p.userId] = p
         }
-        return { ...emblem, factionKey: faction.key, campaignName: campaign.name, userProgress }
+        return {
+          ...emblem,
+          factionKey: faction.key,
+          campaignName: campaign.name,
+          gradeThresholds: allGradeThresholds[emblem.id] || [],
+          userProgress
+        }
       })
 
       factionWithCampaigns.campaigns.push({
@@ -964,7 +989,7 @@ export function getGroupReputationData(groupId: number) {
     }
 
     for (const campaign of campaigns) {
-      const emblems = db.prepare(`
+      const emblemRows = db.prepare(`
         SELECT
           e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
           e.campaign_id as campaignId,
@@ -972,9 +997,13 @@ export function getGroupReputationData(groupId: number) {
         FROM emblems e
         WHERE e.campaign_id = ?
         ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as EmblemInfo[]
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
 
-      const emblemsWithProgress = emblems.map((emblem) => {
+      // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
+      const emblemIds = emblemRows.map(e => e.id)
+      const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
+
+      const emblemsWithProgress = emblemRows.map((emblem) => {
         // Ne récupérer que la progression des membres du groupe
         const progress = db.prepare(`
           SELECT
@@ -994,7 +1023,13 @@ export function getGroupReputationData(groupId: number) {
         for (const p of progress) {
           userProgress[p.userId] = p
         }
-        return { ...emblem, factionKey: faction.key, campaignName: campaign.name, userProgress }
+        return {
+          ...emblem,
+          factionKey: faction.key,
+          campaignName: campaign.name,
+          gradeThresholds: allGradeThresholds[emblem.id] || [],
+          userProgress
+        }
       })
 
       factionWithCampaigns.campaigns.push({
@@ -1183,6 +1218,31 @@ export function getMaxKnownThresholds(emblemIds: number[]): Record<number, numbe
   const result: Record<number, number> = {}
   for (const row of rows) {
     result[row.emblemId] = row.maxThreshold
+  }
+  return result
+}
+
+/**
+ * Recupere tous les seuils de grades pour plusieurs emblemes
+ */
+export function getAllGradeThresholdsForEmblems(emblemIds: number[]): Record<number, GradeThreshold[]> {
+  if (emblemIds.length === 0) return {}
+
+  const db = getReputationDb()
+  const placeholders = emblemIds.map(() => '?').join(',')
+  const rows = db.prepare(`
+    SELECT emblem_id as emblemId, grade, threshold
+    FROM emblem_grade_thresholds
+    WHERE emblem_id IN (${placeholders})
+    ORDER BY emblem_id, grade
+  `).all(...emblemIds) as Array<{ emblemId: number, grade: number, threshold: number }>
+
+  const result: Record<number, GradeThreshold[]> = {}
+  for (const row of rows) {
+    if (!result[row.emblemId]) {
+      result[row.emblemId] = []
+    }
+    result[row.emblemId].push({ grade: row.grade, threshold: row.threshold })
   }
   return result
 }

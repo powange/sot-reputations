@@ -14,6 +14,11 @@ interface FactionInfo {
   motto: string
 }
 
+interface GradeThreshold {
+  grade: number
+  threshold: number
+}
+
 interface EmblemInfo {
   id: number
   key: string
@@ -22,6 +27,7 @@ interface EmblemInfo {
   image: string
   maxGrade: number
   maxThreshold: number | null
+  gradeThresholds: GradeThreshold[]
   campaignId: number
   factionKey: string
   campaignName: string
@@ -59,6 +65,7 @@ interface TableRow {
   description: string
   image: string
   maxThreshold: number | null
+  gradeThresholds: GradeThreshold[]
   progress: string
   completed: boolean
   hasProgress: boolean
@@ -261,10 +268,31 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
       header: 'Max',
       cell: ({ row }) => {
         const maxThreshold = row.original.maxThreshold as number | null
-        if (maxThreshold === null) {
-          return h('span', { class: 'text-muted' }, '?')
+        const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
+
+        const displayValue = maxThreshold === null ? '?' : maxThreshold.toString()
+        const hasThresholds = gradeThresholds && gradeThresholds.length > 0
+
+        if (!hasThresholds) {
+          return h('span', { class: maxThreshold === null ? 'text-muted' : '' }, displayValue)
         }
-        return h('span', {}, maxThreshold.toString())
+
+        // Créer le contenu du popover
+        const popoverContent = gradeThresholds.map(gt =>
+          h('div', { class: 'flex justify-between gap-4 text-sm' }, [
+            h('span', { class: 'text-muted' }, `Grade ${gt.grade}`),
+            h('span', { class: 'font-medium' }, gt.threshold.toString())
+          ])
+        )
+
+        return h(
+          resolveComponent('UPopover'),
+          { mode: 'hover' },
+          {
+            default: () => h('span', { class: 'cursor-help underline decoration-dotted' }, displayValue),
+            content: () => h('div', { class: 'p-2 space-y-1' }, popoverContent)
+          }
+        )
       }
     }
   ]
@@ -312,6 +340,7 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       description: emblem.description,
       image: emblem.image || '',
       maxThreshold: emblem.maxThreshold,
+      gradeThresholds: emblem.gradeThresholds || [],
       progress: progressDisplay,
       completed,
       hasProgress
