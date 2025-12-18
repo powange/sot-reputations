@@ -88,6 +88,7 @@ interface TableRow {
   name: string
   description: string
   image: string
+  maxGrade: number
   maxThreshold: number | null
   gradeThresholds: GradeThreshold[]
   [key: string]: string | number | boolean | null | undefined | GradeThreshold[]
@@ -600,23 +601,30 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
       meta: { class: { th: 'w-full', td: 'w-full' } },
       cell: ({ row }) => {
         const maxThreshold = row.original.maxThreshold as number | null
+        const maxGrade = row.original.maxGrade as number
         const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
 
         const displayValue = maxThreshold === null ? '?' : maxThreshold.toString()
-        // Afficher popover seulement si plusieurs grades (plus d'un seuil)
-        const hasMultipleGrades = gradeThresholds && gradeThresholds.length > 1
+        // Afficher popover seulement si maxGrade >= 2 et qu'il y a des seuils
+        const hasMultipleGrades = maxGrade >= 2 && gradeThresholds && gradeThresholds.length > 0
 
         if (!hasMultipleGrades) {
           return h('span', { class: maxThreshold === null ? 'text-muted' : '' }, displayValue)
         }
 
-        // Créer le contenu du popover
-        const popoverContent = gradeThresholds.map(gt =>
-          h('div', { class: 'flex justify-between gap-4 text-sm' }, [
-            h('span', { class: 'text-muted' }, `Grade ${gt.grade}`),
-            h('span', { class: 'font-medium' }, gt.threshold.toString())
-          ])
-        )
+        // Créer le contenu du popover avec tous les grades
+        const thresholdsMap = new Map(gradeThresholds.map(gt => [gt.grade, gt.threshold]))
+        const popoverContent: ReturnType<typeof h>[] = []
+        for (let grade = 1; grade <= maxGrade; grade++) {
+          const threshold = thresholdsMap.get(grade)
+          popoverContent.push(
+            h('div', { class: 'flex justify-between gap-4 text-sm' }, [
+              h('span', { class: 'text-muted' }, `Grade ${grade}`),
+              h('span', { class: threshold !== undefined ? 'font-medium' : 'text-muted' },
+                threshold !== undefined ? threshold.toString() : '?')
+            ])
+          )
+        }
 
         return h(
           resolveComponent('UPopover'),
@@ -664,6 +672,7 @@ function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number,
       name: emblem.name,
       description: emblem.description,
       image: emblem.image || '',
+      maxGrade: emblem.maxGrade,
       maxThreshold: emblem.maxThreshold,
       gradeThresholds: emblem.gradeThresholds || []
     }
