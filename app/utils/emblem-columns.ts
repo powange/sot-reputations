@@ -1,5 +1,6 @@
+import { h } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { GradeThreshold, BaseTableRow } from '~/types/reputation'
+import type { BaseTableRow } from '~/types/reputation'
 
 /**
  * Crée la colonne "Succès" avec image, nom et description
@@ -30,49 +31,13 @@ export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
 }
 
 /**
- * Crée la colonne "Max" avec popover pour les grades
+ * Crée la colonne "Max" - le rendu avec popover est géré via slot #maxThreshold-cell dans les pages
  */
 export function createMaxColumn<T extends BaseTableRow>(): TableColumn<T> {
   return {
     accessorKey: 'maxThreshold',
     header: 'Max',
-    meta: { class: { th: 'w-full', td: 'w-full' } },
-    cell: ({ row }) => {
-      const maxThreshold = row.original.maxThreshold as number | null
-      const maxGrade = row.original.maxGrade as number
-      const gradeThresholds = row.original.gradeThresholds as GradeThreshold[]
-
-      const displayValue = maxThreshold === null ? '?' : maxThreshold.toString()
-      // Afficher popover seulement si maxGrade >= 2 et qu'il y a des seuils
-      const hasMultipleGrades = maxGrade >= 2 && gradeThresholds && gradeThresholds.length > 0
-
-      if (!hasMultipleGrades) {
-        return h('span', { class: maxThreshold === null ? 'text-muted' : '' }, displayValue)
-      }
-
-      // Créer le contenu du popover avec tous les grades
-      const thresholdsMap = new Map(gradeThresholds.map(gt => [gt.grade, gt.threshold]))
-      const popoverContent: ReturnType<typeof h>[] = []
-      for (let grade = 1; grade <= maxGrade; grade++) {
-        const threshold = thresholdsMap.get(grade)
-        popoverContent.push(
-          h('div', { class: 'flex justify-between gap-4 text-sm' }, [
-            h('span', { class: 'text-muted' }, `Grade ${grade}`),
-            h('span', { class: threshold !== undefined ? 'font-medium' : 'text-muted' },
-              threshold !== undefined ? threshold.toString() : '?')
-          ])
-        )
-      }
-
-      return h(
-        resolveComponent('UPopover'),
-        { mode: 'hover' },
-        {
-          default: () => h('span', { class: 'cursor-help underline decoration-dotted' }, displayValue),
-          content: () => h('div', { class: 'p-2 space-y-1' }, popoverContent)
-        }
-      )
-    }
+    meta: { class: { th: 'w-full', td: 'w-full' } }
   }
 }
 

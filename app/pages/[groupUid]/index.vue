@@ -939,7 +939,15 @@ onUnmounted(() => {
               :data="getTableData(filterEmblemsArray(result.emblems))"
               :columns="columns"
               class="sticky-table"
-            />
+            >
+              <template #maxThreshold-cell="{ row }">
+                <MaxThresholdCell
+                  :max-threshold="row.original.maxThreshold"
+                  :max-grade="row.original.maxGrade"
+                  :grade-thresholds="row.original.gradeThresholds"
+                />
+              </template>
+            </UTable>
           </TableLoader>
         </div>
       </template>
@@ -999,7 +1007,15 @@ onUnmounted(() => {
                     :data="getTableData(getFilteredEmblems(campaign.id))"
                     :columns="columns"
                     class="sticky-table"
-                  />
+                  >
+                    <template #maxThreshold-cell="{ row }">
+                      <MaxThresholdCell
+                        :max-threshold="row.original.maxThreshold"
+                        :max-grade="row.original.maxGrade"
+                        :grade-thresholds="row.original.gradeThresholds"
+                      />
+                    </template>
+                  </UTable>
                 </TableLoader>
               </div>
             </template>
