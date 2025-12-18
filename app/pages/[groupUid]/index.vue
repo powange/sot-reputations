@@ -183,7 +183,11 @@ const dropdownItems = computed(() => {
 })
 
 // Filtres - initialisés depuis l'URL
-const selectedFactionKey = ref<string>((route.query.faction as string) || '')
+const selectedFactionKeys = ref<string[]>(
+  route.query.factions
+    ? (route.query.factions as string).split(',').filter(k => k)
+    : []
+)
 const selectedUserIds = ref<number[]>(
   route.query.users
     ? (route.query.users as string).split(',').map(Number).filter(n => !isNaN(n))
@@ -210,7 +214,7 @@ const usersInitializedFromUrl = route.query.users !== undefined
 const collapsedCampaigns = ref<Set<number>>(new Set())
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
-const allFactionsSelected = computed(() => selectedFactionKey.value === '')
+const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
 
 const users = computed(() => groupData.value?.reputationData.users || [])
 const factions = computed(() => groupData.value?.reputationData.factions || [])
@@ -238,8 +242,8 @@ function updateUrlWithFilters() {
   if (searchQuery.value.trim()) {
     params.set('search', searchQuery.value.trim())
   }
-  if (selectedFactionKey.value) {
-    params.set('faction', selectedFactionKey.value)
+  if (selectedFactionKeys.value.length > 0) {
+    params.set('factions', selectedFactionKeys.value.join(','))
   }
   if (selectedCampaignIds.value.length > 0) {
     params.set('campaigns', selectedCampaignIds.value.join(','))
@@ -268,7 +272,7 @@ function updateUrlWithFilters() {
 }
 
 watch(
-  [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, onlyNotCompletedByAnyone, selectedUserIds],
+  [searchQuery, selectedFactionKeys, selectedCampaignIds, emblemCompletionFilter, ignoreUsersWithoutData, onlyNotCompletedByAnyone, selectedUserIds],
   () => {
     if (urlUpdateTimeout) {
       clearTimeout(urlUpdateTimeout)
@@ -278,19 +282,20 @@ watch(
   { deep: true }
 )
 
-const selectedFaction = computed(() => {
-  return factions.value.find(f => f.key === selectedFactionKey.value)
+// Factions sélectionnées (filtrées par selectedFactionKeys si défini)
+const selectedFactions = computed(() => {
+  if (allFactionsSelected.value) return factions.value
+  return factions.value.filter(f => selectedFactionKeys.value.includes(f.key))
 })
 
-const filteredCampaigns = computed(() => {
-  if (!selectedFaction.value?.campaigns) return []
-  return selectedFaction.value.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
-})
-
-const allFactionsCampaigns = computed(() => {
-  return factions.value.map(faction => ({
+// Factions avec leurs campagnes filtrées
+const filteredFactionsCampaigns = computed(() => {
+  return selectedFactions.value.map(faction => ({
     faction,
-    campaigns: faction.campaigns.filter(c => c.key !== 'default' || faction.campaigns.length === 1)
+    campaigns: faction.campaigns.filter(c =>
+      selectedCampaignIds.value.includes(c.id) &&
+      (c.key !== 'default' || faction.campaigns.length === 1)
+    )
   }))
 })
 
@@ -350,12 +355,7 @@ const allUsersSelected = computed(() => {
 const totalEmblems = computed(() => {
   let count = 0
 
-  // Déterminer les factions à considérer
-  const factionsToCount = selectedFactionKey.value
-    ? factions.value.filter(f => f.key === selectedFactionKey.value)
-    : factions.value
-
-  for (const faction of factionsToCount) {
+  for (const faction of selectedFactions.value) {
     // Déterminer les campagnes à considérer
     const campaignsToCount = selectedCampaignIds.value.length > 0
       ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
@@ -372,16 +372,11 @@ const totalEmblems = computed(() => {
 const userCompletionStats = computed(() => {
   const stats: Record<number, { completed: number; total: number; percentage: number }> = {}
 
-  // Déterminer les factions à considérer
-  const factionsToCount = selectedFactionKey.value
-    ? factions.value.filter(f => f.key === selectedFactionKey.value)
-    : factions.value
-
   for (const user of users.value) {
     let completed = 0
     let total = 0
 
-    for (const faction of factionsToCount) {
+    for (const faction of selectedFactions.value) {
       // Déterminer les campagnes à considérer
       const campaignsToCount = selectedCampaignIds.value.length > 0
         ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
@@ -418,15 +413,10 @@ const groupStats = computed(() => {
     return { completedByAll: 0, averageCompletion: 0, totalEmblems: 0 }
   }
 
-  // Déterminer les factions à considérer
-  const factionsToCount = selectedFactionKey.value
-    ? factions.value.filter(f => f.key === selectedFactionKey.value)
-    : factions.value
-
   let completedByAll = 0
   let totalCompletions = 0
 
-  for (const faction of factionsToCount) {
+  for (const faction of selectedFactions.value) {
     // Déterminer les campagnes à considérer
     const campaignsToCount = selectedCampaignIds.value.length > 0
       ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
@@ -541,7 +531,16 @@ function filterEmblemsArray<T extends { userProgress: Record<number, UserEmblemP
 }
 
 // Mémoiser les emblèmes filtrés par campagne
+// Note: On accède explicitement aux refs de filtre pour que Vue les détecte comme dépendances
 const filteredEmblemsByCampaign = computed(() => {
+  // Dépendances explicites pour la réactivité
+  const _ = [
+    emblemCompletionFilter.value,
+    ignoreUsersWithoutData.value,
+    onlyNotCompletedByAnyone.value,
+    selectedUserIds.value
+  ]
+
   const result: Record<number, Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>> = {}
 
   for (const faction of factions.value) {
@@ -1003,7 +1002,7 @@ onUnmounted(() => {
       <!-- Filtres -->
       <ReputationFilters
         v-model:search-query="searchQuery"
-        v-model:selected-faction-key="selectedFactionKey"
+        v-model:selected-faction-keys="selectedFactionKeys"
         v-model:selected-campaign-ids="selectedCampaignIds"
         v-model:emblem-completion-filter="emblemCompletionFilter"
         :factions="factions"
@@ -1071,9 +1070,9 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <!-- Toutes les factions -->
-      <template v-else-if="allFactionsSelected">
-        <template v-for="{ faction, campaigns } in allFactionsCampaigns" :key="faction.key">
+      <!-- Factions (toutes ou filtrées) -->
+      <template v-else>
+        <template v-for="{ faction, campaigns } in filteredFactionsCampaigns" :key="faction.key">
           <div v-if="campaigns.some(c => getFilteredEmblems(c.id).length > 0)" class="mb-8">
             <h2 class="text-2xl font-pirate">{{ faction.name }}</h2>
             <p v-if="faction.motto" class="text-muted italic mb-4">« {{ faction.motto }} »</p>
@@ -1102,39 +1101,6 @@ onUnmounted(() => {
                 </TableLoader>
               </div>
             </template>
-          </div>
-        </template>
-      </template>
-
-      <!-- Faction spécifique -->
-      <template v-else-if="selectedFaction">
-        <div class="mb-6">
-          <h2 class="text-2xl font-pirate">{{ selectedFaction.name }}</h2>
-          <p v-if="selectedFaction.motto" class="text-muted italic">« {{ selectedFaction.motto }} »</p>
-        </div>
-
-        <template v-for="campaign in filteredCampaigns" :key="campaign.id">
-          <div v-if="getFilteredEmblems(campaign.id).length > 0" class="mb-8">
-            <div
-              v-if="campaign.key !== 'default'"
-              class="mb-4 flex items-center gap-2 cursor-pointer select-none"
-              @click="toggleCampaignCollapse(campaign.id)"
-            >
-              <UIcon
-                :name="isCampaignCollapsed(campaign.id) ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
-                class="w-5 h-5 text-muted"
-              />
-              <div>
-                <h3 class="text-lg font-semibold">
-                  {{ campaign.name }}
-                  <span class="text-sm font-normal text-muted">({{ getFilteredEmblems(campaign.id).length }})</span>
-                </h3>
-                <p v-if="campaign.description && !isCampaignCollapsed(campaign.id)" class="text-sm text-muted italic">{{ campaign.description }}</p>
-              </div>
-            </div>
-            <TableLoader v-if="!isCampaignCollapsed(campaign.id)">
-              <UTable :data="getTableData(getFilteredEmblems(campaign.id))" :columns="columns" />
-            </TableLoader>
           </div>
         </template>
       </template>

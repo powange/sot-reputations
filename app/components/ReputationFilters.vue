@@ -18,32 +18,52 @@ const props = defineProps<{
 }>()
 
 const searchQuery = defineModel<string>('searchQuery', { default: '' })
-const selectedFactionKey = defineModel<string>('selectedFactionKey', { default: '' })
+const selectedFactionKeys = defineModel<string[]>('selectedFactionKeys', { default: () => [] })
 const selectedCampaignIds = defineModel<number[]>('selectedCampaignIds', { default: () => [] })
 const emblemCompletionFilter = defineModel<'all' | 'incomplete' | 'complete'>('emblemCompletionFilter', { default: 'all' })
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
-const allFactionsSelected = computed(() => selectedFactionKey.value === '')
+const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
 
-const selectedFaction = computed(() => {
-  return props.factions.find(f => f.key === selectedFactionKey.value)
+// Factions sélectionnées
+const selectedFactions = computed(() => {
+  if (allFactionsSelected.value) return props.factions
+  return props.factions.filter(f => selectedFactionKeys.value.includes(f.key))
 })
 
-const hasMultipleCampaigns = computed(() => {
-  if (!selectedFaction.value?.campaigns) return false
-  return selectedFaction.value.campaigns.length > 1 ||
-    (selectedFaction.value.campaigns.length === 1 && selectedFaction.value.campaigns[0].key !== 'default')
+// Vérifier si on a des campagnes à afficher (exclure les factions avec seulement 'default')
+const factionsWithCampaigns = computed(() => {
+  return selectedFactions.value.filter(f =>
+    f.campaigns.length > 1 ||
+    (f.campaigns.length === 1 && f.campaigns[0].key !== 'default')
+  )
 })
 
-// Sélectionner toutes les campagnes quand on change de faction
-watch(selectedFaction, (faction) => {
-  if (faction?.campaigns) {
-    selectedCampaignIds.value = faction.campaigns.map(c => c.id)
-  }
+const hasMultipleCampaigns = computed(() => factionsWithCampaigns.value.length > 0)
+
+// Sélectionner toutes les campagnes quand on change de factions
+watch(selectedFactions, (factions) => {
+  const allCampaignIds = factions.flatMap(f => f.campaigns.map(c => c.id))
+  selectedCampaignIds.value = allCampaignIds
 }, { immediate: true })
 
+function toggleFaction(factionKey: string) {
+  const index = selectedFactionKeys.value.indexOf(factionKey)
+  if (index === -1) {
+    // Ajouter la faction
+    selectedFactionKeys.value = [...selectedFactionKeys.value, factionKey]
+  } else {
+    // Retirer la faction (sauf si c'est la dernière et on veut garder au moins une sélection)
+    selectedFactionKeys.value = selectedFactionKeys.value.filter(k => k !== factionKey)
+  }
+}
+
+function selectAllFactions() {
+  selectedFactionKeys.value = []
+}
+
 function toggleCampaign(campaignId: number) {
-  const allCampaignIds = selectedFaction.value?.campaigns.map(c => c.id) || []
+  const allCampaignIds = selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
   const allSelected = selectedCampaignIds.value.length === allCampaignIds.length
 
   if (allSelected) {
@@ -51,9 +71,9 @@ function toggleCampaign(campaignId: number) {
   } else {
     const index = selectedCampaignIds.value.indexOf(campaignId)
     if (index === -1) {
-      selectedCampaignIds.value.push(campaignId)
+      selectedCampaignIds.value = [...selectedCampaignIds.value, campaignId]
     } else if (selectedCampaignIds.value.length > 1) {
-      selectedCampaignIds.value.splice(index, 1)
+      selectedCampaignIds.value = selectedCampaignIds.value.filter(id => id !== campaignId)
     }
   }
 }
@@ -75,44 +95,49 @@ function toggleCampaign(campaignId: number) {
 
       <!-- Faction -->
       <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
-        <span class="text-sm font-medium text-muted">Faction :</span>
+        <span class="text-sm font-medium text-muted">Factions :</span>
         <UButton
           :color="allFactionsSelected ? 'primary' : 'neutral'"
           :variant="allFactionsSelected ? 'solid' : 'outline'"
           size="sm"
-          @click="selectedFactionKey = ''"
+          @click="selectAllFactions"
         >
           Toutes
         </UButton>
         <UButton
           v-for="faction in factions"
           :key="faction.key"
-          :color="selectedFactionKey === faction.key ? 'primary' : 'neutral'"
-          :variant="selectedFactionKey === faction.key ? 'solid' : 'outline'"
+          :color="selectedFactionKeys.includes(faction.key) ? 'primary' : 'neutral'"
+          :variant="selectedFactionKeys.includes(faction.key) ? 'solid' : 'outline'"
           size="sm"
-          @click="selectedFactionKey = faction.key"
+          @click="toggleFaction(faction.key)"
         >
           {{ faction.name }}
         </UButton>
       </div>
 
-      <!-- Campagnes -->
-      <div
-        v-if="!isSearchActive && !allFactionsSelected && hasMultipleCampaigns"
-        class="flex items-center gap-3 flex-wrap"
-      >
-        <span class="text-sm font-medium text-muted">Campagnes :</span>
-        <UButton
-          v-for="campaign in selectedFaction?.campaigns"
-          :key="campaign.id"
-          :color="selectedCampaignIds.includes(campaign.id) ? 'info' : 'neutral'"
-          :variant="selectedCampaignIds.includes(campaign.id) ? 'solid' : 'outline'"
-          size="sm"
-          @click="toggleCampaign(campaign.id)"
+      <!-- Campagnes (groupées par faction si plusieurs factions) -->
+      <template v-if="!isSearchActive && !allFactionsSelected && hasMultipleCampaigns">
+        <div
+          v-for="faction in factionsWithCampaigns"
+          :key="faction.key"
+          class="flex items-center gap-3 flex-wrap"
         >
-          {{ campaign.name }}
-        </UButton>
-      </div>
+          <span class="text-sm font-medium text-muted">
+            {{ factionsWithCampaigns.length > 1 ? `${faction.name} :` : 'Campagnes :' }}
+          </span>
+          <UButton
+            v-for="campaign in faction.campaigns"
+            :key="campaign.id"
+            :color="selectedCampaignIds.includes(campaign.id) ? 'info' : 'neutral'"
+            :variant="selectedCampaignIds.includes(campaign.id) ? 'solid' : 'outline'"
+            size="sm"
+            @click="toggleCampaign(campaign.id)"
+          >
+            {{ campaign.name }}
+          </UButton>
+        </div>
+      </template>
 
       <!-- Slot pour filtres additionnels (ex: utilisateurs) -->
       <slot name="extra-filters" :is-search-active="isSearchActive" />

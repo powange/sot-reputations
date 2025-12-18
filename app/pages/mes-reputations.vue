@@ -90,7 +90,11 @@ const isDeleteModalOpen = ref(false)
 const isDeleting = ref(false)
 
 // Filtres - initialisés depuis l'URL
-const selectedFactionKey = ref<string>((route.query.faction as string) || '')
+const selectedFactionKeys = ref<string[]>(
+  route.query.factions
+    ? (route.query.factions as string).split(',').filter(k => k)
+    : []
+)
 const selectedCampaignIds = ref<number[]>(
   route.query.campaigns
     ? (route.query.campaigns as string).split(',').map(Number).filter(n => !isNaN(n))
@@ -105,7 +109,7 @@ const ignoreWithoutData = ref(route.query.ignoreEmpty === '1')
 const searchQuery = ref((route.query.search as string) || '')
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
-const allFactionsSelected = computed(() => selectedFactionKey.value === '')
+const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
 
 // Synchroniser les filtres avec l'URL (mise à jour légère sans Vue Router)
 let urlUpdateTimeout: ReturnType<typeof setTimeout> | null = null
@@ -118,8 +122,8 @@ function updateUrlWithFilters() {
   if (searchQuery.value.trim()) {
     params.set('search', searchQuery.value.trim())
   }
-  if (selectedFactionKey.value) {
-    params.set('faction', selectedFactionKey.value)
+  if (selectedFactionKeys.value.length > 0) {
+    params.set('factions', selectedFactionKeys.value.join(','))
   }
   if (selectedCampaignIds.value.length > 0) {
     params.set('campaigns', selectedCampaignIds.value.join(','))
@@ -137,7 +141,7 @@ function updateUrlWithFilters() {
 }
 
 watch(
-  [searchQuery, selectedFactionKey, selectedCampaignIds, emblemCompletionFilter, ignoreWithoutData],
+  [searchQuery, selectedFactionKeys, selectedCampaignIds, emblemCompletionFilter, ignoreWithoutData],
   () => {
     if (urlUpdateTimeout) {
       clearTimeout(urlUpdateTimeout)
@@ -151,19 +155,20 @@ const user = computed(() => data.value?.user)
 const factions = computed(() => data.value?.factions || [])
 const hasImportedData = computed(() => !!user.value?.lastImportAt)
 
-const selectedFaction = computed(() => {
-  return factions.value.find(f => f.key === selectedFactionKey.value)
+// Factions sélectionnées (filtrées par selectedFactionKeys si défini)
+const selectedFactions = computed(() => {
+  if (allFactionsSelected.value) return factions.value
+  return factions.value.filter(f => selectedFactionKeys.value.includes(f.key))
 })
 
-const filteredCampaigns = computed(() => {
-  if (!selectedFaction.value?.campaigns) return []
-  return selectedFaction.value.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
-})
-
-const allFactionsCampaigns = computed(() => {
-  return factions.value.map(faction => ({
+// Factions avec leurs campagnes filtrées
+const filteredFactionsCampaigns = computed(() => {
+  return selectedFactions.value.map(faction => ({
     faction,
-    campaigns: faction.campaigns.filter(c => c.key !== 'default' || faction.campaigns.length === 1)
+    campaigns: faction.campaigns.filter(c =>
+      selectedCampaignIds.value.includes(c.id) &&
+      (c.key !== 'default' || faction.campaigns.length === 1)
+    )
   }))
 })
 
@@ -428,7 +433,7 @@ async function handleDelete() {
       <!-- Filtres -->
       <ReputationFilters
         v-model:search-query="searchQuery"
-        v-model:selected-faction-key="selectedFactionKey"
+        v-model:selected-faction-keys="selectedFactionKeys"
         v-model:selected-campaign-ids="selectedCampaignIds"
         v-model:emblem-completion-filter="emblemCompletionFilter"
         :factions="factions"
@@ -477,9 +482,9 @@ async function handleDelete() {
         </div>
       </template>
 
-      <!-- Toutes les factions -->
-      <template v-else-if="allFactionsSelected">
-        <template v-for="{ faction, campaigns } in allFactionsCampaigns" :key="faction.key">
+      <!-- Factions (toutes ou filtrées) -->
+      <template v-else>
+        <template v-for="{ faction, campaigns } in filteredFactionsCampaigns" :key="faction.key">
           <div v-if="campaigns.some(c => filterEmblems(c.emblems).length > 0)" class="mb-8">
             <h2 class="text-2xl font-pirate">{{ faction.name }}</h2>
             <p v-if="faction.motto" class="text-muted italic mb-4">« {{ faction.motto }} »</p>
@@ -493,24 +498,6 @@ async function handleDelete() {
                 <UTable :data="getTableData(campaign.emblems)" :columns="columns" />
               </div>
             </template>
-          </div>
-        </template>
-      </template>
-
-      <!-- Faction spécifique -->
-      <template v-else-if="selectedFaction">
-        <div class="mb-6">
-          <h2 class="text-2xl font-pirate">{{ selectedFaction.name }}</h2>
-          <p v-if="selectedFaction.motto" class="text-muted italic">« {{ selectedFaction.motto }} »</p>
-        </div>
-
-        <template v-for="campaign in filteredCampaigns" :key="campaign.id">
-          <div v-if="filterEmblems(campaign.emblems).length > 0" class="mb-8">
-            <div v-if="campaign.key !== 'default'" class="mb-4">
-              <h3 class="text-lg font-semibold">{{ campaign.name }}</h3>
-              <p v-if="campaign.description" class="text-sm text-muted italic">{{ campaign.description }}</p>
-            </div>
-            <UTable :data="getTableData(campaign.emblems)" :columns="columns" />
           </div>
         </template>
       </template>
