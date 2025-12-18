@@ -380,8 +380,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
               // Enregistrer le seuil du grade actuel
               const grade = emblem.Grade || 0
               const threshold = emblem.Threshold || 0
+              const value = emblem.Value || 0
               if (grade > 0 && threshold > 0) {
                 upsertGradeThreshold.run(emblemRow.id, grade, threshold)
+              } else if (emblem.Completed && grade > 0 && value > 0) {
+                // Pour les emblèmes complétés avec threshold=0, utiliser value comme seuil
+                upsertGradeThreshold.run(emblemRow.id, grade, value)
               }
             }
           }
@@ -422,8 +426,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
           // Enregistrer le seuil du grade actuel
           const grade = emblem.Grade || 0
           const threshold = emblem.Threshold || 0
+          const value = emblem.Value || 0
           if (grade > 0 && threshold > 0) {
             upsertGradeThreshold.run(emblemRow.id, grade, threshold)
+          } else if (emblem.Completed && grade > 0 && value > 0) {
+            // Pour les emblèmes complétés avec threshold=0, utiliser value comme seuil
+            upsertGradeThreshold.run(emblemRow.id, grade, value)
           }
         }
       }
