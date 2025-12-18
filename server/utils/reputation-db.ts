@@ -385,7 +385,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
 
               // Pour max_grade=1 complétés, Grade reste à 0 mais c'est effectivement grade 1
               const gradeToStore = (emblem.Completed && maxGrade === 1 && grade === 0) ? 1 : grade
-              const thresholdToStore = threshold > 0 ? threshold : value
+              let thresholdToStore = threshold > 0 ? threshold : value
+
+              // Pour les emblèmes binaires complétés (HasScalar=false), utiliser 1 comme seuil
+              if (gradeToStore > 0 && thresholdToStore === 0 && emblem.Completed) {
+                thresholdToStore = 1
+              }
 
               if (gradeToStore > 0 && thresholdToStore > 0) {
                 upsertGradeThreshold.run(emblemRow.id, gradeToStore, thresholdToStore)
@@ -434,7 +439,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
 
           // Pour max_grade=1 complétés, Grade reste à 0 mais c'est effectivement grade 1
           const gradeToStore = (emblem.Completed && maxGrade === 1 && grade === 0) ? 1 : grade
-          const thresholdToStore = threshold > 0 ? threshold : value
+          let thresholdToStore = threshold > 0 ? threshold : value
+
+          // Pour les emblèmes binaires complétés (HasScalar=false), utiliser 1 comme seuil
+          if (gradeToStore > 0 && thresholdToStore === 0 && emblem.Completed) {
+            thresholdToStore = 1
+          }
 
           if (gradeToStore > 0 && thresholdToStore > 0) {
             upsertGradeThreshold.run(emblemRow.id, gradeToStore, thresholdToStore)
