@@ -229,12 +229,6 @@ const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 
 const users = computed(() => groupData.value?.reputationData.users || [])
 const factions = computed(() => groupData.value?.reputationData.factions || [])
 
-const allCampaignIds = computed(() => factions.value.flatMap(f => f.campaigns.map(c => c.id)))
-const allCampaignsSelected = computed(() => {
-  if (selectedCampaignIds.value.length === 0) return true
-  if (selectedCampaignIds.value.length !== allCampaignIds.value.length) return false
-  return allCampaignIds.value.every(id => selectedCampaignIds.value.includes(id))
-})
 const members = computed(() => groupData.value?.members || [])
 const userRole = computed(() => groupData.value?.userRole || 'member')
 const isChef = computed(() => userRole.value === 'chef')
@@ -303,6 +297,17 @@ watch(
 const selectedFactions = computed(() => {
   if (allFactionsSelected.value) return factions.value
   return factions.value.filter(f => selectedFactionKeys.value.includes(f.key))
+})
+
+// Toutes les campagnes des factions sélectionnées
+const selectedFactionCampaignIds = computed(() =>
+  selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
+)
+const allCampaignsSelected = computed(() => {
+  if (selectedCampaignIds.value.length === 0) return true
+  const targetIds = selectedFactionCampaignIds.value
+  if (selectedCampaignIds.value.length !== targetIds.length) return false
+  return targetIds.every(id => selectedCampaignIds.value.includes(id))
 })
 
 // Factions avec leurs campagnes filtrées
