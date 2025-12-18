@@ -303,12 +303,9 @@ const selectedFactions = computed(() => {
 const selectedFactionCampaignIds = computed(() =>
   selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
 )
-const allCampaignsSelected = computed(() => {
-  if (selectedCampaignIds.value.length === 0) return true
-  const targetIds = selectedFactionCampaignIds.value
-  if (selectedCampaignIds.value.length !== targetIds.length) return false
-  return targetIds.every(id => selectedCampaignIds.value.includes(id))
-})
+const allCampaignsSelected = computed(() =>
+  areAllSelected(selectedCampaignIds.value, selectedFactionCampaignIds.value)
+)
 
 // Factions avec leurs campagnes filtrées
 const filteredFactionsCampaigns = computed(() => {

@@ -5,6 +5,17 @@
 
 export type CompletionFilter = 'all' | 'incomplete' | 'complete'
 
+/**
+ * Vérifie si tous les éléments d'un ensemble cible sont sélectionnés
+ * Retourne true si aucune sélection (tous implicitement sélectionnés)
+ * ou si tous les éléments cibles sont dans la sélection
+ */
+export function areAllSelected(selectedIds: number[], targetIds: number[]): boolean {
+  if (selectedIds.length === 0) return true
+  if (selectedIds.length !== targetIds.length) return false
+  return targetIds.every(id => selectedIds.includes(id))
+}
+
 export interface FilterOptions {
   /** Filtre de complétion: tous, complétés, non complétés */
   completionFilter: CompletionFilter

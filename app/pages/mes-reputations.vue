@@ -135,7 +135,7 @@ function updateUrlWithFilters() {
   if (selectedFactionKeys.value.length > 0) {
     params.set('factions', selectedFactionKeys.value.join(','))
   }
-  if (selectedCampaignIds.value.length > 0) {
+  if (selectedCampaignIds.value.length > 0 && !allCampaignsSelected.value) {
     params.set('campaigns', selectedCampaignIds.value.join(','))
   }
   if (emblemCompletionFilter.value !== 'all') {
@@ -170,6 +170,14 @@ const selectedFactions = computed(() => {
   if (allFactionsSelected.value) return factions.value
   return factions.value.filter(f => selectedFactionKeys.value.includes(f.key))
 })
+
+// Toutes les campagnes des factions sélectionnées
+const selectedFactionCampaignIds = computed(() =>
+  selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
+)
+const allCampaignsSelected = computed(() =>
+  areAllSelected(selectedCampaignIds.value, selectedFactionCampaignIds.value)
+)
 
 // Factions avec leurs campagnes filtrées
 const filteredFactionsCampaigns = computed(() => {
