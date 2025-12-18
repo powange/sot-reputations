@@ -320,41 +320,31 @@ const groupStats = computed(() => {
     return { completedByAll: 0, averageCompletion: 0, totalEmblems: 0 }
   }
 
-  let completedByAll = 0
-  let totalCompletions = 0
+  // Moyenne des pourcentages individuels des utilisateurs sélectionnés
+  const totalPercentage = selectedUserList.reduce((sum, u) => {
+    return sum + (userCompletionStats.value[u.id]?.percentage || 0)
+  }, 0)
+  const averageCompletion = Math.floor(totalPercentage / selectedUserList.length)
 
+  // Compter les emblèmes complétés par tous les utilisateurs sélectionnés
+  let completedByAll = 0
   for (const faction of selectedFactions.value) {
-    // Déterminer les campagnes à considérer
     const campaignsToCount = selectedCampaignIds.value.length > 0
       ? faction.campaigns.filter((c: { id: number }) => selectedCampaignIds.value.includes(c.id))
       : faction.campaigns
 
     for (const campaign of campaignsToCount) {
       for (const emblem of campaign.emblems) {
-        let allCompleted = true
-        let completionCount = 0
-
-        for (const u of selectedUserList) {
+        const allCompleted = selectedUserList.every((u) => {
           const progress = emblem.userProgress[u.id]
-          if (progress?.completed) {
-            completionCount++
-          } else {
-            allCompleted = false
-          }
-        }
-
+          return progress?.completed
+        })
         if (allCompleted) {
           completedByAll++
         }
-        totalCompletions += completionCount
       }
     }
   }
-
-  const totalPossible = totalEmblems.value * selectedUserList.length
-  const averageCompletion = totalCompletions === totalPossible
-    ? 100
-    : Math.floor((totalCompletions / totalPossible) * 100)
 
   return {
     completedByAll,
