@@ -346,27 +346,48 @@ const allUsersSelected = computed(() => {
   return users.value.length > 0 && selectedUserIds.value.length === users.value.length
 })
 
-// Calculer le nombre total d'emblèmes
+// Calculer le nombre total d'emblèmes (basé sur les filtres faction/campagne)
 const totalEmblems = computed(() => {
   let count = 0
-  for (const faction of factions.value) {
-    for (const campaign of faction.campaigns) {
+
+  // Déterminer les factions à considérer
+  const factionsToCount = selectedFactionKey.value
+    ? factions.value.filter(f => f.key === selectedFactionKey.value)
+    : factions.value
+
+  for (const faction of factionsToCount) {
+    // Déterminer les campagnes à considérer
+    const campaignsToCount = selectedCampaignIds.value.length > 0
+      ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+      : faction.campaigns
+
+    for (const campaign of campaignsToCount) {
       count += campaign.emblems.length
     }
   }
   return count
 })
 
-// Statistiques de complétion par utilisateur
+// Statistiques de complétion par utilisateur (basé sur les filtres faction/campagne)
 const userCompletionStats = computed(() => {
   const stats: Record<number, { completed: number; total: number; percentage: number }> = {}
+
+  // Déterminer les factions à considérer
+  const factionsToCount = selectedFactionKey.value
+    ? factions.value.filter(f => f.key === selectedFactionKey.value)
+    : factions.value
 
   for (const user of users.value) {
     let completed = 0
     let total = 0
 
-    for (const faction of factions.value) {
-      for (const campaign of faction.campaigns) {
+    for (const faction of factionsToCount) {
+      // Déterminer les campagnes à considérer
+      const campaignsToCount = selectedCampaignIds.value.length > 0
+        ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+        : faction.campaigns
+
+      for (const campaign of campaignsToCount) {
         for (const emblem of campaign.emblems) {
           total++
           const progress = emblem.userProgress[user.id]
@@ -387,18 +408,28 @@ const userCompletionStats = computed(() => {
   return stats
 })
 
-// Statistiques du groupe
+// Statistiques du groupe (basé sur les filtres faction/campagne)
 const groupStats = computed(() => {
   const selectedUserList = selectedUsers.value
   if (selectedUserList.length === 0 || totalEmblems.value === 0) {
     return { completedByAll: 0, averageCompletion: 0, totalEmblems: 0 }
   }
 
+  // Déterminer les factions à considérer
+  const factionsToCount = selectedFactionKey.value
+    ? factions.value.filter(f => f.key === selectedFactionKey.value)
+    : factions.value
+
   let completedByAll = 0
   let totalCompletions = 0
 
-  for (const faction of factions.value) {
-    for (const campaign of faction.campaigns) {
+  for (const faction of factionsToCount) {
+    // Déterminer les campagnes à considérer
+    const campaignsToCount = selectedCampaignIds.value.length > 0
+      ? faction.campaigns.filter(c => selectedCampaignIds.value.includes(c.id))
+      : faction.campaigns
+
+    for (const campaign of campaignsToCount) {
       for (const emblem of campaign.emblems) {
         let allCompleted = true
         let completionCount = 0
