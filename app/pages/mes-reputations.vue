@@ -15,6 +15,7 @@ interface MyReputationsData {
   factions: FactionWithCampaigns<EmblemProgress | null>[]
 }
 
+const { t } = useI18n()
 const toast = useToast()
 const { isAuthenticated } = useAuth()
 
@@ -128,7 +129,7 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
     if (progress) {
       progressDisplay = progress.threshold > 0
         ? `${progress.value}/${progress.threshold}`
-        : (progress.completed ? 'Oui' : 'Non')
+        : (progress.completed ? t('reputations.yes') : t('reputations.no'))
       completed = progress.completed
       hasProgress = progress.value > 0
     }
@@ -152,12 +153,12 @@ async function handleDelete() {
   isDeleting.value = true
   try {
     await $fetch('/api/my-reputations', { method: 'DELETE' })
-    toast.add({ title: 'Succès', description: 'Données supprimées', color: 'success' })
+    toast.add({ title: t('common.success'), description: t('reputations.dataDeleted'), color: 'success' })
     isDeleteModalOpen.value = false
     await refresh()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isDeleting.value = false
   }
@@ -192,11 +193,11 @@ async function handleDelete() {
               />
             </NuxtLink>
             <h1 class="text-3xl font-pirate">
-              Mes Réputations
+              {{ $t('reputations.title') }}
             </h1>
           </div>
           <p class="text-muted">
-            Dernier import : {{ formatLastImport(user?.lastImportAt || null) }}
+            {{ $t('reputations.lastImport', { date: formatLastImport(user?.lastImportAt || null) }) }}
           </p>
         </div>
 
@@ -204,14 +205,14 @@ async function handleDelete() {
           <UButton
             v-if="hasImportedData"
             icon="i-lucide-trash-2"
-            label="Supprimer"
+            :label="$t('common.delete')"
             color="error"
             variant="outline"
             @click="isDeleteModalOpen = true"
           />
           <UButton
             icon="i-lucide-upload"
-            label="Importer"
+            :label="$t('common.import')"
             @click="isImportModalOpen = true"
           />
         </div>
@@ -227,14 +228,14 @@ async function handleDelete() {
           class="w-16 h-16 text-muted mx-auto mb-4"
         />
         <h2 class="text-xl font-semibold mb-2">
-          Aucune donnée de réputation
+          {{ $t('reputations.noData') }}
         </h2>
         <p class="text-muted mb-4">
-          Importez vos données de réputation pour les visualiser.
+          {{ $t('reputations.noDataDescription') }}
         </p>
         <UButton
           icon="i-lucide-upload"
-          label="Importer mes données"
+          :label="$t('reputations.importMyData')"
           @click="isImportModalOpen = true"
         />
       </div>
@@ -258,7 +259,7 @@ async function handleDelete() {
                 v-model="ignoreWithoutData"
                 size="sm"
               />
-              <span class="text-sm text-muted">Ignorer sans données</span>
+              <span class="text-sm text-muted">{{ $t('reputations.ignoreWithoutData') }}</span>
             </div>
           </template>
         </ReputationFilters>
@@ -268,24 +269,23 @@ async function handleDelete() {
           v-if="!hasImportedData"
           icon="i-lucide-info"
           color="info"
-          title="Importez vos données"
+          :title="$t('reputations.importMyData')"
           class="mb-6"
         >
           <template #description>
-            Pour voir votre progression sur chaque succès,
             <button
               class="underline font-medium"
               @click="isImportModalOpen = true"
             >
-              importez vos données
+              {{ $t('reputations.importMyData') }}
             </button>
-            ou consultez le
+            -
             <NuxtLink
               to="/tutoriel"
               class="underline font-medium"
             >
-              tutoriel
-            </NuxtLink>.
+              {{ $t('nav.tutorial') }}
+            </NuxtLink>
           </template>
         </UAlert>
 
@@ -295,7 +295,7 @@ async function handleDelete() {
             v-if="searchResults.length === 0"
             class="text-center py-8 text-muted"
           >
-            Aucun succès trouvé pour "{{ searchQuery }}"
+            {{ $t('reputations.noAchievementFound', { query: searchQuery }) }}
           </div>
           <div
             v-for="(result, index) in searchResults"
@@ -425,31 +425,31 @@ async function handleDelete() {
           <UCard>
             <template #header>
               <h2 class="text-xl font-semibold text-error">
-                Supprimer mes données
+                {{ $t('reputations.deleteMyData') }}
               </h2>
             </template>
             <div class="space-y-4">
               <UAlert
                 icon="i-lucide-alert-triangle"
                 color="error"
-                title="Attention"
+                :title="$t('reputations.deleteWarning')"
               >
                 <template #description>
-                  Cette action est irréversible. Toutes vos données de progression seront supprimées.
+                  {{ $t('reputations.deleteWarningMessage') }}
                 </template>
               </UAlert>
-              <p>Êtes-vous sûr de vouloir supprimer toutes vos données de réputation ?</p>
+              <p>{{ $t('reputations.deleteConfirm') }}</p>
             </div>
             <template #footer>
               <div class="flex justify-end gap-2">
                 <UButton
-                  label="Annuler"
+                  :label="$t('common.cancel')"
                   color="neutral"
                   variant="outline"
                   @click="isDeleteModalOpen = false"
                 />
                 <UButton
-                  label="Supprimer"
+                  :label="$t('common.delete')"
                   icon="i-lucide-trash-2"
                   color="error"
                   :loading="isDeleting"

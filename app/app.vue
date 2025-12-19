@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { user, isAuthenticated, isAdmin, logout } = useAuth()
 const toast = useToast()
+const { t, locale, locales, setLocale } = useI18n()
 
 useHead({
   meta: [
@@ -10,7 +11,7 @@ useHead({
     { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
   ],
   htmlAttrs: {
-    lang: 'fr'
+    lang: locale
   }
 })
 
@@ -26,10 +27,10 @@ useSeoMeta({
 
 const navItems = computed(() => {
   const items = [
-    { label: 'Mes reputations', to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true, requiresAdmin: false },
-    { label: 'Mes groupes', to: '/', icon: 'i-lucide-users', requiresAuth: true, requiresAdmin: false },
-    { label: 'Tutoriel', to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false, requiresAdmin: false },
-    { label: 'Admin', to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
+    { label: t('nav.myReputations'), to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true, requiresAdmin: false },
+    { label: t('nav.myGroups'), to: '/', icon: 'i-lucide-users', requiresAuth: true, requiresAdmin: false },
+    { label: t('nav.tutorial'), to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false, requiresAdmin: false },
+    { label: t('nav.admin'), to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
   ]
   return items.filter(item => {
     if (item.requiresAdmin && !isAdmin.value) return false
@@ -38,11 +39,16 @@ const navItems = computed(() => {
   })
 })
 
+// Sélecteur de langue
+const availableLocales = computed(() => {
+  return locales.value.filter(l => typeof l === 'object')
+})
+
 async function handleLogout() {
   await logout()
   toast.add({
-    title: 'Deconnexion',
-    description: 'A bientot, pirate !',
+    title: t('nav.logout'),
+    description: t('common.goodbye'),
     color: 'info'
   })
   navigateTo('/')
@@ -92,7 +98,7 @@ async function handleLogout() {
             @click="handleLogout"
           >
             <UIcon name="i-lucide-log-out" class="w-5 h-5" />
-            Deconnexion
+            {{ t('nav.logout') }}
           </button>
         </nav>
       </template>
@@ -105,11 +111,16 @@ async function handleLogout() {
               icon="i-lucide-log-out"
               variant="ghost"
               size="sm"
-              title="Deconnexion"
+              :title="t('nav.logout')"
               @click="handleLogout"
             />
           </template>
           <UColorModeSwitch color="info" />
+          <UDropdownMenu
+            :items="availableLocales.map(l => ({ label: l.name, onSelect: () => setLocale(l.code) }))"
+          >
+            <UButton variant="ghost" size="sm" icon="i-lucide-globe" />
+          </UDropdownMenu>
         </div>
       </template>
     </UHeader>
@@ -121,7 +132,7 @@ async function handleLogout() {
     <UFooter>
       <template #left>
         <p class="text-sm text-muted">
-          SoT Reputations - Outil de suivi des progressions
+          SoT Reputations
         </p>
       </template>
     </UFooter>

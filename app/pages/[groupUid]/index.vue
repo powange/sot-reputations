@@ -40,6 +40,7 @@ interface GroupData {
 
 const route = useRoute()
 const toast = useToast()
+const { t } = useI18n()
 const { user } = useAuth()
 const { leaveGroup } = useGroups()
 
@@ -99,11 +100,11 @@ const isLoadingGroupPendingInvites = ref(false)
 const cancellingInviteIds = ref<number[]>([])
 
 // Labels des rôles
-const roleLabels: Record<GroupRole, string> = {
-  chef: 'Chef de groupe',
-  moderator: 'Modérateur',
-  member: 'Membre'
-}
+const roleLabels = computed(() => ({
+  chef: t('groups.roles.chef'),
+  moderator: t('groups.roles.moderator'),
+  member: t('groups.roles.member')
+}))
 
 const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
   chef: 'primary',
@@ -115,7 +116,7 @@ const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
 const dropdownItems = computed(() => {
   const items = [
     [{
-      label: 'Quitter le groupe',
+      label: t('groupPage.leaveGroup'),
       icon: 'i-lucide-log-out',
       onSelect: () => { isLeaveModalOpen.value = true }
     }]
@@ -123,7 +124,7 @@ const dropdownItems = computed(() => {
 
   if (isChef.value) {
     items[0].push({
-      label: 'Supprimer le groupe',
+      label: t('groupPage.deleteGroup'),
       icon: 'i-lucide-trash-2',
       color: 'error' as const,
       onSelect: () => { isDeleteModalOpen.value = true }
@@ -476,7 +477,7 @@ function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number,
       if (progress) {
         row[`user_${u.id}_display`] = progress.threshold > 0
           ? progress.value.toString()
-          : (progress.completed ? 'Oui' : 'Non')
+          : (progress.completed ? t('reputations.yes') : t('reputations.no'))
         row[`user_${u.id}_completed`] = progress.completed
         row[`user_${u.id}_hasProgress`] = progress.value > 0
       } else {
@@ -501,7 +502,7 @@ function toggleUser(userId: number) {
 
 async function handleInvite() {
   if (!inviteUsername.value.trim()) {
-    toast.add({ title: 'Erreur', description: 'Pseudo requis', color: 'error' })
+    toast.add({ title: t('common.error'), description: t('groupPage.pseudoRequired'), color: 'error' })
     return
   }
 
@@ -511,12 +512,12 @@ async function handleInvite() {
       method: 'POST',
       body: { username: inviteUsername.value.trim() }
     })
-    toast.add({ title: 'Succès', description: result.message, color: 'success' })
+    toast.add({ title: t('common.success'), description: result.message, color: 'success' })
     inviteUsername.value = ''
     await fetchGroupPendingInvites()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isInviting.value = false
   }
@@ -531,13 +532,13 @@ async function handleChangeRole() {
       method: 'POST',
       body: { userId: memberToChangeRole.value.userId, newRole: newRoleSelected.value }
     })
-    toast.add({ title: 'Succès', description: result.message, color: 'success' })
+    toast.add({ title: t('common.success'), description: result.message, color: 'success' })
     isRoleModalOpen.value = false
     memberToChangeRole.value = null
     await refresh()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isChangingRole.value = false
   }
@@ -552,13 +553,13 @@ async function handleKick() {
       method: 'POST',
       body: { userId: memberToKick.value.userId }
     })
-    toast.add({ title: 'Succès', description: result.message, color: 'success' })
+    toast.add({ title: t('common.success'), description: result.message, color: 'success' })
     isKickModalOpen.value = false
     memberToKick.value = null
     await refresh()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isKicking.value = false
   }
@@ -568,11 +569,11 @@ async function handleLeave() {
   isLeaving.value = true
   try {
     await leaveGroup(groupUid)
-    toast.add({ title: 'Succès', description: 'Vous avez quitté le groupe', color: 'success' })
+    toast.add({ title: t('common.success'), description: t('groupPage.leftGroup'), color: 'success' })
     navigateTo('/')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isLeaving.value = false
   }
@@ -582,11 +583,11 @@ async function handleDelete() {
   isDeleting.value = true
   try {
     await $fetch(`/api/groups/${groupUid}`, { method: 'DELETE' })
-    toast.add({ title: 'Succès', description: 'Groupe supprimé', color: 'success' })
+    toast.add({ title: t('common.success'), description: t('groupPage.groupDeleted'), color: 'success' })
     navigateTo('/')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isDeleting.value = false
   }
@@ -613,10 +614,10 @@ async function generateInviteLink() {
       method: 'POST'
     })
     inviteLink.value = result.invite
-    toast.add({ title: 'Succès', description: 'Lien d\'invitation généré', color: 'success' })
+    toast.add({ title: t('common.success'), description: t('groupPage.linkGenerated'), color: 'success' })
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.add({ title: 'Erreur', description: err.data?.message || 'Erreur', color: 'error' })
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
   } finally {
     isGeneratingInviteLink.value = false
   }
@@ -626,9 +627,9 @@ async function copyInviteLink() {
   if (!fullInviteLink.value) return
   try {
     await navigator.clipboard.writeText(fullInviteLink.value)
-    toast.add({ title: 'Copié !', description: 'Lien copié dans le presse-papier', color: 'success' })
+    toast.add({ title: t('common.copied'), description: t('groupPage.linkCopied'), color: 'success' })
   } catch {
-    toast.add({ title: 'Erreur', description: 'Impossible de copier le lien', color: 'error' })
+    toast.add({ title: t('common.error'), description: t('groupPage.linkCopyError'), color: 'error' })
   }
 }
 
@@ -649,9 +650,9 @@ async function cancelPendingInvite(inviteId: number) {
   try {
     await $fetch(`/api/groups/${groupUid}/pending-invites/${inviteId}`, { method: 'DELETE' })
     groupPendingInvites.value = groupPendingInvites.value.filter(i => i.id !== inviteId)
-    toast.add({ title: 'Invitation annulée', color: 'success' })
+    toast.add({ title: t('groupPage.inviteCancelled'), color: 'success' })
   } catch {
-    toast.add({ title: 'Erreur', description: 'Impossible d\'annuler l\'invitation', color: 'error' })
+    toast.add({ title: t('common.error'), description: t('groupPage.inviteCancelError'), color: 'error' })
   } finally {
     cancellingInviteIds.value = cancellingInviteIds.value.filter(id => id !== inviteId)
   }
@@ -713,8 +714,8 @@ function connectSSE() {
     // Ne pas rafraîchir si c'est nous qui avons importé
     if (data.userId !== user.value?.id) {
       toast.add({
-        title: 'Données mises à jour',
-        description: `${data.username} a importé ses données`,
+        title: t('groupPage.dataUpdated'),
+        description: t('groupPage.memberUpdatedData', { username: data.username }),
         color: 'info'
       })
       await refresh()
@@ -770,13 +771,13 @@ onUnmounted(() => {
       <div class="flex gap-2">
         <UButton
           icon="i-lucide-upload"
-          label="Importer"
+          :label="$t('groupPage.import')"
           variant="outline"
           @click="isImportModalOpen = true"
         />
         <UButton
           icon="i-lucide-users"
-          label="Membres"
+          :label="$t('groupPage.members')"
           variant="outline"
           @click="isMembersModalOpen = true"
         />
@@ -799,14 +800,14 @@ onUnmounted(() => {
         class="w-16 h-16 text-muted mx-auto mb-4"
       />
       <h2 class="text-xl font-semibold mb-2">
-        Aucune donnée de réputation
+        {{ $t('groupPage.noData') }}
       </h2>
       <p class="text-muted mb-4">
-        Les membres du groupe doivent importer leurs données de réputation.
+        {{ $t('groupPage.noDataDescription') }}
       </p>
       <UButton
         icon="i-lucide-upload"
-        label="Importer mes données"
+        :label="$t('groupPage.importMyData')"
         @click="isImportModalOpen = true"
       />
     </div>
@@ -819,7 +820,7 @@ onUnmounted(() => {
             {{ groupStats.completedByAll }}
           </div>
           <div class="text-sm text-muted">
-            Complétés par tous
+            {{ $t('groupPage.completedByAll') }}
           </div>
         </div>
         <div class="bg-muted/30 rounded-lg p-4">
@@ -827,7 +828,7 @@ onUnmounted(() => {
             {{ groupStats.averageCompletion }}%
           </div>
           <div class="text-sm text-muted">
-            Complétion moyenne
+            {{ $t('groupPage.averageCompletion') }}
           </div>
         </div>
         <div class="bg-muted/30 rounded-lg p-4">
@@ -835,7 +836,7 @@ onUnmounted(() => {
             {{ groupStats.totalEmblems }}
           </div>
           <div class="text-sm text-muted">
-            Emblèmes au total
+            {{ $t('groupPage.totalAchievements') }}
           </div>
         </div>
       </div>
@@ -851,14 +852,14 @@ onUnmounted(() => {
       >
         <template #extra-filters>
           <div class="flex items-center gap-3 flex-wrap">
-            <span class="text-sm font-medium text-muted">Utilisateurs :</span>
+            <span class="text-sm font-medium text-muted">{{ $t('groupPage.users') }}</span>
             <UButton
               size="xs"
               variant="ghost"
               :disabled="allUsersSelected"
               @click="selectAllUsers"
             >
-              Tous
+              {{ $t('common.all') }}
             </UButton>
             <UTooltip
               v-for="u in users"
@@ -886,7 +887,7 @@ onUnmounted(() => {
               v-model="ignoreUsersWithoutData"
               size="sm"
             />
-            <span class="text-sm text-muted">Ignorer sans données</span>
+            <span class="text-sm text-muted">{{ $t('groupPage.ignoreWithoutData') }}</span>
           </div>
           <div
             v-if="emblemCompletionFilter === 'incomplete'"
@@ -897,7 +898,7 @@ onUnmounted(() => {
               size="sm"
               color="warning"
             />
-            <span class="text-sm text-muted">Non complétés par personne</span>
+            <span class="text-sm text-muted">{{ $t('groupPage.notCompletedByAnyone') }}</span>
           </div>
         </template>
       </ReputationFilters>
@@ -908,7 +909,7 @@ onUnmounted(() => {
           v-if="searchResults.length === 0"
           class="text-center py-8 text-muted"
         >
-          Aucun succès trouvé pour "{{ searchQuery }}"
+          {{ $t('groupPage.noResultFound', { query: searchQuery }) }}
         </div>
         <div
           v-for="(result, index) in searchResults"
@@ -1021,7 +1022,7 @@ onUnmounted(() => {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-semibold">
-                Membres du groupe
+                {{ $t('groupPage.groupMembers') }}
               </h2>
               <UBadge
                 :label="`${members.length} membre(s)`"
@@ -1057,7 +1058,7 @@ onUnmounted(() => {
                     icon="i-lucide-shield"
                     size="xs"
                     variant="ghost"
-                    title="Modifier le rôle"
+                    :title="$t('groupPage.changeRole')"
                     @click="openRoleModal(member)"
                   />
                   <!-- Bouton retirer du groupe (chef et moderateur) -->
@@ -1067,7 +1068,7 @@ onUnmounted(() => {
                     size="xs"
                     variant="ghost"
                     color="error"
-                    title="Retirer du groupe"
+                    :title="$t('groupPage.removeFromGroup')"
                     @click="openKickModal(member)"
                   />
                 </div>
@@ -1079,14 +1080,14 @@ onUnmounted(() => {
             <div class="flex justify-between">
               <UButton
                 v-if="canManageMembers"
-                label="Inviter"
+                :label="$t('groupPage.invite')"
                 icon="i-lucide-user-plus"
                 variant="outline"
                 @click="isInviteModalOpen = true"
               />
               <div v-else />
               <UButton
-                label="Fermer"
+                :label="$t('common.close')"
                 color="neutral"
                 variant="outline"
                 @click="isMembersModalOpen = false"
@@ -1103,7 +1104,7 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <h2 class="text-xl font-semibold">
-              Inviter des pirates
+              {{ $t('groupPage.invitePirates') }}
             </h2>
           </template>
 
@@ -1111,7 +1112,7 @@ onUnmounted(() => {
             <!-- Lien d'invitation -->
             <div>
               <h3 class="text-sm font-medium mb-2">
-                Lien d'invitation
+                {{ $t('groupPage.inviteLink') }}
               </h3>
               <div
                 v-if="isLoadingInviteLink"
@@ -1121,7 +1122,7 @@ onUnmounted(() => {
                   name="i-lucide-loader-2"
                   class="w-4 h-4 animate-spin"
                 />
-                <span>Chargement...</span>
+                <span>{{ $t('groupPage.loadingLink') }}</span>
               </div>
               <div
                 v-else-if="inviteLink"
@@ -1137,25 +1138,25 @@ onUnmounted(() => {
                   <UButton
                     icon="i-lucide-copy"
                     variant="outline"
-                    title="Copier le lien"
+                    :title="$t('groupPage.copyLink')"
                     @click="copyInviteLink"
                   />
                   <UButton
                     icon="i-lucide-refresh-cw"
                     variant="outline"
                     color="warning"
-                    title="Régénérer le lien"
+                    :title="$t('groupPage.regenerateLink')"
                     :loading="isGeneratingInviteLink"
                     @click="generateInviteLink"
                   />
                 </div>
                 <p class="text-xs text-muted">
-                  Partagez ce lien pour inviter des pirates à rejoindre le groupe.
+                  {{ $t('groupPage.shareLinkHint') }}
                 </p>
               </div>
               <div v-else>
                 <UButton
-                  label="Générer un lien d'invitation"
+                  :label="$t('groupPage.generateLink')"
                   icon="i-lucide-link"
                   variant="outline"
                   :loading="isGeneratingInviteLink"
@@ -1167,25 +1168,22 @@ onUnmounted(() => {
             <!-- Invitation par pseudo -->
             <div>
               <h3 class="text-sm font-medium mb-2">
-                Inviter par Gamertag
+                {{ $t('groupPage.inviteByGamertag') }}
               </h3>
               <div class="flex gap-2">
                 <UInput
                   v-model="inviteUsername"
-                  placeholder="Gamertag Xbox"
+                  :placeholder="$t('groupPage.gamertagPlaceholder')"
                   icon="i-lucide-user-plus"
                   class="flex-1"
                 />
                 <UButton
-                  label="Inviter"
+                  :label="$t('groupPage.invite')"
                   icon="i-lucide-plus"
                   :loading="isInviting"
                   @click="handleInvite"
                 />
               </div>
-              <p class="text-xs text-muted mt-2">
-                L'utilisateur devra accepter l'invitation pour rejoindre le groupe.
-              </p>
             </div>
 
             <!-- Invitations en attente -->
@@ -1197,11 +1195,11 @@ onUnmounted(() => {
                 name="i-lucide-loader-2"
                 class="w-4 h-4 animate-spin"
               />
-              <span>Chargement des invitations...</span>
+              <span>{{ $t('groupPage.loadingInvites') }}</span>
             </div>
             <div v-else-if="groupPendingInvites.length > 0">
               <h3 class="text-sm font-medium mb-2">
-                Invitations en attente ({{ groupPendingInvites.length }})
+                {{ $t('groupPage.pendingInvitesCount', { count: groupPendingInvites.length }) }}
               </h3>
               <div class="space-y-2">
                 <div
@@ -1211,14 +1209,14 @@ onUnmounted(() => {
                 >
                   <div>
                     <span class="font-medium">{{ invite.username }}</span>
-                    <span class="text-xs text-muted ml-2">invité par {{ invite.invitedByUsername }}</span>
+                    <span class="text-xs text-muted ml-2">{{ $t('groupPage.invitedByUser', { username: invite.invitedByUsername }) }}</span>
                   </div>
                   <UButton
                     icon="i-lucide-x"
                     size="xs"
                     variant="ghost"
                     color="error"
-                    title="Annuler l'invitation"
+                    :title="$t('groupPage.cancelInvite')"
                     :loading="cancellingInviteIds.includes(invite.id)"
                     @click="cancelPendingInvite(invite.id)"
                   />
@@ -1230,7 +1228,7 @@ onUnmounted(() => {
           <template #footer>
             <div class="flex justify-end">
               <UButton
-                label="Fermer"
+                :label="$t('common.close')"
                 color="neutral"
                 variant="outline"
                 @click="isInviteModalOpen = false"
@@ -1247,11 +1245,11 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <h2 class="text-xl font-semibold">
-              Modifier le rôle
+              {{ $t('groupPage.changeRoleTitle') }}
             </h2>
           </template>
           <div class="space-y-4">
-            <p>Choisir le nouveau rôle pour <strong>{{ memberToChangeRole?.username }}</strong> :</p>
+            <p>{{ $t('groupPage.chooseNewRole') }} <strong>{{ memberToChangeRole?.username }}</strong> :</p>
 
             <div class="space-y-2">
               <label
@@ -1272,9 +1270,9 @@ onUnmounted(() => {
                   :label="roleLabels[role]"
                 />
                 <span class="text-sm text-muted">
-                  <template v-if="role === 'chef'">Tous les droits. Un seul chef par groupe.</template>
-                  <template v-else-if="role === 'moderator'">Peut inviter et retirer des membres.</template>
-                  <template v-else>Accès en lecture seule.</template>
+                  <template v-if="role === 'chef'">{{ $t('groupPage.chefDescription') }}</template>
+                  <template v-else-if="role === 'moderator'">{{ $t('groupPage.moderatorDescription') }}</template>
+                  <template v-else>{{ $t('groupPage.memberDescription') }}</template>
                 </span>
               </label>
             </div>
@@ -1283,23 +1281,23 @@ onUnmounted(() => {
               v-if="newRoleSelected === 'chef'"
               icon="i-lucide-alert-triangle"
               color="warning"
-              title="Attention"
+              :title="$t('reputations.deleteWarning')"
             >
               <template #description>
-                En transférant le rôle de Chef, vous deviendrez Modérateur.
+                {{ $t('groupPage.transferWarning') }}
               </template>
             </UAlert>
           </div>
           <template #footer>
             <div class="flex justify-end gap-2">
               <UButton
-                label="Annuler"
+                :label="$t('common.cancel')"
                 color="neutral"
                 variant="outline"
                 @click="isRoleModalOpen = false"
               />
               <UButton
-                label="Valider"
+                :label="$t('groupPage.validate')"
                 icon="i-lucide-check"
                 :loading="isChangingRole"
                 :disabled="newRoleSelected === memberToChangeRole?.role"
@@ -1317,23 +1315,23 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <h2 class="text-xl font-semibold text-error">
-              Retirer du groupe
+              {{ $t('groupPage.removeFromGroupTitle') }}
             </h2>
           </template>
-          <p>Voulez-vous vraiment retirer <strong>{{ memberToKick?.username }}</strong> du groupe ?</p>
+          <p>{{ $t('groupPage.confirmRemove') }} <strong>{{ memberToKick?.username }}</strong> {{ $t('groupPage.fromGroup') }}</p>
           <p class="text-sm text-muted mt-2">
-            Cette personne devra être invitée à nouveau pour rejoindre le groupe.
+            {{ $t('groupPage.removeHint') }}
           </p>
           <template #footer>
             <div class="flex justify-end gap-2">
               <UButton
-                label="Annuler"
+                :label="$t('common.cancel')"
                 color="neutral"
                 variant="outline"
                 @click="isKickModalOpen = false"
               />
               <UButton
-                label="Retirer"
+                :label="$t('groupPage.remove')"
                 color="error"
                 icon="i-lucide-user-minus"
                 :loading="isKicking"
@@ -1351,20 +1349,20 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <h2 class="text-xl font-semibold">
-              Quitter le groupe
+              {{ $t('groupPage.leaveGroupTitle') }}
             </h2>
           </template>
-          <p>Voulez-vous vraiment quitter le groupe <strong>{{ groupData?.group.name }}</strong> ?</p>
+          <p>{{ $t('groupPage.confirmLeave') }} <strong>{{ groupData?.group.name }}</strong> ?</p>
           <template #footer>
             <div class="flex justify-end gap-2">
               <UButton
-                label="Annuler"
+                :label="$t('common.cancel')"
                 color="neutral"
                 variant="outline"
                 @click="isLeaveModalOpen = false"
               />
               <UButton
-                label="Quitter"
+                :label="$t('groupPage.leave')"
                 color="warning"
                 icon="i-lucide-log-out"
                 :loading="isLeaving"
@@ -1382,28 +1380,28 @@ onUnmounted(() => {
         <UCard>
           <template #header>
             <h2 class="text-xl font-semibold text-error">
-              Supprimer le groupe
+              {{ $t('groupPage.deleteGroupTitle') }}
             </h2>
           </template>
           <UAlert
             icon="i-lucide-alert-triangle"
             color="error"
-            title="Attention"
+            :title="$t('reputations.deleteWarning')"
           >
             <template #description>
-              Cette action est irréversible. Tous les membres seront retirés du groupe.
+              {{ $t('groupPage.deleteWarning') }}
             </template>
           </UAlert>
           <template #footer>
             <div class="flex justify-end gap-2">
               <UButton
-                label="Annuler"
+                :label="$t('common.cancel')"
                 color="neutral"
                 variant="outline"
                 @click="isDeleteModalOpen = false"
               />
               <UButton
-                label="Supprimer"
+                :label="$t('common.delete')"
                 color="error"
                 icon="i-lucide-trash-2"
                 :loading="isDeleting"

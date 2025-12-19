@@ -16,6 +16,7 @@
     "@iconify-json/simple-icons": "^1.2.59",
     "@nuxt/fonts": "^0.11.4",
     "@nuxt/ui": "^4.2.1",
+    "@nuxtjs/i18n": "^10.2.1",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.5.0",
     "nuxt": "^4.2.1",

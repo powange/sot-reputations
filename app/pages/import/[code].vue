@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
 const toast = useToast()
+const { t } = useI18n()
 const { user, isAuthenticated, isLoading: authLoading, loginWithMicrosoft } = useAuth()
 
 const code = route.params.code as string
@@ -23,8 +24,8 @@ async function handleImport() {
       }
     })
     toast.add({
-      title: 'Import reussi !',
-      description: 'Vos donnees de reputation ont ete importees.',
+      title: t('importPage.success'),
+      description: t('importPage.successDescription'),
       color: 'success'
     })
     importSuccess.value = true
@@ -35,8 +36,8 @@ async function handleImport() {
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({
-      title: 'Erreur',
-      description: err.data?.message || 'Erreur lors de l\'import',
+      title: t('common.error'),
+      description: err.data?.message || t('importPage.importError'),
       color: 'error'
     })
   } finally {
@@ -44,7 +45,7 @@ async function handleImport() {
   }
 }
 
-// Compter le nombre d'emblèmes dans les données
+// Compter le nombre d'accomplissements dans les données
 const emblemCount = computed(() => {
   if (!tempData.value?.data) return 0
   const data = tempData.value.data as Record<string, { Emblems?: { Emblems?: unknown[] }, Campaigns?: Record<string, { Emblems?: unknown[] }> }>
@@ -83,14 +84,14 @@ const factionCount = computed(() => {
         <UCard>
           <div class="text-center py-8">
             <UIcon name="i-lucide-clock" class="w-16 h-16 text-error mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">Lien expire</h1>
+            <h1 class="text-2xl font-pirate mb-2">{{ $t('importPage.expired') }}</h1>
             <p class="text-muted mb-6">
-              Ce lien d'import a expire ou a deja ete utilise.
+              {{ $t('importPage.expiredDescription') }}
               <br />
-              Veuillez relancer le bookmarklet sur le site Sea of Thieves.
+              {{ $t('importPage.expiredHint') }}
             </p>
             <UButton
-              label="Retour a l'accueil"
+              :label="$t('invite.backToHome')"
               icon="i-lucide-home"
               @click="navigateTo('/')"
             />
@@ -103,19 +104,19 @@ const factionCount = computed(() => {
         <UCard>
           <div class="text-center py-4">
             <UIcon name="i-lucide-download" class="w-16 h-16 text-primary mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">Importer mes reputations</h1>
+            <h1 class="text-2xl font-pirate mb-2">{{ $t('importPage.title') }}</h1>
 
             <!-- Résumé des données -->
             <div class="bg-muted/50 rounded-lg p-4 mb-6">
-              <p class="text-sm text-muted mb-2">Donnees recuperees :</p>
+              <p class="text-sm text-muted mb-2">{{ $t('importPage.dataRetrieved') }}</p>
               <div class="flex justify-center gap-6">
                 <div class="text-center">
                   <div class="text-2xl font-bold text-primary">{{ factionCount }}</div>
-                  <div class="text-xs text-muted">Factions</div>
+                  <div class="text-xs text-muted">{{ $t('importPage.factions') }}</div>
                 </div>
                 <div class="text-center">
                   <div class="text-2xl font-bold text-primary">{{ emblemCount }}</div>
-                  <div class="text-xs text-muted">Emblemes</div>
+                  <div class="text-xs text-muted">{{ $t('importPage.achievements') }}</div>
                 </div>
               </div>
             </div>
@@ -124,7 +125,7 @@ const factionCount = computed(() => {
             <template v-if="importSuccess">
               <UAlert icon="i-lucide-check-circle" color="success" class="mb-4">
                 <template #description>
-                  Import reussi ! Redirection en cours...
+                  {{ $t('importPage.success') }}
                 </template>
               </UAlert>
             </template>
@@ -132,10 +133,10 @@ const factionCount = computed(() => {
             <!-- Non connecté -->
             <template v-else-if="!isAuthenticated">
               <p class="text-muted mb-4">
-                Connectez-vous avec votre compte Xbox pour importer ces donnees.
+                {{ $t('importPage.loginToImport') }}
               </p>
               <UButton
-                label="Connexion Xbox"
+                :label="$t('auth.loginXbox')"
                 icon="i-lucide-gamepad-2"
                 color="success"
                 size="lg"
@@ -146,10 +147,10 @@ const factionCount = computed(() => {
             <!-- Connecté, peut importer -->
             <template v-else>
               <p class="text-muted mb-4">
-                Ces donnees seront associees a votre compte <strong>{{ user?.username }}</strong>.
+                {{ $t('importPage.dataAssociated') }} <strong>{{ user?.username }}</strong>.
               </p>
               <UButton
-                label="Importer mes reputations"
+                :label="$t('importPage.importMyReputations')"
                 icon="i-lucide-download"
                 size="lg"
                 :loading="isImporting"

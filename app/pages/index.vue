@@ -1,16 +1,17 @@
 <script setup lang="ts">
 type GroupRole = 'chef' | 'moderator' | 'member'
 
+const { t } = useI18n()
 const toast = useToast()
 const { user, isAuthenticated, isLoading, loginWithMicrosoft } = useAuth()
 const { groups, pendingInvites, isLoadingGroups, fetchGroups, createGroup, fetchPendingInvites, acceptInvite, rejectInvite } = useGroups()
 
 // Labels des rôles
-const roleLabels: Record<GroupRole, string> = {
-  chef: 'Chef de groupe',
-  moderator: 'Modérateur',
-  member: 'Membre'
-}
+const roleLabels = computed<Record<GroupRole, string>>(() => ({
+  chef: t('groups.roles.chef'),
+  moderator: t('groups.roles.moderator'),
+  member: t('groups.roles.member')
+}))
 
 const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
   chef: 'primary',
@@ -22,8 +23,8 @@ const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
 const route = useRoute()
 if (route.query.error === 'oauth') {
   toast.add({
-    title: 'Erreur de connexion',
-    description: 'La connexion Xbox a echoue. Veuillez reessayer.',
+    title: t('auth.loginError'),
+    description: t('auth.loginErrorMessage'),
     color: 'error'
   })
 }
@@ -48,15 +49,15 @@ async function handleAcceptInvite(inviteId: number) {
   try {
     const response = await acceptInvite(inviteId)
     toast.add({
-      title: 'Invitation acceptee',
+      title: t('groups.invitationAccepted'),
       description: response.message,
       color: 'success'
     })
   } catch (error: unknown) {
     const err = error as { data?: { message?: string }, message?: string }
     toast.add({
-      title: 'Erreur',
-      description: err.data?.message || err.message || 'Erreur lors de l\'acceptation',
+      title: t('common.error'),
+      description: err.data?.message || err.message || t('groups.errorAccepting'),
       color: 'error'
     })
   } finally {
@@ -69,15 +70,15 @@ async function handleRejectInvite(inviteId: number) {
   try {
     await rejectInvite(inviteId)
     toast.add({
-      title: 'Invitation refusee',
-      description: 'L\'invitation a ete refusee',
+      title: t('groups.invitationDeclined'),
+      description: t('groups.invitationDeclinedMessage'),
       color: 'info'
     })
   } catch (error: unknown) {
     const err = error as { data?: { message?: string }, message?: string }
     toast.add({
-      title: 'Erreur',
-      description: err.data?.message || err.message || 'Erreur lors du refus',
+      title: t('common.error'),
+      description: err.data?.message || err.message || t('groups.errorDeclining'),
       color: 'error'
     })
   } finally {
@@ -88,8 +89,8 @@ async function handleRejectInvite(inviteId: number) {
 async function handleCreateGroup() {
   if (!newGroupName.value.trim()) {
     toast.add({
-      title: 'Erreur',
-      description: 'Nom du groupe requis',
+      title: t('common.error'),
+      description: t('groups.groupNameRequired'),
       color: 'error'
     })
     return
@@ -100,8 +101,8 @@ async function handleCreateGroup() {
   try {
     const group = await createGroup(newGroupName.value.trim())
     toast.add({
-      title: 'Groupe cree',
-      description: `Le groupe "${group.name}" a ete cree`,
+      title: t('groups.groupCreated'),
+      description: t('groups.groupCreatedMessage', { name: group.name }),
       color: 'success'
     })
     isCreateGroupModalOpen.value = false
@@ -112,8 +113,8 @@ async function handleCreateGroup() {
   } catch (error: unknown) {
     const err = error as { data?: { message?: string }, message?: string }
     toast.add({
-      title: 'Erreur',
-      description: err.data?.message || err.message || 'Erreur lors de la creation',
+      title: t('common.error'),
+      description: err.data?.message || err.message || t('groups.errorCreating'),
       color: 'error'
     })
   } finally {
@@ -138,14 +139,14 @@ async function handleCreateGroup() {
             SoT Reputations
           </h1>
           <p class="text-muted">
-            Connectez-vous avec votre compte Xbox pour acceder a vos groupes de comparaison
+            {{ $t('auth.loginPrompt') }}
           </p>
         </div>
 
         <UCard>
           <div class="space-y-4">
             <UButton
-              label="Connexion Xbox"
+              :label="$t('auth.loginXbox')"
               icon="i-lucide-gamepad-2"
               color="success"
               size="lg"
@@ -156,11 +157,11 @@ async function handleCreateGroup() {
 
           <template #footer>
             <p class="text-sm text-muted text-center">
-              Besoin d'aide ?
+              {{ $t('auth.needHelp') }}
               <NuxtLink to="/tutoriel" class="text-primary hover:underline">
-                Consultez le tutoriel
+                {{ $t('auth.checkTutorial') }}
               </NuxtLink>
-              pour importer vos donnees.
+              {{ $t('auth.toImportData') }}
             </p>
           </template>
         </UCard>
@@ -172,15 +173,15 @@ async function handleCreateGroup() {
       <div class="flex justify-between items-center mb-8">
         <div>
           <h1 class="text-3xl font-pirate">
-            Mes groupes
+            {{ $t('groups.title') }}
           </h1>
           <p class="text-muted mt-1">
-            Bienvenue, {{ user?.username }} !
+            {{ $t('groups.welcome', { username: user?.username }) }}
           </p>
         </div>
         <UButton
           icon="i-lucide-plus"
-          label="Creer un groupe"
+          :label="$t('groups.createGroup')"
           @click="isCreateGroupModalOpen = true"
         />
       </div>
@@ -189,7 +190,7 @@ async function handleCreateGroup() {
       <div v-if="pendingInvites.length > 0" class="mb-8">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <UIcon name="i-lucide-mail" class="w-5 h-5 text-primary" />
-          Invitations en attente
+          {{ $t('groups.pendingInvitations') }}
           <UBadge :label="String(pendingInvites.length)" color="primary" size="sm" />
         </h2>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -200,12 +201,12 @@ async function handleCreateGroup() {
                   {{ invite.groupName }}
                 </h3>
                 <p class="text-sm text-muted">
-                  Invite par {{ invite.invitedByUsername }}
+                  {{ $t('groups.invitedBy', { username: invite.invitedByUsername }) }}
                 </p>
               </div>
               <div class="flex gap-2">
                 <UButton
-                  label="Accepter"
+                  :label="$t('common.accept')"
                   icon="i-lucide-check"
                   color="success"
                   size="sm"
@@ -213,7 +214,7 @@ async function handleCreateGroup() {
                   @click="handleAcceptInvite(invite.id)"
                 />
                 <UButton
-                  label="Refuser"
+                  :label="$t('common.decline')"
                   icon="i-lucide-x"
                   color="error"
                   variant="outline"
@@ -235,14 +236,14 @@ async function handleCreateGroup() {
       <div v-else-if="groups.length === 0" class="text-center py-16">
         <UIcon name="i-lucide-users" class="w-16 h-16 text-muted mx-auto mb-4" />
         <h2 class="text-xl font-semibold mb-2">
-          Aucun groupe
+          {{ $t('groups.noGroups') }}
         </h2>
         <p class="text-muted mb-4">
-          Creez un groupe pour commencer a comparer vos reputations avec d'autres pirates !
+          {{ $t('groups.noGroupsDescription') }}
         </p>
         <UButton
           icon="i-lucide-plus"
-          label="Creer mon premier groupe"
+          :label="$t('groups.createFirstGroup')"
           @click="isCreateGroupModalOpen = true"
         />
       </div>
@@ -279,15 +280,15 @@ async function handleCreateGroup() {
           <UCard>
             <template #header>
               <h2 class="text-xl font-semibold">
-                Creer un nouveau groupe
+                {{ $t('groups.createNewGroup') }}
               </h2>
             </template>
 
             <form @submit.prevent="handleCreateGroup" class="space-y-4">
-              <UFormField label="Nom du groupe">
+              <UFormField :label="$t('groups.groupName')">
                 <UInput
                   v-model="newGroupName"
-                  placeholder="Ex: Mon equipage"
+                  :placeholder="$t('groups.groupNamePlaceholder')"
                   icon="i-lucide-users"
                   class="w-full"
                 />
@@ -297,13 +298,13 @@ async function handleCreateGroup() {
             <template #footer>
               <div class="flex justify-end gap-2">
                 <UButton
-                  label="Annuler"
+                  :label="$t('common.cancel')"
                   color="neutral"
                   variant="outline"
                   @click="isCreateGroupModalOpen = false"
                 />
                 <UButton
-                  label="Creer"
+                  :label="$t('common.create')"
                   icon="i-lucide-plus"
                   :loading="isCreatingGroup"
                   @click="handleCreateGroup"

@@ -123,7 +123,7 @@ async function validateEmblem(emblem: Emblem) {
   try {
     await $fetch(`/api/admin/emblems/${emblem.id}/validate`, { method: 'POST' })
     toast.add({
-      title: 'Embleme valide',
+      title: 'Accomplissement valide',
       description: `"${emblem.name}" est maintenant visible`,
       color: 'success'
     })
@@ -131,7 +131,7 @@ async function validateEmblem(emblem: Emblem) {
   } catch {
     toast.add({
       title: 'Erreur',
-      description: 'Impossible de valider l\'embleme',
+      description: 'Impossible de valider l\'accomplissement',
       color: 'error'
     })
   } finally {
@@ -260,14 +260,14 @@ watch(showOnlyIncompleteGrades, (value) => {
         to="/admin"
         variant="ghost"
         icon="i-lucide-arrow-left"
-        label="Retour"
+        :label="$t('common.back')"
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">
-        Factions & Emblemes
+        Factions & Accomplissements
       </h1>
       <p class="text-muted mt-2">
-        Gestion des factions, campagnes et emblemes
+        Gestion des factions, campagnes et accomplissements
       </p>
     </div>
 
@@ -288,7 +288,7 @@ watch(showOnlyIncompleteGrades, (value) => {
       <UCard>
         <div class="text-center">
           <div class="text-3xl font-bold text-primary">{{ stats.emblems }}</div>
-          <div class="text-sm text-muted">Emblemes</div>
+          <div class="text-sm text-muted">Accomplissements</div>
         </div>
       </UCard>
       <UCard
@@ -314,7 +314,7 @@ watch(showOnlyIncompleteGrades, (value) => {
     <div class="mb-6 flex flex-wrap items-center gap-4">
       <UInput
         v-model="searchQuery"
-        placeholder="Rechercher un embleme..."
+        placeholder="Rechercher un accomplissement..."
         icon="i-lucide-search"
         size="lg"
         class="w-full sm:w-80"
@@ -375,7 +375,7 @@ watch(showOnlyIncompleteGrades, (value) => {
                 <span class="font-medium">{{ campaign.name }}</span>
               </div>
               <div class="flex items-center gap-3 text-sm text-muted">
-                <span>{{ campaign.emblems.length }} embleme{{ campaign.emblems.length > 1 ? 's' : '' }}</span>
+                <span>{{ campaign.emblems.length }} accomplissement{{ campaign.emblems.length > 1 ? 's' : '' }}</span>
                 <UBadge color="neutral" size="xs">{{ campaign.key }}</UBadge>
               </div>
             </div>
@@ -385,7 +385,7 @@ watch(showOnlyIncompleteGrades, (value) => {
               <table v-if="campaign.emblems.length > 0" class="w-full text-sm">
                 <thead>
                   <tr class="border-b border-muted/30">
-                    <th class="text-left py-2 px-2 font-medium">Embleme</th>
+                    <th class="text-left py-2 px-2 font-medium">Accomplissement</th>
                     <th class="text-left py-2 px-2 font-medium">Key</th>
                     <th class="text-center py-2 px-2 font-medium">Grades</th>
                     <th class="text-center py-2 px-2 font-medium">Joueurs</th>
@@ -458,7 +458,7 @@ watch(showOnlyIncompleteGrades, (value) => {
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="text-muted text-center py-4">Aucun embleme</p>
+              <p v-else class="text-muted text-center py-4">Aucun accomplissement</p>
             </div>
           </div>
 
@@ -471,7 +471,7 @@ watch(showOnlyIncompleteGrades, (value) => {
 
     <div v-else class="text-center py-8 text-muted">
       <template v-if="searchQuery.trim()">
-        Aucun embleme trouve pour "{{ searchQuery }}"
+        Aucun accomplissement trouve pour "{{ searchQuery }}"
       </template>
       <template v-else>
         Aucune faction

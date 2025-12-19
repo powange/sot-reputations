@@ -266,7 +266,7 @@ export function generateBookmarkletCode(siteUrl: string): string {
         </div>
         <div class="stat">
           <div class="stat-value">\${emblemCount}</div>
-          <div class="stat-label">Emblemes</div>
+          <div class="stat-label">Accomplissements</div>
         </div>
       </div>
       <div class="buttons">

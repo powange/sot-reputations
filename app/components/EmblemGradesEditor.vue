@@ -14,6 +14,8 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const { t } = useI18n()
+
 const isLoading = ref(true)
 const isSaving = ref(false)
 const error = ref<string | null>(null)
@@ -44,7 +46,7 @@ async function loadGrades() {
     thresholds.value = values
   }
   catch (e) {
-    error.value = 'Erreur lors du chargement des grades'
+    error.value = t('components.gradeEditor.loadError')
     console.error(e)
   }
   finally {
@@ -72,7 +74,7 @@ async function save() {
     emit('close')
   }
   catch (e) {
-    error.value = 'Erreur lors de la sauvegarde'
+    error.value = t('components.gradeEditor.saveError')
     console.error(e)
   }
   finally {
@@ -94,7 +96,7 @@ onMounted(() => {
           {{ emblem.name }}
         </h3>
         <p class="text-sm text-muted">
-          {{ emblem.maxGrade }} grade{{ emblem.maxGrade > 1 ? 's' : '' }}
+          {{ emblem.maxGrade }} {{ $t('reputations.grade') }}{{ emblem.maxGrade > 1 ? 's' : '' }}
         </p>
       </div>
       <UButton
@@ -125,11 +127,11 @@ onMounted(() => {
         :key="index"
         class="flex items-center gap-4"
       >
-        <span class="text-sm font-medium w-20">Grade {{ index + 1 }}</span>
+        <span class="text-sm font-medium w-20">{{ $t('reputations.grade') }} {{ index + 1 }}</span>
         <UInput
           v-model.number="thresholds[index]"
           type="number"
-          :placeholder="'Seuil...'"
+          :placeholder="$t('components.gradeEditor.threshold')"
           class="flex-1"
           :min="0"
         />
@@ -142,14 +144,14 @@ onMounted(() => {
           :disabled="isSaving"
           @click="emit('close')"
         >
-          Annuler
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="primary"
           :loading="isSaving"
           @click="save"
         >
-          Sauvegarder
+          {{ $t('common.save') }}
         </UButton>
       </div>
     </div>

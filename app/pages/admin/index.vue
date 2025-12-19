@@ -1,8 +1,9 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const { isAdmin, isAdminOrModerator, isAuthenticated } = useAuth()
 
 useSeoMeta({
-  title: 'Administration - SoT Reputations'
+  title: () => `${t('admin.title')} - SoT Reputations`
 })
 
 // Redirection si non admin/moderateur
@@ -24,14 +25,14 @@ watchEffect(() => {
         to="/"
         variant="ghost"
         icon="i-lucide-arrow-left"
-        label="Retour"
+        :label="$t('common.back')"
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">
-        Administration
+        {{ $t('admin.title') }}
       </h1>
       <p class="text-muted mt-2">
-        Gestion du site
+        {{ $t('admin.subtitle') }}
       </p>
     </div>
 
@@ -44,8 +45,8 @@ watchEffect(() => {
               <UIcon name="i-lucide-users" class="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h3 class="font-semibold">Utilisateurs</h3>
-              <p class="text-sm text-muted">Voir tous les utilisateurs et leurs groupes</p>
+              <h3 class="font-semibold">{{ $t('admin.users.title') }}</h3>
+              <p class="text-sm text-muted">{{ $t('admin.users.description') }}</p>
             </div>
           </div>
         </UCard>
@@ -59,8 +60,8 @@ watchEffect(() => {
               <UIcon name="i-lucide-flag" class="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h3 class="font-semibold">Factions & Emblemes</h3>
-              <p class="text-sm text-muted">Gerer les factions, campagnes et emblemes</p>
+              <h3 class="font-semibold">{{ $t('admin.factions.title') }}</h3>
+              <p class="text-sm text-muted">{{ $t('admin.factions.description') }}</p>
             </div>
           </div>
         </UCard>
@@ -74,8 +75,8 @@ watchEffect(() => {
               <UIcon name="i-lucide-database" class="w-6 h-6 text-warning" />
             </div>
             <div>
-              <h3 class="font-semibold">Base de donnees</h3>
-              <p class="text-sm text-muted">Sauvegarde et restauration</p>
+              <h3 class="font-semibold">{{ $t('admin.database.title') }}</h3>
+              <p class="text-sm text-muted">{{ $t('admin.database.description') }}</p>
             </div>
           </div>
         </UCard>

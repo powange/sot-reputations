@@ -109,7 +109,7 @@ function formatDate(date: string | null): string {
         to="/admin"
         variant="ghost"
         icon="i-lucide-arrow-left"
-        label="Retour"
+        :label="$t('common.back')"
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">

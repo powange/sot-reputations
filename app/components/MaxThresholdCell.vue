@@ -30,7 +30,7 @@ function getThreshold(gradeThresholds: GradeThreshold[] | undefined, grade: numb
             :key="grade"
             class="flex justify-between gap-4 text-sm"
           >
-            <span class="text-muted">Grade {{ grade }}</span>
+            <span class="text-muted">{{ $t('reputations.grade') }} {{ grade }}</span>
             <span :class="getThreshold(gradeThresholds, grade) !== undefined ? 'font-medium' : 'text-muted'">
               {{ getThreshold(gradeThresholds, grade) ?? '?' }}
             </span>

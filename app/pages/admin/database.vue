@@ -129,7 +129,7 @@ async function executeRestore() {
         to="/admin"
         variant="ghost"
         icon="i-lucide-arrow-left"
-        label="Retour"
+        :label="$t('common.back')"
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">
@@ -151,7 +151,7 @@ async function executeRestore() {
         </template>
 
         <p class="text-muted mb-4">
-          Telechargez une copie de la base de donnees actuelle. Cette sauvegarde contient toutes les donnees : utilisateurs, groupes, factions, emblemes et progressions.
+          Telechargez une copie de la base de donnees actuelle. Cette sauvegarde contient toutes les donnees : utilisateurs, groupes, factions, accomplissements et progressions.
         </p>
 
         <UButton

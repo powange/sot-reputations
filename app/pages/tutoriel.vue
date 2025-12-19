@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { generateBookmarkletCode, minifyBookmarkletCode, BOOKMARKLET_VERSION } from '~/utils/bookmarklet'
 
+const { t } = useI18n()
+
 useSeoMeta({
-  title: 'Tutoriel - Recuperer ses donnees de reputation Sea of Thieves',
-  description: 'Guide etape par etape pour exporter vos donnees de reputation depuis Sea of Thieves'
+  title: () => t('tutorial.title'),
+  description: () => t('tutorial.subtitle')
 })
 
 const config = useRuntimeConfig()
@@ -21,15 +23,15 @@ async function copyBookmarklet() {
     await navigator.clipboard.writeText(bookmarkletUrl.value)
     copied.value = true
     toast.add({
-      title: 'Copie !',
-      description: 'Code du bookmarklet copie dans le presse-papier',
+      title: t('common.copied'),
+      description: t('bookmarklet.dataCopied'),
       color: 'success'
     })
     setTimeout(() => copied.value = false, 3000)
   } catch {
     toast.add({
-      title: 'Erreur',
-      description: 'Impossible de copier',
+      title: t('common.error'),
+      description: t('bookmarklet.errorFetching'),
       color: 'error'
     })
   }
@@ -53,14 +55,14 @@ onMounted(() => {
         to="/"
         variant="ghost"
         icon="i-lucide-arrow-left"
-        label="Retour"
+        :label="$t('common.back')"
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">
-        Comment recuperer ses donnees de reputation
+        {{ $t('tutorial.title') }}
       </h1>
       <p class="text-muted mt-2">
-        Deux methodes pour exporter vos donnees depuis Sea of Thieves
+        {{ $t('tutorial.subtitle') }}
       </p>
     </div>
 
@@ -68,12 +70,11 @@ onMounted(() => {
     <UAlert
       icon="i-lucide-shield-check"
       color="success"
-      title="Vos donnees restent privees"
+      :title="$t('tutorial.privacyTitle')"
       class="mb-8"
     >
       <template #description>
-        Ces methodes utilisent uniquement vos propres donnees depuis le site officiel.
-        Aucun mot de passe ou cookie n'est partage.
+        {{ $t('tutorial.privacyDescription') }}
       </template>
     </UAlert>
 
@@ -81,8 +82,8 @@ onMounted(() => {
     <UTabs
       v-model="activeTab"
       :items="[
-        { value: 'bookmarklet', label: 'Bookmarklet (Recommande)', slot: 'bookmarklet', icon: 'i-lucide-bookmark' },
-        { value: 'manual', label: 'Methode manuelle', slot: 'manual', icon: 'i-lucide-code' }
+        { value: 'bookmarklet', label: $t('tutorial.tabs.bookmarklet'), slot: 'bookmarklet', icon: 'i-lucide-bookmark' },
+        { value: 'manual', label: $t('tutorial.tabs.manual'), slot: 'manual', icon: 'i-lucide-code' }
       ]"
       class="mb-6"
     >
@@ -97,14 +98,14 @@ onMounted(() => {
                   1
                 </div>
                 <h3 class="text-lg font-semibold">
-                  Installer le bookmarklet
+                  {{ $t('tutorial.step1.title') }}
                   <span class="text-xs font-normal text-muted ml-2">v{{ BOOKMARKLET_VERSION }}</span>
                 </h3>
               </div>
             </template>
 
             <p class="mb-4">
-              Faites glisser ce bouton vers votre barre de favoris :
+              {{ $t('tutorial.step1.description') }}
             </p>
 
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-muted/50 rounded-lg mb-4">
@@ -118,7 +119,7 @@ onMounted(() => {
                 <span>SoT Reputations</span>
               </a>
               <span class="text-muted text-sm">
-                ← Glissez vers votre barre de favoris
+                ← {{ $t('tutorial.step1.dragHint') }}
               </span>
             </div>
 
@@ -127,20 +128,20 @@ onMounted(() => {
               color="info"
               class="mb-4"
             >
-              <template #title>Le glisse-depose ne fonctionne pas ?</template>
+              <template #title>{{ $t('tutorial.step1.dragNotWorking') }}</template>
               <template #description>
                 <ol class="list-decimal list-inside space-y-1 mt-2 text-sm">
-                  <li>Cliquez sur "Copier le code" ci-dessous</li>
-                  <li>Clic droit sur votre barre de favoris → "Ajouter une page" ou "Ajouter un favori"</li>
-                  <li>Donnez un nom (ex: "SoT Reputations")</li>
-                  <li>Collez le code dans le champ URL/Adresse</li>
+                  <li>{{ $t('tutorial.step1.instructions.1') }}</li>
+                  <li>{{ $t('tutorial.step1.instructions.2') }}</li>
+                  <li>{{ $t('tutorial.step1.instructions.3') }}</li>
+                  <li>{{ $t('tutorial.step1.instructions.4') }}</li>
                 </ol>
               </template>
             </UAlert>
 
             <UButton
               :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
-              :label="copied ? 'Copie !' : 'Copier le code'"
+              :label="copied ? $t('common.copied') : $t('tutorial.step1.copyCode')"
               variant="outline"
               size="sm"
               @click="copyBookmarklet"
@@ -155,20 +156,20 @@ onMounted(() => {
                   2
                 </div>
                 <h3 class="text-lg font-semibold">
-                  Aller sur Sea of Thieves
+                  {{ $t('tutorial.step2.title') }}
                 </h3>
               </div>
             </template>
 
             <p class="mb-4">
-              Rendez-vous sur la page de reputation du site officiel et connectez-vous avec votre compte Xbox.
+              {{ $t('tutorial.step2.description') }}
             </p>
 
             <UButton
               href="https://www.seaofthieves.com/profile/reputation"
               target="_blank"
               icon="i-lucide-external-link"
-              label="Ouvrir Sea of Thieves"
+              :label="$t('tutorial.step2.openSoT')"
             />
 
             <UAlert
@@ -177,10 +178,10 @@ onMounted(() => {
               class="mt-4"
             >
               <template #title>
-                Mettez le site en francais
+                {{ $t('tutorial.step2.languageWarning') }}
               </template>
               <template #description>
-                Le selecteur de langue se trouve en bas de page. C'est important pour que l'import fonctionne correctement.
+                {{ $t('tutorial.step2.languageWarningDescription') }}
               </template>
             </UAlert>
           </UCard>
@@ -193,34 +194,33 @@ onMounted(() => {
                   3
                 </div>
                 <h3 class="text-lg font-semibold">
-                  Cliquer sur le bookmarklet
+                  {{ $t('tutorial.step3.title') }}
                 </h3>
               </div>
             </template>
 
             <p class="mb-4">
-              Une fois connecte sur seaofthieves.com, cliquez sur le bookmarklet dans votre barre de favoris.
-              Une fenetre s'affichera avec deux options :
+              {{ $t('tutorial.step3.description') }}
             </p>
 
             <div class="grid sm:grid-cols-2 gap-4">
               <div class="p-4 bg-muted/50 rounded-lg">
                 <div class="flex items-center gap-2 mb-2">
                   <UIcon name="i-lucide-download" class="w-5 h-5 text-primary" />
-                  <span class="font-medium">Importer sur le site</span>
+                  <span class="font-medium">{{ $t('tutorial.step3.optionImport') }}</span>
                 </div>
                 <p class="text-sm text-muted">
-                  Envoie directement vos donnees sur notre site. Vous serez redirige pour finaliser l'import.
+                  {{ $t('tutorial.step3.optionImportDescription') }}
                 </p>
               </div>
 
               <div class="p-4 bg-muted/50 rounded-lg">
                 <div class="flex items-center gap-2 mb-2">
                   <UIcon name="i-lucide-clipboard" class="w-5 h-5 text-primary" />
-                  <span class="font-medium">Copier les donnees</span>
+                  <span class="font-medium">{{ $t('tutorial.step3.optionCopy') }}</span>
                 </div>
                 <p class="text-sm text-muted">
-                  Copie le JSON dans votre presse-papier pour l'importer manuellement plus tard.
+                  {{ $t('tutorial.step3.optionCopyDescription') }}
                 </p>
               </div>
             </div>
@@ -236,28 +236,20 @@ onMounted(() => {
             color="info"
           >
             <template #description>
-              Cette methode est plus technique mais fonctionne sur tous les navigateurs.
+              {{ $t('tutorial.manual.intro') }}
             </template>
           </UAlert>
 
           <UCard>
-            <template #header>
-              <h3 class="font-semibold">
-                Etapes detaillees
-              </h3>
-            </template>
-
             <ol class="space-y-4">
               <li class="flex gap-3">
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">1</span>
                 <div>
                   <p class="font-medium">
-                    Aller sur seaofthieves.com
+                    {{ $t('tutorial.manual.step1') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Rendez-vous sur la
-                    <a href="https://www.seaofthieves.com/profile/reputation" target="_blank" class="text-primary hover:underline">page de reputation</a>
-                    et connectez-vous.
+                    {{ $t('tutorial.manual.step1Description') }}
                   </p>
                 </div>
               </li>
@@ -266,10 +258,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">2</span>
                 <div>
                   <p class="font-medium">
-                    Mettre le site en francais
+                    {{ $t('tutorial.manual.step2') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Selecteur de langue en bas de page.
+                    {{ $t('tutorial.manual.step2Description') }}
                   </p>
                 </div>
               </li>
@@ -278,13 +270,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">3</span>
                 <div>
                   <p class="font-medium">
-                    Ouvrir les DevTools
+                    {{ $t('tutorial.manual.step3') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Appuyez sur
-                    <kbd class="px-1.5 py-0.5 bg-muted rounded text-xs">F12</kbd>
-                    ou
-                    <kbd class="px-1.5 py-0.5 bg-muted rounded text-xs">Ctrl+Shift+I</kbd>
+                    {{ $t('tutorial.manual.step3Description') }}
                   </p>
                 </div>
               </li>
@@ -293,10 +282,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">4</span>
                 <div>
                   <p class="font-medium">
-                    Onglet Network
+                    {{ $t('tutorial.manual.step4') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Cliquez sur l'onglet "Network" ou "Reseau".
+                    {{ $t('tutorial.manual.step4Description') }}
                   </p>
                 </div>
               </li>
@@ -305,12 +294,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">5</span>
                 <div>
                   <p class="font-medium">
-                    Rafraichir la page
+                    {{ $t('tutorial.manual.step5') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Appuyez sur
-                    <kbd class="px-1.5 py-0.5 bg-muted rounded text-xs">F5</kbd>
-                    pour recharger.
+                    {{ $t('tutorial.manual.step5Description') }}
                   </p>
                 </div>
               </li>
@@ -319,11 +306,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">6</span>
                 <div>
                   <p class="font-medium">
-                    Filtrer par "reputation"
+                    {{ $t('tutorial.manual.step6') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Tapez "reputation" dans la barre de recherche pour trouver la requete
-                    <code class="bg-muted px-1 rounded text-xs">/api/profilev2/reputation</code>
+                    {{ $t('tutorial.manual.step6Description') }}
                   </p>
                 </div>
               </li>
@@ -332,10 +318,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">7</span>
                 <div>
                   <p class="font-medium">
-                    Copier la reponse JSON
+                    {{ $t('tutorial.manual.step7') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Cliquez sur la requete, allez dans l'onglet "Response" et copiez tout le contenu (Ctrl+A puis Ctrl+C).
+                    {{ $t('tutorial.manual.step7Description') }}
                   </p>
                 </div>
               </li>
@@ -344,10 +330,10 @@ onMounted(() => {
                 <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">8</span>
                 <div>
                   <p class="font-medium">
-                    Importer sur notre site
+                    {{ $t('tutorial.manual.step8') }}
                   </p>
                   <p class="text-sm text-muted">
-                    Retournez sur la page "Mes reputations" et collez le JSON dans le champ d'import.
+                    {{ $t('tutorial.manual.step8Description') }}
                   </p>
                 </div>
               </li>
@@ -358,7 +344,7 @@ onMounted(() => {
           <UCard>
             <template #header>
               <h3 class="font-semibold">
-                Exemple de JSON attendu
+                {{ $t('tutorial.manual.jsonExample') }}
               </h3>
             </template>
 

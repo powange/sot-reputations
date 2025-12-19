@@ -84,10 +84,10 @@ function toggleCampaign(campaignId: number) {
     <div class="space-y-4">
       <!-- Recherche -->
       <div class="flex items-center gap-3">
-        <span class="text-sm font-medium text-muted">Recherche :</span>
+        <span class="text-sm font-medium text-muted">{{ $t('common.search') }} :</span>
         <UInput
           v-model="searchQuery"
-          placeholder="Rechercher un succes..."
+          :placeholder="$t('reputations.searchPlaceholder')"
           icon="i-lucide-search"
           class="max-w-md"
         />
@@ -95,14 +95,14 @@ function toggleCampaign(campaignId: number) {
 
       <!-- Faction -->
       <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
-        <span class="text-sm font-medium text-muted">Factions :</span>
+        <span class="text-sm font-medium text-muted">{{ $t('reputations.factions') }}</span>
         <UButton
           :color="allFactionsSelected ? 'primary' : 'neutral'"
           :variant="allFactionsSelected ? 'solid' : 'outline'"
           size="sm"
           @click="selectAllFactions"
         >
-          Toutes
+          {{ $t('common.all') }}
         </UButton>
         <UButton
           v-for="faction in factions"
@@ -124,7 +124,7 @@ function toggleCampaign(campaignId: number) {
           class="flex items-center gap-3 flex-wrap"
         >
           <span class="text-sm font-medium text-muted">
-            {{ factionsWithCampaigns.length > 1 ? `${faction.name} :` : 'Campagnes :' }}
+            {{ factionsWithCampaigns.length > 1 ? `${faction.name} :` : $t('reputations.campaigns') }}
           </span>
           <UButton
             v-for="campaign in faction.campaigns"
@@ -144,14 +144,14 @@ function toggleCampaign(campaignId: number) {
 
       <!-- Filtre completion -->
       <div v-if="!isSearchActive && showCompletionFilter" class="flex items-center gap-3 flex-wrap">
-        <span class="text-sm font-medium text-muted">Filtrer succes :</span>
+        <span class="text-sm font-medium text-muted">{{ $t('reputations.filterAchievements') }}</span>
         <UButton
           :color="emblemCompletionFilter === 'all' ? 'primary' : 'neutral'"
           :variant="emblemCompletionFilter === 'all' ? 'solid' : 'outline'"
           size="sm"
           @click="emblemCompletionFilter = 'all'"
         >
-          Tous
+          {{ $t('common.all') }}
         </UButton>
         <UButton
           :color="emblemCompletionFilter === 'incomplete' ? 'warning' : 'neutral'"
@@ -159,7 +159,7 @@ function toggleCampaign(campaignId: number) {
           size="sm"
           @click="emblemCompletionFilter = 'incomplete'"
         >
-          Non completes
+          {{ $t('reputations.notCompleted') }}
         </UButton>
         <UButton
           :color="emblemCompletionFilter === 'complete' ? 'success' : 'neutral'"
@@ -167,7 +167,7 @@ function toggleCampaign(campaignId: number) {
           size="sm"
           @click="emblemCompletionFilter = 'complete'"
         >
-          Completes
+          {{ $t('reputations.completed') }}
         </UButton>
 
         <!-- Slot pour options additionnelles du filtre completion -->
