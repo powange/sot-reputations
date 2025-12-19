@@ -312,7 +312,14 @@ async function handleDelete() {
               <UTable
                 :data="getTableData(result.emblems)"
                 :columns="columns"
-                              >
+              >
+                <template #name-cell="{ row }">
+                  <EmblemNameCell
+                    :name="row.original.name"
+                    :description="row.original.description"
+                    :image="row.original.image"
+                  />
+                </template>
                 <template #maxThreshold-cell="{ row }">
                   <MaxThresholdCell
                     :max-threshold="row.original.maxThreshold"
@@ -371,32 +378,20 @@ async function handleDelete() {
                     <UTable
                       :data="getTableData(campaign.emblems)"
                       :columns="columns"
-                                          >
+                    >
+                      <template #name-cell="{ row }">
+                        <EmblemNameCell
+                          :name="row.original.name"
+                          :description="row.original.description"
+                          :image="row.original.image"
+                        />
+                      </template>
                       <template #maxThreshold-cell="{ row }">
-                        <template v-if="row.original.maxGrade >= 2 && row.original.gradeThresholds?.length">
-                          <UPopover mode="hover">
-                            <span class="cursor-help underline decoration-dotted">
-                              {{ row.original.maxThreshold ?? '?' }}
-                            </span>
-                            <template #content>
-                              <div class="p-2 space-y-1">
-                                <div
-                                  v-for="grade in row.original.maxGrade"
-                                  :key="grade"
-                                  class="flex justify-between gap-4 text-sm"
-                                >
-                                  <span class="text-muted">Grade {{ grade }}</span>
-                                  <span :class="row.original.gradeThresholds?.find(g => g.grade === grade) ? 'font-medium' : 'text-muted'">
-                                    {{ row.original.gradeThresholds?.find(g => g.grade === grade)?.threshold ?? '?' }}
-                                  </span>
-                                </div>
-                              </div>
-                            </template>
-                          </UPopover>
-                        </template>
-                        <template v-else>
-                          {{ row.original.maxThreshold ?? '?' }}
-                        </template>
+                        <MaxThresholdCell
+                          :max-threshold="row.original.maxThreshold"
+                          :max-grade="row.original.maxGrade"
+                          :grade-thresholds="row.original.gradeThresholds"
+                        />
                       </template>
                     </UTable>
                   </TableLoader>

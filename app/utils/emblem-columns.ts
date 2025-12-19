@@ -1,25 +1,14 @@
-import { h, resolveComponent } from 'vue'
+import { h } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { BaseTableRow } from '~/types/reputation'
 
 /**
- * Crée la colonne "Succès" avec image, nom et description
- * Mobile: nom + icône info avec popover
- * Desktop: nom + description complète
+ * Crée la colonne "Succès" - le rendu est géré via slot #name-cell dans les pages
  */
 export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
   return {
     accessorKey: 'name',
-    header: 'Succès',
-    cell: ({ row }) => {
-      const EmblemNameCell = resolveComponent('EmblemNameCell')
-
-      return h(EmblemNameCell, {
-        name: row.original.name,
-        description: row.original.description,
-        image: row.original.image
-      })
-    }
+    header: 'Succès'
   }
 }
 

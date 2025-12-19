@@ -926,7 +926,14 @@ onUnmounted(() => {
             <UTable
               :data="getTableData(filterEmblemsArray(result.emblems))"
               :columns="columns"
-                          >
+            >
+              <template #name-cell="{ row }">
+                <EmblemNameCell
+                  :name="row.original.name"
+                  :description="row.original.description"
+                  :image="row.original.image"
+                />
+              </template>
               <template #maxThreshold-cell="{ row }">
                 <MaxThresholdCell
                   :max-threshold="row.original.maxThreshold"
@@ -993,7 +1000,14 @@ onUnmounted(() => {
                   <UTable
                     :data="getTableData(getFilteredEmblems(campaign.id))"
                     :columns="columns"
-                                      >
+                  >
+                    <template #name-cell="{ row }">
+                      <EmblemNameCell
+                        :name="row.original.name"
+                        :description="row.original.description"
+                        :image="row.original.image"
+                      />
+                    </template>
                     <template #maxThreshold-cell="{ row }">
                       <MaxThresholdCell
                         :max-threshold="row.original.maxThreshold"
