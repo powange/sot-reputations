@@ -7,10 +7,14 @@ useSeoMeta({
 const config = useRuntimeConfig()
 const siteUrl = config.public.siteUrl || 'https://reputations.sot.powange.com'
 
+// Version du bookmarklet - doit correspondre à BOOKMARKLET_VERSION dans server/api/bookmarklet-version.get.ts
+const BOOKMARKLET_VERSION = 2
+
 // Code du bookmarklet (non minifié pour lisibilité)
 const bookmarkletCode = computed(() => {
   return `javascript:(function(){
   const SITE_URL = '${siteUrl}';
+  const VERSION = ${BOOKMARKLET_VERSION};
 
   // Vérifier si on est sur seaofthieves.com
   if (!window.location.hostname.includes('seaofthieves.com')) {
@@ -20,6 +24,24 @@ const bookmarkletCode = computed(() => {
     return;
   }
 
+  // Vérifier la version du bookmarklet
+  fetch(SITE_URL + '/api/bookmarklet-version')
+    .then(r => r.json())
+    .then(data => {
+      if (data.version > VERSION) {
+        if (confirm('Une nouvelle version du bookmarklet est disponible !\\n\\nVoulez-vous mettre a jour ?\\n(Vous devrez re-installer le bookmarklet depuis la page tutoriel)')) {
+          window.open(SITE_URL + '/tutoriel', '_blank');
+          return;
+        }
+      }
+      runBookmarklet();
+    })
+    .catch(() => {
+      // En cas d'erreur de vérification, on continue quand même
+      runBookmarklet();
+    });
+
+  function runBookmarklet() {
   // Créer le style de la modal
   const style = document.createElement('style');
   style.textContent = \`
@@ -295,6 +317,7 @@ const bookmarkletCode = computed(() => {
       style.remove();
     });
   });
+  }
 })();`
 })
 
