@@ -65,6 +65,21 @@ watchEffect(() => {
           </div>
         </UCard>
       </NuxtLink>
+
+      <!-- Base de donnees - Admin seulement -->
+      <NuxtLink v-if="isAdmin" to="/admin/database" class="block">
+        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-lg bg-warning/10">
+              <UIcon name="i-lucide-database" class="w-6 h-6 text-warning" />
+            </div>
+            <div>
+              <h3 class="font-semibold">Base de donnees</h3>
+              <p class="text-sm text-muted">Sauvegarde et restauration</p>
+            </div>
+          </div>
+        </UCard>
+      </NuxtLink>
     </div>
   </UContainer>
 </template>

@@ -3,12 +3,12 @@ import Database from 'better-sqlite3'
 
 let db: Database.Database | null = null
 
+export const DB_PATH = join('/app/data', 'reputation.db')
+
 export function getReputationDb(): Database.Database {
   if (db) return db
 
-  // Chemin absolu fixe pour la cohérence entre dev et prod
-  const dbPath = join('/app/data', 'reputation.db')
-  db = new Database(dbPath)
+  db = new Database(DB_PATH)
 
   // Créer les tables si elles n'existent pas
   db.exec(`
@@ -215,6 +215,13 @@ export function getReputationDb(): Database.Database {
   }
 
   return db
+}
+
+export function closeReputationDb(): void {
+  if (db) {
+    db.close()
+    db = null
+  }
 }
 
 // Noms des factions en français (seules ces factions seront importées)
