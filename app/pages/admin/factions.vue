@@ -148,14 +148,6 @@ const showOnlyIncompleteGrades = ref(false)
 // Recherche d'emblèmes
 const searchQuery = ref('')
 
-// Normaliser le texte pour la recherche (gère les espaces insécables, multiples, etc.)
-function normalizeForSearch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[\s\u00A0]+/g, ' ') // Remplace tous les espaces (y compris insécables) par un espace normal
-    .trim()
-}
-
 // Compteur d'emblèmes non validés
 const unvalidatedCount = computed(() => {
   if (!factions.value) return 0

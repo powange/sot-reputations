@@ -206,14 +206,6 @@ watch(
   { deep: true }
 )
 
-// Normaliser le texte pour la recherche (gère les espaces insécables, multiples, etc.)
-function normalizeForSearch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[\s\u00A0]+/g, ' ')
-    .trim()
-}
-
 // Résultats de recherche
 const searchResults = computed(() => {
   if (!isSearchActive.value) return []
