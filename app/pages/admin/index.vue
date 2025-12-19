@@ -67,6 +67,21 @@ watchEffect(() => {
         </UCard>
       </NuxtLink>
 
+      <!-- Traductions - Admin et Moderateurs -->
+      <NuxtLink to="/admin/traductions" class="block">
+        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-lg bg-primary/10">
+              <UIcon name="i-lucide-languages" class="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 class="font-semibold">Traductions</h3>
+              <p class="text-sm text-muted">Traduire les accomplissements</p>
+            </div>
+          </div>
+        </UCard>
+      </NuxtLink>
+
       <!-- Base de donnees - Admin seulement -->
       <NuxtLink v-if="isAdmin" to="/admin/database" class="block">
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">

@@ -40,9 +40,25 @@ interface GroupData {
 
 const route = useRoute()
 const toast = useToast()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { user } = useAuth()
 const { leaveGroup } = useGroups()
+
+// Helper pour obtenir le nom/description traduit
+function getTranslatedText(
+  emblem: { name: string; description: string; translations?: Record<string, { name: string | null; description: string | null }> },
+  field: 'name' | 'description'
+): string {
+  const currentLocale = locale.value
+  if (currentLocale === 'fr' || !emblem.translations) {
+    return emblem[field]
+  }
+  const translation = emblem.translations[currentLocale]
+  if (translation && translation[field]) {
+    return translation[field]!
+  }
+  return emblem[field]
+}
 
 const groupUid = route.params.groupUid as string
 
@@ -457,12 +473,12 @@ const columns = computed<TableColumn<MultiUserTableRow>[]>(() => {
   return cols
 })
 
-function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress> }>): MultiUserTableRow[] {
+function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress>; translations?: Record<string, { name: string | null; description: string | null }> }>): MultiUserTableRow[] {
   return emblems.map((emblem) => {
     const row: MultiUserTableRow = {
       id: emblem.id,
-      name: emblem.name,
-      description: emblem.description,
+      name: getTranslatedText(emblem, 'name'),
+      description: getTranslatedText(emblem, 'description'),
       image: emblem.image || '',
       maxGrade: emblem.maxGrade,
       maxThreshold: emblem.maxThreshold,

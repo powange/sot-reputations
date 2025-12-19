@@ -15,9 +15,28 @@ interface MyReputationsData {
   factions: FactionWithCampaigns<EmblemProgress | null>[]
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const { isAuthenticated } = useAuth()
+
+// Helper pour obtenir le nom/description traduit
+function getTranslatedText(
+  emblem: { name: string; description: string; translations?: Record<string, { name: string | null; description: string | null }> },
+  field: 'name' | 'description'
+): string {
+  const currentLocale = locale.value
+  // Si français ou pas de traduction disponible, retourner le texte original
+  if (currentLocale === 'fr' || !emblem.translations) {
+    return emblem[field]
+  }
+  // Chercher la traduction dans la langue courante
+  const translation = emblem.translations[currentLocale]
+  if (translation && translation[field]) {
+    return translation[field]!
+  }
+  // Fallback vers le texte original (français)
+  return emblem[field]
+}
 
 // Rediriger si non connecté
 if (!isAuthenticated.value) {
@@ -114,7 +133,7 @@ const columns = computed<TableColumn<SingleUserTableRow>[]>(() => {
   return cols
 })
 
-function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null }>): SingleUserTableRow[] {
+function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null; translations?: Record<string, { name: string | null; description: string | null }> }>): SingleUserTableRow[] {
   const filteredEmblems = filterEmblemsList(emblems)
 
   return filteredEmblems.map(emblem => {
@@ -133,8 +152,8 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
 
     return {
       id: emblem.id,
-      name: emblem.name,
-      description: emblem.description,
+      name: getTranslatedText(emblem, 'name'),
+      description: getTranslatedText(emblem, 'description'),
       image: emblem.image || '',
       maxGrade: emblem.maxGrade,
       maxThreshold: emblem.maxThreshold,

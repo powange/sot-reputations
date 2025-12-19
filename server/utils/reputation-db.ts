@@ -138,6 +138,17 @@ export function getReputationDb(): Database.Database {
       FOREIGN KEY (emblem_id) REFERENCES emblems(id) ON DELETE CASCADE
     );
 
+    -- Traductions des emblèmes (EN, ES)
+    CREATE TABLE IF NOT EXISTS emblem_translations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      emblem_id INTEGER NOT NULL,
+      locale TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      FOREIGN KEY (emblem_id) REFERENCES emblems(id) ON DELETE CASCADE,
+      UNIQUE(emblem_id, locale)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -147,6 +158,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_group_pending_invites_user ON group_pending_invites(user_id);
     CREATE INDEX IF NOT EXISTS idx_group_pending_invites_group ON group_pending_invites(group_id);
     CREATE INDEX IF NOT EXISTS idx_emblem_grade_thresholds_emblem ON emblem_grade_thresholds(emblem_id);
+    CREATE INDEX IF NOT EXISTS idx_emblem_translations_emblem ON emblem_translations(emblem_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -1044,12 +1056,27 @@ export function getGroupReputationData(groupId: number) {
 
   const factions = getAllFactions()
 
+  // Récupérer toutes les traductions d'emblèmes
+  const allTranslations = db.prepare(`
+    SELECT emblem_id, locale, name, description FROM emblem_translations
+  `).all() as Array<{ emblem_id: number; locale: string; name: string | null; description: string | null }>
+
+  // Indexer par emblem_id
+  const translationsByEmblem: Record<number, Record<string, { name: string | null; description: string | null }>> = {}
+  for (const t of allTranslations) {
+    if (!translationsByEmblem[t.emblem_id]) {
+      translationsByEmblem[t.emblem_id] = {}
+    }
+    translationsByEmblem[t.emblem_id][t.locale] = { name: t.name, description: t.description }
+  }
+
   const result: {
     users: UserInfo[]
     factions: Array<FactionInfo & {
       campaigns: Array<CampaignInfo & {
         emblems: Array<EmblemInfo & {
           userProgress: Record<number, UserEmblemProgress>
+          translations: Record<string, { name: string | null; description: string | null }>
         }>
       }>
     }>
@@ -1108,7 +1135,8 @@ export function getGroupReputationData(groupId: number) {
           factionKey: faction.key,
           campaignName: campaign.name,
           gradeThresholds: allGradeThresholds[emblem.id] || [],
-          userProgress
+          userProgress,
+          translations: translationsByEmblem[emblem.id] || {}
         }
       })
 
