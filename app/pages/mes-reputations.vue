@@ -128,7 +128,7 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
 
     if (progress) {
       progressDisplay = progress.threshold > 0
-        ? `${progress.value}/${progress.threshold}`
+        ? String(progress.value)
         : (progress.completed ? t('reputations.yes') : t('reputations.no'))
       completed = progress.completed
       hasProgress = progress.value > 0
