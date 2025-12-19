@@ -36,6 +36,14 @@ async function copyBookmarklet() {
 }
 
 const activeTab = ref('bookmarklet')
+
+// Gérer l'ancre dans l'URL pour ouvrir la bonne tab
+onMounted(() => {
+  const hash = window.location.hash.slice(1)
+  if (hash === 'bookmarklet' || hash === 'manual') {
+    activeTab.value = hash
+  }
+})
 </script>
 
 <template>

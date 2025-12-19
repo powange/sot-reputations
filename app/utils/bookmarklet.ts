@@ -188,7 +188,7 @@ export function generateBookmarkletCode(siteUrl: string): string {
       </div>
     \`;
     modal.querySelector('#sot-update-btn').addEventListener('click', () => {
-      window.open(SITE_URL + '/tutoriel', '_blank');
+      window.open(SITE_URL + '/tutoriel#bookmarklet', '_blank');
       closeModal();
     });
     modal.querySelector('#sot-continue-btn').addEventListener('click', checkSiteAndRun);
