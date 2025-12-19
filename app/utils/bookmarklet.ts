@@ -1,5 +1,5 @@
 // Version du bookmarklet - doit correspondre à BOOKMARKLET_VERSION dans server/api/bookmarklet-version.get.ts
-export const BOOKMARKLET_VERSION = 2
+export const BOOKMARKLET_VERSION = 3
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {
@@ -153,6 +153,7 @@ export function generateBookmarkletCode(siteUrl: string): string {
     modal.innerHTML = \`
       <h2>⚓ SoT Reputations</h2>
       <p>Ce bookmarklet doit etre execute depuis le site officiel Sea of Thieves.</p>
+      <p style="color:#d4af37;font-size:13px;margin-top:12px;">Une fois sur le site, cliquez a nouveau sur le bookmarklet pour recuperer vos donnees.</p>
       <div class="buttons">
         <button class="btn-primary" id="sot-goto-btn">
           🌐 Aller sur seaofthieves.com
