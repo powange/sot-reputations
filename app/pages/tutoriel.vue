@@ -81,8 +81,8 @@ onMounted(() => {
     <UTabs
       v-model="activeTab"
       :items="[
-        { label: 'Bookmarklet (Recommande)', slot: 'bookmarklet', icon: 'i-lucide-bookmark' },
-        { label: 'Methode manuelle', slot: 'manual', icon: 'i-lucide-code' }
+        { value: 'bookmarklet', label: 'Bookmarklet (Recommande)', slot: 'bookmarklet', icon: 'i-lucide-bookmark' },
+        { value: 'manual', label: 'Methode manuelle', slot: 'manual', icon: 'i-lucide-code' }
       ]"
       class="mb-6"
     >
