@@ -199,8 +199,8 @@ function toggleUnvalidatedFilter() {
 const filteredFactions = computed(() => {
   if (!factions.value) return []
 
-  const query = normalizeForSearch(searchQuery.value)
-  const hasSearch = query.length > 0
+  const query = searchQuery.value
+  const hasSearch = query.trim().length > 0
   const hasUnvalidatedFilter = showOnlyUnvalidated.value
   const hasIncompleteGradesFilter = showOnlyIncompleteGrades.value
 
@@ -214,10 +214,7 @@ const filteredFactions = computed(() => {
         .map(campaign => ({
           ...campaign,
           emblems: campaign.emblems.filter(e => {
-            const matchesSearch = !hasSearch ||
-              normalizeForSearch(e.name).includes(query) ||
-              normalizeForSearch(e.key).includes(query) ||
-              (e.description && normalizeForSearch(e.description).includes(query))
+            const matchesSearch = emblemMatchesSearch(e, query, true)
             const matchesUnvalidated = !hasUnvalidatedFilter || e.validated === 0
             const matchesIncompleteGrades = !hasIncompleteGradesFilter || (e.maxGrade > 1 && e.gradesConfigured < e.maxGrade)
             return matchesSearch && matchesUnvalidated && matchesIncompleteGrades

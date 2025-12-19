@@ -210,7 +210,7 @@ watch(
 const searchResults = computed(() => {
   if (!isSearchActive.value) return []
 
-  const query = normalizeForSearch(searchQuery.value)
+  const query = searchQuery.value
   const results: Array<{
     factionName: string
     campaignName: string
@@ -220,10 +220,7 @@ const searchResults = computed(() => {
 
   for (const faction of factions.value) {
     for (const campaign of faction.campaigns) {
-      const matchingEmblems = campaign.emblems.filter(e =>
-        normalizeForSearch(e.name).includes(query) ||
-        normalizeForSearch(e.description).includes(query)
-      )
+      const matchingEmblems = campaign.emblems.filter(e => emblemMatchesSearch(e, query))
 
       if (matchingEmblems.length > 0) {
         results.push({
