@@ -539,6 +539,22 @@ const filteredEmblems = computed(() => {
   return result
 })
 
+// Pagination
+const currentPage = ref(1)
+const pageSize = 50
+
+const paginatedEmblems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredEmblems.value.slice(start, start + pageSize)
+})
+
+const totalPages = computed(() => Math.ceil(filteredEmblems.value.length / pageSize))
+
+// Reset page when filters change
+watch([searchQuery, translationFilter], () => {
+  currentPage.value = 1
+})
+
 // Statistiques
 const stats = computed(() => {
   if (!emblems.value) return { total: 0, completeEn: 0, completeEs: 0, complete: 0 }
@@ -656,13 +672,20 @@ const stats = computed(() => {
     </div>
 
     <!-- Liste des emblèmes -->
-    <div v-else-if="filteredEmblems.length > 0" class="space-y-2">
-      <div
-        v-for="emblem in filteredEmblems"
-        :key="emblem.id"
-        class="flex items-center gap-4 p-4 rounded-lg border border-muted/30 hover:bg-muted/10 cursor-pointer"
-        @click="openEditModal(emblem)"
-      >
+    <div v-else-if="filteredEmblems.length > 0" class="space-y-4">
+      <!-- Info pagination -->
+      <div class="flex items-center justify-between text-sm text-muted">
+        <span>{{ filteredEmblems.length }} emblème(s) trouvé(s)</span>
+        <span v-if="totalPages > 1">Page {{ currentPage }} / {{ totalPages }}</span>
+      </div>
+
+      <div class="space-y-2">
+        <div
+          v-for="emblem in paginatedEmblems"
+          :key="emblem.id"
+          class="flex items-center gap-4 p-4 rounded-lg border border-muted/30 hover:bg-muted/10 cursor-pointer"
+          @click="openEditModal(emblem)"
+        >
         <img
           v-if="emblem.image"
           :src="emblem.image"
@@ -709,6 +732,17 @@ const stats = computed(() => {
             </div>
           </UTooltip>
         </div>
+      </div>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="flex justify-center mt-6">
+        <UPagination
+          v-model:page="currentPage"
+          :total="filteredEmblems.length"
+          :items-per-page="pageSize"
+          show-edges
+        />
       </div>
     </div>
 
