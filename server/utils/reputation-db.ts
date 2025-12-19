@@ -317,7 +317,7 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
     INSERT INTO emblems (campaign_id, key, name, description, image, max_grade, sort_order, validated)
     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     ON CONFLICT(campaign_id, key) DO UPDATE SET
-      image = COALESCE(excluded.image, emblems.image),
+      image = COALESCE(NULLIF(excluded.image, ''), emblems.image),
       sort_order = excluded.sort_order
   `)
 
