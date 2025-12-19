@@ -7,32 +7,6 @@ export function generateBookmarkletCode(siteUrl: string): string {
   const SITE_URL = '${siteUrl}';
   const VERSION = ${BOOKMARKLET_VERSION};
 
-  // Vérifier si on est sur seaofthieves.com
-  if (!window.location.hostname.includes('seaofthieves.com')) {
-    if (confirm('Ce bookmarklet doit etre execute depuis seaofthieves.com\\n\\nVoulez-vous y aller maintenant ?')) {
-      window.location.href = 'https://www.seaofthieves.com/profile/reputation';
-    }
-    return;
-  }
-
-  // Vérifier la version du bookmarklet
-  fetch(SITE_URL + '/api/bookmarklet-version')
-    .then(r => r.json())
-    .then(data => {
-      if (data.version > VERSION) {
-        if (confirm('Une nouvelle version du bookmarklet est disponible !\\n\\nVoulez-vous mettre a jour ?\\n(Vous devrez re-installer le bookmarklet depuis la page tutoriel)')) {
-          window.open(SITE_URL + '/tutoriel', '_blank');
-          return;
-        }
-      }
-      runBookmarklet();
-    })
-    .catch(() => {
-      // En cas d'erreur de vérification, on continue quand même
-      runBookmarklet();
-    });
-
-  function runBookmarklet() {
   // Créer le style de la modal
   const style = document.createElement('style');
   style.textContent = \`
@@ -168,6 +142,69 @@ export function generateBookmarkletCode(siteUrl: string): string {
     }
   });
 
+  // Fonction pour fermer la modal
+  function closeModal() {
+    overlay.remove();
+    style.remove();
+  }
+
+  // Vérifier si on est sur seaofthieves.com
+  if (!window.location.hostname.includes('seaofthieves.com')) {
+    modal.innerHTML = \`
+      <h2>⚓ SoT Reputations</h2>
+      <p>Ce bookmarklet doit etre execute depuis le site officiel Sea of Thieves.</p>
+      <div class="buttons">
+        <button class="btn-primary" id="sot-goto-btn">
+          🌐 Aller sur seaofthieves.com
+        </button>
+        <button class="btn-close" id="sot-close-btn">
+          Fermer
+        </button>
+      </div>
+    \`;
+    modal.querySelector('#sot-goto-btn').addEventListener('click', () => {
+      window.location.href = 'https://www.seaofthieves.com/profile/reputation';
+    });
+    modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
+    return;
+  }
+
+  // Vérifier la version du bookmarklet
+  fetch(SITE_URL + '/api/bookmarklet-version')
+    .then(r => r.json())
+    .then(data => {
+      if (data.version > VERSION) {
+        modal.innerHTML = \`
+          <h2>⚓ SoT Reputations</h2>
+          <p>Une nouvelle version du bookmarklet est disponible !</p>
+          <p class="error">Vous devrez re-installer le bookmarklet depuis la page tutoriel.</p>
+          <div class="buttons">
+            <button class="btn-primary" id="sot-update-btn">
+              🔄 Mettre a jour
+            </button>
+            <button class="btn-secondary" id="sot-continue-btn">
+              Continuer quand meme
+            </button>
+            <button class="btn-close" id="sot-close-btn">
+              Fermer
+            </button>
+          </div>
+        \`;
+        modal.querySelector('#sot-update-btn').addEventListener('click', () => {
+          window.open(SITE_URL + '/tutoriel', '_blank');
+          closeModal();
+        });
+        modal.querySelector('#sot-continue-btn').addEventListener('click', runBookmarklet);
+        modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
+      } else {
+        runBookmarklet();
+      }
+    })
+    .catch(() => {
+      runBookmarklet();
+    });
+
+  function runBookmarklet() {
   // Compter les emblèmes
   function countEmblems(data) {
     let count = 0;
