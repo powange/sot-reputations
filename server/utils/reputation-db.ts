@@ -346,6 +346,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
     UPDATE users SET last_import_at = CURRENT_TIMESTAMP WHERE id = ?
   `)
 
+  // Mettre à jour l'image si l'emblème est complété et l'image importée est différente
+  const updateEmblemImageIfCompleted = db.prepare(`
+    UPDATE emblems SET image = ?
+    WHERE id = ? AND (image IS NULL OR image = '' OR image != ?)
+  `)
+
   const transaction = db.transaction(() => {
     // Mettre à jour la date du dernier import
     updateLastImport.run(userId)
@@ -389,6 +395,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
               )
 
               const emblemRow = getEmblemId.get(campaignId, emblemKey) as { id: number }
+
+              // Si complété avec une image, mettre à jour l'image de l'emblème
+              if (emblem.Completed && emblem.image) {
+                updateEmblemImageIfCompleted.run(emblem.image, emblemRow.id, emblem.image)
+              }
+
               upsertUserEmblem.run(
                 userId,
                 emblemRow.id,
@@ -443,6 +455,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
           )
 
           const emblemRow = getEmblemId.get(campaignId, emblemKey) as { id: number }
+
+          // Si complété avec une image, mettre à jour l'image de l'emblème
+          if (emblem.Completed && emblem.image) {
+            updateEmblemImageIfCompleted.run(emblem.image, emblemRow.id, emblem.image)
+          }
+
           upsertUserEmblem.run(
             userId,
             emblemRow.id,
