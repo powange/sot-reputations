@@ -58,15 +58,25 @@ export default defineEventHandler(async (event) => {
 
   const countsByEmblem = new Map(emblemCounts.map(e => [e.emblemId, e.count]))
 
+  // Compter les grades configurés par emblème
+  const gradeCounts = db.prepare(`
+    SELECT emblem_id as emblemId, COUNT(*) as count
+    FROM emblem_grade_thresholds
+    GROUP BY emblem_id
+  `).all() as Array<{ emblemId: number; count: number }>
+
+  const gradesConfiguredByEmblem = new Map(gradeCounts.map(e => [e.emblemId, e.count]))
+
   // Organiser les emblèmes par campagne
-  const emblemsByCampaign = new Map<number, Array<typeof emblems[0] & { userCount: number }>>()
+  const emblemsByCampaign = new Map<number, Array<typeof emblems[0] & { userCount: number; gradesConfigured: number }>>()
   for (const emblem of emblems) {
     if (!emblemsByCampaign.has(emblem.campaignId)) {
       emblemsByCampaign.set(emblem.campaignId, [])
     }
     emblemsByCampaign.get(emblem.campaignId)!.push({
       ...emblem,
-      userCount: countsByEmblem.get(emblem.id) || 0
+      userCount: countsByEmblem.get(emblem.id) || 0,
+      gradesConfigured: gradesConfiguredByEmblem.get(emblem.id) || 0
     })
   }
 

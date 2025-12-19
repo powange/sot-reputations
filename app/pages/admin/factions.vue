@@ -25,6 +25,7 @@ interface Emblem {
   sortOrder: number
   userCount: number
   validated: number
+  gradesConfigured: number
 }
 
 interface Campaign {
@@ -141,6 +142,12 @@ async function validateEmblem(emblem: Emblem) {
 // Filtre emblèmes non validés
 const showOnlyUnvalidated = ref(false)
 
+// Filtre emblèmes avec grades incomplets
+const showOnlyIncompleteGrades = ref(false)
+
+// Recherche d'emblèmes
+const searchQuery = ref('')
+
 // Compteur d'emblèmes non validés
 const unvalidatedCount = computed(() => {
   if (!factions.value) return 0
@@ -148,6 +155,18 @@ const unvalidatedCount = computed(() => {
   for (const faction of factions.value) {
     for (const campaign of faction.campaigns) {
       count += campaign.emblems.filter(e => e.validated === 0).length
+    }
+  }
+  return count
+})
+
+// Compteur d'emblèmes avec grades incomplets (maxGrade > 1 et gradesConfigured < maxGrade)
+const incompleteGradesCount = computed(() => {
+  if (!factions.value) return 0
+  let count = 0
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      count += campaign.emblems.filter(e => e.maxGrade > 1 && e.gradesConfigured < e.maxGrade).length
     }
   }
   return count
@@ -179,7 +198,14 @@ function toggleUnvalidatedFilter() {
 // Factions filtrées
 const filteredFactions = computed(() => {
   if (!factions.value) return []
-  if (!showOnlyUnvalidated.value) return factions.value
+
+  const query = searchQuery.value.toLowerCase().trim()
+  const hasSearch = query.length > 0
+  const hasUnvalidatedFilter = showOnlyUnvalidated.value
+  const hasIncompleteGradesFilter = showOnlyIncompleteGrades.value
+
+  // Pas de filtre actif
+  if (!hasSearch && !hasUnvalidatedFilter && !hasIncompleteGradesFilter) return factions.value
 
   return factions.value
     .map(faction => ({
@@ -187,11 +213,43 @@ const filteredFactions = computed(() => {
       campaigns: faction.campaigns
         .map(campaign => ({
           ...campaign,
-          emblems: campaign.emblems.filter(e => e.validated === 0)
+          emblems: campaign.emblems.filter(e => {
+            const matchesSearch = !hasSearch || e.name.toLowerCase().includes(query) || e.key.toLowerCase().includes(query) || (e.description && e.description.toLowerCase().includes(query))
+            const matchesUnvalidated = !hasUnvalidatedFilter || e.validated === 0
+            const matchesIncompleteGrades = !hasIncompleteGradesFilter || (e.maxGrade > 1 && e.gradesConfigured < e.maxGrade)
+            return matchesSearch && matchesUnvalidated && matchesIncompleteGrades
+          })
         }))
         .filter(campaign => campaign.emblems.length > 0)
     }))
     .filter(faction => faction.campaigns.length > 0)
+})
+
+// Ouvrir les accordéons quand il y a une recherche ou un filtre
+function openFilteredAccordions() {
+  for (const faction of filteredFactions.value) {
+    if (!openFactions.value.includes(faction.key)) {
+      openFactions.value.push(faction.key)
+    }
+    for (const campaign of faction.campaigns) {
+      const campaignKey = `${faction.key}-${campaign.key}`
+      if (!openCampaigns.value.includes(campaignKey)) {
+        openCampaigns.value.push(campaignKey)
+      }
+    }
+  }
+}
+
+watch(searchQuery, (query) => {
+  if (query.trim() && factions.value) {
+    openFilteredAccordions()
+  }
+})
+
+watch(showOnlyIncompleteGrades, (value) => {
+  if (value && factions.value) {
+    openFilteredAccordions()
+  }
 })
 </script>
 
@@ -250,6 +308,22 @@ const filteredFactions = computed(() => {
           </div>
         </div>
       </UCard>
+    </div>
+
+    <!-- Recherche et filtres -->
+    <div class="mb-6 flex flex-wrap items-center gap-4">
+      <UInput
+        v-model="searchQuery"
+        placeholder="Rechercher un embleme..."
+        icon="i-lucide-search"
+        size="lg"
+        class="w-full sm:w-80"
+      />
+      <USwitch
+        v-model="showOnlyIncompleteGrades"
+        :label="`Grades a configurer (${incompleteGradesCount})`"
+        :disabled="incompleteGradesCount === 0"
+      />
     </div>
 
     <!-- Loading -->
@@ -396,7 +470,12 @@ const filteredFactions = computed(() => {
     </div>
 
     <div v-else class="text-center py-8 text-muted">
-      Aucune faction
+      <template v-if="searchQuery.trim()">
+        Aucun embleme trouve pour "{{ searchQuery }}"
+      </template>
+      <template v-else>
+        Aucune faction
+      </template>
     </div>
 
     <!-- Modal edition grades -->
