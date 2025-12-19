@@ -39,10 +39,10 @@ export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
           : null
       ])
 
-      // Version desktop: nom + description tronquée
+      // Version desktop: nom + description complète
       const desktopContent = h('div', { class: 'hidden md:block min-w-0' }, [
         h('div', { class: 'font-medium' }, row.original.name),
-        h('div', { class: 'text-xs text-muted whitespace-nowrap overflow-hidden text-ellipsis' }, row.original.description)
+        h('div', { class: 'text-xs text-muted' }, row.original.description)
       ])
 
       children.push(h('div', { class: 'min-w-0 flex-1' }, [mobileContent, desktopContent]))
