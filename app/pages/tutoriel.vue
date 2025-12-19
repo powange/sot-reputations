@@ -12,6 +12,14 @@ const bookmarkletCode = computed(() => {
   return `javascript:(function(){
   const SITE_URL = '${siteUrl}';
 
+  // Vérifier si on est sur seaofthieves.com
+  if (!window.location.hostname.includes('seaofthieves.com')) {
+    if (confirm('Ce bookmarklet doit etre execute depuis seaofthieves.com\\n\\nVoulez-vous y aller maintenant ?')) {
+      window.location.href = 'https://www.seaofthieves.com/profile/reputation';
+    }
+    return;
+  }
+
   // Créer le style de la modal
   const style = document.createElement('style');
   style.textContent = \`
