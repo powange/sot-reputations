@@ -5,49 +5,20 @@ import type { BaseTableRow } from '~/types/reputation'
 /**
  * Crée la colonne "Succès" avec image, nom et description
  * Mobile: nom + icône info avec popover
- * Desktop: nom + description tronquée
+ * Desktop: nom + description complète
  */
 export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
   return {
     accessorKey: 'name',
     header: 'Succès',
     cell: ({ row }) => {
-      const UPopover = resolveComponent('UPopover')
-      const UIcon = resolveComponent('UIcon')
+      const EmblemNameCell = resolveComponent('EmblemNameCell')
 
-      const children = []
-
-      if (row.original.image) {
-        children.push(h('img', {
-          src: row.original.image,
-          alt: row.original.name,
-          class: 'w-10 h-10 object-contain shrink-0'
-        }))
-      }
-
-      // Version mobile: nom + icône info
-      const mobileContent = h('div', { class: 'flex items-center gap-2 md:hidden' }, [
-        h('span', { class: 'font-medium' }, row.original.name),
-        row.original.description
-          ? h(UPopover, { mode: 'click' }, {
-              default: () => h(UIcon, {
-                name: 'i-lucide-info',
-                class: 'w-4 h-4 text-muted cursor-pointer'
-              }),
-              content: () => h('div', { class: 'p-2 text-sm max-w-xs' }, row.original.description)
-            })
-          : null
-      ])
-
-      // Version desktop: nom + description complète
-      const desktopContent = h('div', { class: 'hidden md:block min-w-0' }, [
-        h('div', { class: 'font-medium' }, row.original.name),
-        h('div', { class: 'text-xs text-muted' }, row.original.description)
-      ])
-
-      children.push(h('div', { class: 'min-w-0 flex-1' }, [mobileContent, desktopContent]))
-
-      return h('div', { class: 'flex items-center gap-3' }, children)
+      return h(EmblemNameCell, {
+        name: row.original.name,
+        description: row.original.description,
+        image: row.original.image
+      })
     }
   }
 }
