@@ -1,5 +1,5 @@
 // Version du bookmarklet - doit correspondre à BOOKMARKLET_VERSION dans server/api/bookmarklet-version.get.ts
-export const BOOKMARKLET_VERSION = 3
+export const BOOKMARKLET_VERSION = 4
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {
