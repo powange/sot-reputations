@@ -22,7 +22,7 @@ export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
 
       children.push(h('div', { class: 'min-w-0' }, [
         h('div', { class: 'font-medium' }, row.original.name),
-        h('div', { class: 'text-xs text-muted whitespace-normal break-words' }, row.original.description)
+        h('div', { class: 'text-xs text-muted break-words md:whitespace-nowrap md:overflow-hidden md:text-ellipsis' }, row.original.description)
       ]))
 
       return h('div', { class: 'flex items-center gap-3' }, children)
