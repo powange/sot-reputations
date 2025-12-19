@@ -148,8 +148,8 @@ export function generateBookmarkletCode(siteUrl: string): string {
     style.remove();
   }
 
-  // Vérifier si on est sur seaofthieves.com
-  if (!window.location.hostname.includes('seaofthieves.com')) {
+  // Afficher le message si pas sur le bon site
+  function showWrongSiteMessage() {
     modal.innerHTML = \`
       <h2>⚓ SoT Reputations</h2>
       <p>Ce bookmarklet doit etre execute depuis le site officiel Sea of Thieves.</p>
@@ -167,42 +167,55 @@ export function generateBookmarkletCode(siteUrl: string): string {
       window.location.href = 'https://www.seaofthieves.com/profile/reputation';
     });
     modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
-    return;
   }
 
-  // Vérifier la version du bookmarklet
+  // Afficher le message de mise à jour
+  function showUpdateMessage() {
+    modal.innerHTML = \`
+      <h2>⚓ SoT Reputations</h2>
+      <p>Une nouvelle version du bookmarklet est disponible !</p>
+      <p class="error">Vous devrez re-installer le bookmarklet depuis la page tutoriel.</p>
+      <div class="buttons">
+        <button class="btn-primary" id="sot-update-btn">
+          🔄 Mettre a jour
+        </button>
+        <button class="btn-secondary" id="sot-continue-btn">
+          Continuer quand meme
+        </button>
+        <button class="btn-close" id="sot-close-btn">
+          Fermer
+        </button>
+      </div>
+    \`;
+    modal.querySelector('#sot-update-btn').addEventListener('click', () => {
+      window.open(SITE_URL + '/tutoriel', '_blank');
+      closeModal();
+    });
+    modal.querySelector('#sot-continue-btn').addEventListener('click', checkSiteAndRun);
+    modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
+  }
+
+  // Vérifier le site et lancer le bookmarklet
+  function checkSiteAndRun() {
+    if (!window.location.hostname.includes('seaofthieves.com')) {
+      showWrongSiteMessage();
+    } else {
+      runBookmarklet();
+    }
+  }
+
+  // Vérifier la version du bookmarklet en premier
   fetch(SITE_URL + '/api/bookmarklet-version')
     .then(r => r.json())
     .then(data => {
       if (data.version > VERSION) {
-        modal.innerHTML = \`
-          <h2>⚓ SoT Reputations</h2>
-          <p>Une nouvelle version du bookmarklet est disponible !</p>
-          <p class="error">Vous devrez re-installer le bookmarklet depuis la page tutoriel.</p>
-          <div class="buttons">
-            <button class="btn-primary" id="sot-update-btn">
-              🔄 Mettre a jour
-            </button>
-            <button class="btn-secondary" id="sot-continue-btn">
-              Continuer quand meme
-            </button>
-            <button class="btn-close" id="sot-close-btn">
-              Fermer
-            </button>
-          </div>
-        \`;
-        modal.querySelector('#sot-update-btn').addEventListener('click', () => {
-          window.open(SITE_URL + '/tutoriel', '_blank');
-          closeModal();
-        });
-        modal.querySelector('#sot-continue-btn').addEventListener('click', runBookmarklet);
-        modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
+        showUpdateMessage();
       } else {
-        runBookmarklet();
+        checkSiteAndRun();
       }
     })
     .catch(() => {
-      runBookmarklet();
+      checkSiteAndRun();
     });
 
   function runBookmarklet() {
