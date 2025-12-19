@@ -148,6 +148,14 @@ const showOnlyIncompleteGrades = ref(false)
 // Recherche d'emblèmes
 const searchQuery = ref('')
 
+// Normaliser le texte pour la recherche (gère les espaces insécables, multiples, etc.)
+function normalizeForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s\u00A0]+/g, ' ') // Remplace tous les espaces (y compris insécables) par un espace normal
+    .trim()
+}
+
 // Compteur d'emblèmes non validés
 const unvalidatedCount = computed(() => {
   if (!factions.value) return 0
@@ -199,7 +207,7 @@ function toggleUnvalidatedFilter() {
 const filteredFactions = computed(() => {
   if (!factions.value) return []
 
-  const query = searchQuery.value.toLowerCase().trim()
+  const query = normalizeForSearch(searchQuery.value)
   const hasSearch = query.length > 0
   const hasUnvalidatedFilter = showOnlyUnvalidated.value
   const hasIncompleteGradesFilter = showOnlyIncompleteGrades.value
@@ -214,7 +222,10 @@ const filteredFactions = computed(() => {
         .map(campaign => ({
           ...campaign,
           emblems: campaign.emblems.filter(e => {
-            const matchesSearch = !hasSearch || e.name.toLowerCase().includes(query) || e.key.toLowerCase().includes(query) || (e.description && e.description.toLowerCase().includes(query))
+            const matchesSearch = !hasSearch ||
+              normalizeForSearch(e.name).includes(query) ||
+              normalizeForSearch(e.key).includes(query) ||
+              (e.description && normalizeForSearch(e.description).includes(query))
             const matchesUnvalidated = !hasUnvalidatedFilter || e.validated === 0
             const matchesIncompleteGrades = !hasIncompleteGradesFilter || (e.maxGrade > 1 && e.gradesConfigured < e.maxGrade)
             return matchesSearch && matchesUnvalidated && matchesIncompleteGrades
