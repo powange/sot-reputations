@@ -55,4 +55,12 @@ onMounted(() => {
   content-visibility: auto;
   contain-intrinsic-size: auto 300px;
 }
+
+/* Scroll horizontal sur mobile */
+@media (max-width: 768px) {
+  .table-loader {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 </style>
