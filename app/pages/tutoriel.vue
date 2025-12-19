@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { generateBookmarkletCode, minifyBookmarkletCode } from '~/utils/bookmarklet'
+import { generateBookmarkletCode, minifyBookmarkletCode, BOOKMARKLET_VERSION } from '~/utils/bookmarklet'
 
 useSeoMeta({
   title: 'Tutoriel - Recuperer ses donnees de reputation Sea of Thieves',
@@ -98,6 +98,7 @@ onMounted(() => {
                 </div>
                 <h3 class="text-lg font-semibold">
                   Installer le bookmarklet
+                  <span class="text-xs font-normal text-muted ml-2">v{{ BOOKMARKLET_VERSION }}</span>
                 </h3>
               </div>
             </template>
