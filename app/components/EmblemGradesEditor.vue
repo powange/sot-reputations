@@ -3,6 +3,7 @@ interface Emblem {
   id: number
   name: string
   maxGrade: number
+  image: string | null
 }
 
 const props = defineProps<{
@@ -91,13 +92,27 @@ onMounted(() => {
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <div>
-        <h3 class="text-lg font-semibold">
-          {{ emblem.name }}
-        </h3>
-        <p class="text-sm text-muted">
-          {{ emblem.maxGrade }} {{ $t('reputations.grade') }}{{ emblem.maxGrade > 1 ? 's' : '' }}
-        </p>
+      <div class="flex items-center gap-3">
+        <img
+          v-if="emblem.image"
+          :src="emblem.image"
+          :alt="emblem.name"
+          class="w-12 h-12 rounded"
+        />
+        <div
+          v-else
+          class="w-12 h-12 rounded bg-muted/30 flex items-center justify-center"
+        >
+          <UIcon name="i-lucide-image-off" class="w-6 h-6 text-muted" />
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold">
+            {{ emblem.name }}
+          </h3>
+          <p class="text-sm text-muted">
+            {{ emblem.maxGrade }} {{ $t('reputations.grade') }}{{ emblem.maxGrade > 1 ? 's' : '' }}
+          </p>
+        </div>
       </div>
       <UButton
         icon="i-lucide-x"
