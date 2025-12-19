@@ -1,15 +1,20 @@
-import { h } from 'vue'
+import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { BaseTableRow } from '~/types/reputation'
 
 /**
  * Crée la colonne "Succès" avec image, nom et description
+ * Mobile: nom + icône info avec popover
+ * Desktop: nom + description tronquée
  */
 export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
   return {
     accessorKey: 'name',
     header: 'Succès',
     cell: ({ row }) => {
+      const UPopover = resolveComponent('UPopover')
+      const UIcon = resolveComponent('UIcon')
+
       const children = []
 
       if (row.original.image) {
@@ -20,10 +25,27 @@ export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
         }))
       }
 
-      children.push(h('div', { class: 'min-w-0' }, [
+      // Version mobile: nom + icône info
+      const mobileContent = h('div', { class: 'flex items-center gap-2 md:hidden' }, [
+        h('span', { class: 'font-medium' }, row.original.name),
+        row.original.description
+          ? h(UPopover, { mode: 'hover' }, {
+              default: () => h(UIcon, {
+                name: 'i-lucide-info',
+                class: 'w-4 h-4 text-muted cursor-help'
+              }),
+              content: () => h('div', { class: 'p-2 text-sm max-w-xs' }, row.original.description)
+            })
+          : null
+      ])
+
+      // Version desktop: nom + description tronquée
+      const desktopContent = h('div', { class: 'hidden md:block min-w-0' }, [
         h('div', { class: 'font-medium' }, row.original.name),
-        h('div', { class: 'text-xs text-muted break-words md:whitespace-nowrap md:overflow-hidden md:text-ellipsis' }, row.original.description)
-      ]))
+        h('div', { class: 'text-xs text-muted whitespace-nowrap overflow-hidden text-ellipsis' }, row.original.description)
+      ])
+
+      children.push(h('div', { class: 'min-w-0 flex-1' }, [mobileContent, desktopContent]))
 
       return h('div', { class: 'flex items-center gap-3' }, children)
     }
