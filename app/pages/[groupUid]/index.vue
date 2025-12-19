@@ -926,8 +926,7 @@ onUnmounted(() => {
             <UTable
               :data="getTableData(filterEmblemsArray(result.emblems))"
               :columns="columns"
-              class="sticky-table"
-            >
+                          >
               <template #maxThreshold-cell="{ row }">
                 <MaxThresholdCell
                   :max-threshold="row.original.maxThreshold"
@@ -994,8 +993,7 @@ onUnmounted(() => {
                   <UTable
                     :data="getTableData(getFilteredEmblems(campaign.id))"
                     :columns="columns"
-                    class="sticky-table"
-                  >
+                                      >
                     <template #maxThreshold-cell="{ row }">
                       <MaxThresholdCell
                         :max-threshold="row.original.maxThreshold"

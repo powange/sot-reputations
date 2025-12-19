@@ -312,8 +312,7 @@ async function handleDelete() {
               <UTable
                 :data="getTableData(result.emblems)"
                 :columns="columns"
-                class="sticky-table"
-              >
+                              >
                 <template #maxThreshold-cell="{ row }">
                   <MaxThresholdCell
                     :max-threshold="row.original.maxThreshold"
@@ -372,8 +371,7 @@ async function handleDelete() {
                     <UTable
                       :data="getTableData(campaign.emblems)"
                       :columns="columns"
-                      class="sticky-table"
-                    >
+                                          >
                       <template #maxThreshold-cell="{ row }">
                         <template v-if="row.original.maxGrade >= 2 && row.original.gradeThresholds?.length">
                           <UPopover mode="hover">
