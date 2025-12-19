@@ -15,12 +15,12 @@ function getThreshold(gradeThresholds: GradeThreshold[] | undefined, grade: numb
 <template>
   <template v-if="maxGrade >= 2 && gradeThresholds?.length">
     <UPopover
-      mode="hover"
+      mode="click"
       :content="{
         side: 'right'
       }"
     >
-      <span class="cursor-help underline decoration-dotted">
+      <span class="cursor-pointer underline decoration-dotted">
         {{ maxThreshold ?? '?' }}
       </span>
       <template #content>

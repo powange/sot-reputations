@@ -29,10 +29,10 @@ export function createSuccessColumn<T extends BaseTableRow>(): TableColumn<T> {
       const mobileContent = h('div', { class: 'flex items-center gap-2 md:hidden' }, [
         h('span', { class: 'font-medium' }, row.original.name),
         row.original.description
-          ? h(UPopover, { mode: 'hover' }, {
+          ? h(UPopover, { mode: 'click' }, {
               default: () => h(UIcon, {
                 name: 'i-lucide-info',
-                class: 'w-4 h-4 text-muted cursor-help'
+                class: 'w-4 h-4 text-muted cursor-pointer'
               }),
               content: () => h('div', { class: 'p-2 text-sm max-w-xs' }, row.original.description)
             })
