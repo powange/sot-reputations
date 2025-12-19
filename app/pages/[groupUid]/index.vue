@@ -206,11 +206,19 @@ watch(
   { deep: true }
 )
 
+// Normaliser le texte pour la recherche (gère les espaces insécables, multiples, etc.)
+function normalizeForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s\u00A0]+/g, ' ')
+    .trim()
+}
+
 // Résultats de recherche
 const searchResults = computed(() => {
   if (!isSearchActive.value) return []
 
-  const query = searchQuery.value.toLowerCase().trim()
+  const query = normalizeForSearch(searchQuery.value)
   const results: Array<{
     factionName: string
     campaignName: string
@@ -221,8 +229,8 @@ const searchResults = computed(() => {
   for (const faction of factions.value) {
     for (const campaign of faction.campaigns) {
       const matchingEmblems = campaign.emblems.filter(e =>
-        e.name.toLowerCase().includes(query) ||
-        e.description.toLowerCase().includes(query)
+        normalizeForSearch(e.name).includes(query) ||
+        normalizeForSearch(e.description).includes(query)
       )
 
       if (matchingEmblems.length > 0) {
