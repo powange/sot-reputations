@@ -38,10 +38,6 @@
 }
 
 /* Sticky table headers */
-.sticky-table {
-  overflow: visible !important;
-}
-
 .sticky-table table thead {
   position: sticky;
   top: var(--ui-header-height);
