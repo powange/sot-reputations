@@ -77,6 +77,9 @@ useHead({
           </h2>
         </template>
         <div class="space-y-4 text-muted">
+          <p v-if="$t('legal.privacy.joke') !== 'legal.privacy.joke'" class="italic">
+            {{ $t('legal.privacy.joke') }}
+          </p>
           <div>
             <h3 class="font-medium text-foreground mb-2">{{ $t('legal.privacy.dataCollected.title') }}</h3>
             <ul class="list-disc list-inside space-y-1">

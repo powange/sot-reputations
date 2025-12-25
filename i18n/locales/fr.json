@@ -309,6 +309,7 @@
     },
     "privacy": {
       "title": "Donnees personnelles et RGPD",
+      "joke": "Pour les donnees collectees, on garde quoi ? Feur.",
       "dataCollected": {
         "title": "Donnees collectees",
         "gamertag": "Gamertag Xbox (via authentification Microsoft)",
