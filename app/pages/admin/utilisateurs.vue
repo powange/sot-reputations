@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
+
 const { isAdmin, isAuthenticated, user: currentUser } = useAuth()
 const toast = useToast()
 
@@ -36,7 +38,7 @@ const { data: users, status, refresh } = await useFetch<User[]>('/api/admin/user
 
 const roleLabels: Record<string, string> = {
   chef: 'Chef',
-  moderator: 'Moderateur',
+  moderator: 'Modérateur',
   member: 'Membre'
 }
 
@@ -48,7 +50,7 @@ const roleColors: Record<string, string> = {
 
 const siteRoleOptions = [
   { label: 'Utilisateur', value: 'user' },
-  { label: 'Moderateur', value: 'moderator' },
+  { label: 'Modérateur', value: 'moderator' },
   { label: 'Administrateur', value: 'admin' }
 ]
 
@@ -60,7 +62,7 @@ function getUserSiteRole(user: User): string {
 
 function getSiteRoleLabel(user: User): string {
   if (user.isAdmin) return 'Admin'
-  if (user.isModerator) return 'Moderateur'
+  if (user.isModerator) return 'Modérateur'
   return 'Utilisateur'
 }
 
@@ -70,6 +72,13 @@ function getSiteRoleColor(user: User): string {
   return 'neutral'
 }
 
+// Valeur numérique pour le tri des rôles
+function getSiteRoleOrder(user: User): number {
+  if (user.isAdmin) return 0
+  if (user.isModerator) return 1
+  return 2
+}
+
 async function changeUserRole(user: User, newRole: string) {
   try {
     await $fetch(`/api/admin/users/${user.id}/role`, {
@@ -77,8 +86,8 @@ async function changeUserRole(user: User, newRole: string) {
       body: { role: newRole }
     })
     toast.add({
-      title: 'Droits modifies',
-      description: `${user.username} est maintenant ${newRole === 'admin' ? 'administrateur' : newRole === 'moderator' ? 'moderateur' : 'utilisateur'}`,
+      title: 'Droits modifiés',
+      description: `${user.username} est maintenant ${newRole === 'admin' ? 'administrateur' : newRole === 'moderator' ? 'modérateur' : 'utilisateur'}`,
       color: 'success'
     })
     await refresh()
@@ -100,6 +109,130 @@ function formatDate(date: string | null): string {
     year: 'numeric'
   })
 }
+
+// Configuration du tri
+const sorting = ref([{ id: 'username', desc: false }])
+
+function getSortIcon(columnId: string) {
+  const sort = sorting.value.find(s => s.id === columnId)
+  if (!sort) return 'i-lucide-arrow-up-down'
+  return sort.desc ? 'i-lucide-arrow-down-wide-narrow' : 'i-lucide-arrow-up-narrow-wide'
+}
+
+function toggleSort(columnId: string) {
+  const existingSort = sorting.value.find(s => s.id === columnId)
+  if (!existingSort) {
+    sorting.value = [{ id: columnId, desc: false }]
+  } else if (!existingSort.desc) {
+    sorting.value = [{ id: columnId, desc: true }]
+  } else {
+    sorting.value = [{ id: columnId, desc: false }]
+  }
+}
+
+// Colonnes du tableau
+const columns: TableColumn<User>[] = [
+  {
+    accessorKey: 'username',
+    header: () => h('button', {
+      class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
+      onClick: () => toggleSort('username')
+    }, [
+      'Utilisateur',
+      h(resolveComponent('UIcon'), { name: getSortIcon('username'), class: 'w-4 h-4' })
+    ])
+  },
+  {
+    accessorKey: 'role',
+    id: 'role',
+    accessorFn: (row) => getSiteRoleOrder(row),
+    header: () => h('button', {
+      class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
+      onClick: () => toggleSort('role')
+    }, [
+      'Droits',
+      h(resolveComponent('UIcon'), { name: getSortIcon('role'), class: 'w-4 h-4' })
+    ])
+  },
+  {
+    accessorKey: 'groups',
+    id: 'groups',
+    accessorFn: (row) => row.groups.length,
+    header: () => h('button', {
+      class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
+      onClick: () => toggleSort('groups')
+    }, [
+      'Groupes',
+      h(resolveComponent('UIcon'), { name: getSortIcon('groups'), class: 'w-4 h-4' })
+    ])
+  },
+  {
+    accessorKey: 'createdAt',
+    header: () => h('button', {
+      class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
+      onClick: () => toggleSort('createdAt')
+    }, [
+      'Inscription',
+      h(resolveComponent('UIcon'), { name: getSortIcon('createdAt'), class: 'w-4 h-4' })
+    ])
+  },
+  {
+    accessorKey: 'lastImportAt',
+    header: () => h('button', {
+      class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
+      onClick: () => toggleSort('lastImportAt')
+    }, [
+      'Dernier import',
+      h(resolveComponent('UIcon'), { name: getSortIcon('lastImportAt'), class: 'w-4 h-4' })
+    ])
+  }
+]
+
+// Données triées
+const sortedUsers = computed(() => {
+  if (!users.value) return []
+
+  const sorted = [...users.value]
+  const sort = sorting.value[0]
+
+  if (!sort) return sorted
+
+  sorted.sort((a, b) => {
+    let aVal: any
+    let bVal: any
+
+    switch (sort.id) {
+      case 'username':
+        aVal = a.username.toLowerCase()
+        bVal = b.username.toLowerCase()
+        break
+      case 'role':
+        aVal = getSiteRoleOrder(a)
+        bVal = getSiteRoleOrder(b)
+        break
+      case 'groups':
+        aVal = a.groups.length
+        bVal = b.groups.length
+        break
+      case 'createdAt':
+        aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        break
+      case 'lastImportAt':
+        aVal = a.lastImportAt ? new Date(a.lastImportAt).getTime() : 0
+        bVal = b.lastImportAt ? new Date(b.lastImportAt).getTime() : 0
+        break
+      default:
+        return 0
+    }
+
+    if (aVal < bVal) return sort.desc ? 1 : -1
+    if (aVal > bVal) return sort.desc ? -1 : 1
+    return 0
+  })
+
+  return sorted
+})
 </script>
 
 <template>
@@ -125,85 +258,74 @@ function formatDate(date: string | null): string {
         <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-muted" />
       </div>
 
-      <div v-else-if="users && users.length > 0" class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-muted">
-              <th class="text-left py-3 px-4 font-medium">Utilisateur</th>
-              <th class="text-left py-3 px-4 font-medium">Droits</th>
-              <th class="text-left py-3 px-4 font-medium">Groupes</th>
-              <th class="text-left py-3 px-4 font-medium">Inscription</th>
-              <th class="text-left py-3 px-4 font-medium">Dernier import</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="u in users"
-              :key="u.id"
-              class="border-b border-muted/50 hover:bg-muted/20"
+      <div v-else-if="sortedUsers && sortedUsers.length > 0" class="overflow-x-auto">
+        <UTable
+          :data="sortedUsers"
+          :columns="columns"
+          class="w-full"
+        >
+          <template #username-cell="{ row }">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">{{ row.original.username }}</span>
+              <UIcon
+                v-if="row.original.microsoftId"
+                name="i-simple-icons-xbox"
+                class="w-4 h-4 text-green-500"
+                title="Compte Xbox"
+              />
+            </div>
+          </template>
+
+          <template #role-cell="{ row }">
+            <UDropdownMenu
+              v-if="row.original.id !== currentUser?.id"
+              :items="siteRoleOptions.map(opt => ({
+                label: opt.label,
+                icon: getUserSiteRole(row.original) === opt.value ? 'i-lucide-check' : undefined,
+                onSelect: () => changeUserRole(row.original, opt.value)
+              }))"
             >
-              <td class="py-3 px-4">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium">{{ u.username }}</span>
-                  <UIcon
-                    v-if="u.microsoftId"
-                    name="i-simple-icons-xbox"
-                    class="w-4 h-4 text-green-500"
-                    title="Compte Xbox"
-                  />
-                </div>
-              </td>
-              <td class="py-3 px-4">
-                <UDropdownMenu
-                  v-if="u.id !== currentUser?.id"
-                  :items="[[
-                    ...siteRoleOptions.map(opt => ({
-                      label: opt.label,
-                      icon: getUserSiteRole(u) === opt.value ? 'i-lucide-check' : undefined,
-                      onSelect: () => changeUserRole(u, opt.value)
-                    }))
-                  ]]"
-                >
-                  <UButton
-                    :color="getSiteRoleColor(u)"
-                    size="xs"
-                    variant="subtle"
-                    trailing-icon="i-lucide-chevron-down"
-                  >
-                    {{ getSiteRoleLabel(u) }}
-                  </UButton>
-                </UDropdownMenu>
-                <UBadge
-                  v-else
-                  :color="getSiteRoleColor(u)"
-                  size="xs"
-                >
-                  {{ getSiteRoleLabel(u) }} (vous)
-                </UBadge>
-              </td>
-              <td class="py-3 px-4">
-                <div v-if="u.groups.length > 0" class="flex flex-wrap gap-1">
-                  <UBadge
-                    v-for="group in u.groups"
-                    :key="group.uid"
-                    :color="roleColors[group.role] || 'neutral'"
-                    size="xs"
-                    variant="subtle"
-                  >
-                    {{ group.name }} ({{ roleLabels[group.role] || group.role }})
-                  </UBadge>
-                </div>
-                <span v-else class="text-muted">-</span>
-              </td>
-              <td class="py-3 px-4 text-muted">
-                {{ formatDate(u.createdAt) }}
-              </td>
-              <td class="py-3 px-4 text-muted">
-                {{ formatDate(u.lastImportAt) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              <UButton
+                :color="getSiteRoleColor(row.original)"
+                size="xs"
+                variant="subtle"
+                trailing-icon="i-lucide-chevron-down"
+              >
+                {{ getSiteRoleLabel(row.original) }}
+              </UButton>
+            </UDropdownMenu>
+            <UBadge
+              v-else
+              :color="getSiteRoleColor(row.original)"
+              size="xs"
+            >
+              {{ getSiteRoleLabel(row.original) }} (vous)
+            </UBadge>
+          </template>
+
+          <template #groups-cell="{ row }">
+            <div v-if="row.original.groups.length > 0" class="flex flex-wrap gap-1">
+              <UBadge
+                v-for="group in row.original.groups"
+                :key="group.uid"
+                :color="roleColors[group.role] || 'neutral'"
+                size="xs"
+                variant="subtle"
+              >
+                {{ group.name }} ({{ roleLabels[group.role] || group.role }})
+              </UBadge>
+            </div>
+            <span v-else class="text-muted">-</span>
+          </template>
+
+          <template #createdAt-cell="{ row }">
+            <span class="text-muted">{{ formatDate(row.original.createdAt) }}</span>
+          </template>
+
+          <template #lastImportAt-cell="{ row }">
+            <span class="text-muted">{{ formatDate(row.original.lastImportAt) }}</span>
+          </template>
+        </UTable>
       </div>
 
       <div v-else class="text-center py-8 text-muted">
