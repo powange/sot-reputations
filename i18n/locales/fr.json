@@ -36,7 +36,7 @@
     "loginError": "Erreur de connexion",
     "loginErrorMessage": "La connexion Xbox a echoue. Veuillez reessayer.",
     "dataCollectedInfo": "En vous connectant, seuls votre Gamertag Xbox et votre identifiant sont recuperes pour vous identifier.",
-    "seePrivacyPolicy": "Voir les mentions legales"
+    "seePrivacyPolicy": "Voir les mentions légales"
   },
   "groups": {
     "title": "Mes groupes",
@@ -288,63 +288,63 @@
     "login": "Se connecter"
   },
   "legal": {
-    "title": "Mentions legales",
-    "lastUpdate": "Derniere mise a jour : Decembre 2025",
+    "title": "Mentions légales",
+    "lastUpdate": "Dernière mise à jour : Décembre 2025",
     "editor": {
-      "title": "Editeur du site",
+      "title": "Éditeur du site",
       "name": "SoT Reputations",
-      "status": "Site personnel a but non lucratif",
+      "status": "Site personnel à but non lucratif",
       "contact": "Contact : "
     },
     "hosting": {
-      "title": "Hebergement",
-      "provider": "Hebergement : Serveur personnel",
+      "title": "Hébergement",
+      "provider": "Hébergement : Serveur personnel",
       "address": "France"
     },
     "intellectual": {
-      "title": "Propriete intellectuelle",
-      "content": "Le contenu de ce site (textes, images, code source) est la propriete de son auteur, sauf mention contraire.",
-      "trademark": "Sea of Thieves est une marque deposee de Microsoft Corporation et Rare Ltd. Ce site n'est pas affilie, endosse ou sponsorise par Microsoft ou Rare.",
-      "disclaimer": "Les noms, logos et images lies a Sea of Thieves sont utilises a des fins informatives uniquement et appartiennent a leurs proprietaires respectifs."
+      "title": "Propriété intellectuelle",
+      "content": "Le contenu de ce site (textes, images, code source) est la propriété de son auteur, sauf mention contraire.",
+      "trademark": "Sea of Thieves est une marque déposée de Microsoft Corporation et Rare Ltd. Ce site n'est pas affilié, endossé ou sponsorisé par Microsoft ou Rare.",
+      "disclaimer": "Les noms, logos et images liés à Sea of Thieves sont utilisés à des fins informatives uniquement et appartiennent à leurs propriétaires respectifs."
     },
     "privacy": {
-      "title": "Donnees personnelles et RGPD",
-      "joke": "Pour les donnees collectees, on garde quoi ? Feur.",
+      "title": "Données personnelles et RGPD",
+      "joke": "Pour les données collectées, on garde quoi ? Feur.",
       "dataCollected": {
-        "title": "Donnees collectees",
+        "title": "Données collectées",
         "gamertag": "Gamertag Xbox (via authentification Microsoft)",
         "visitorId": "Identifiant Xbox (XUID) pour l'authentification",
-        "reputation": "Donnees de reputation Sea of Thieves (importees volontairement par l'utilisateur)"
+        "reputation": "Données de réputation Sea of Thieves (importées volontairement par l'utilisateur)"
       },
       "purpose": {
-        "title": "Finalite du traitement",
-        "content": "Les donnees collectees sont utilisees uniquement pour permettre aux utilisateurs de comparer leurs progressions dans Sea of Thieves avec d'autres joueurs."
+        "title": "Finalité du traitement",
+        "content": "Les données collectées sont utilisées uniquement pour permettre aux utilisateurs de comparer leurs progressions dans Sea of Thieves avec d'autres joueurs."
       },
       "retention": {
-        "title": "Duree de conservation",
-        "content": "Les donnees sont conservees tant que le compte utilisateur est actif. Vous pouvez supprimer vos donnees a tout moment depuis la page \"Mes reputations\"."
+        "title": "Durée de conservation",
+        "content": "Les données sont conservées tant que le compte utilisateur est actif. Vous pouvez supprimer vos données à tout moment depuis la page \"Mes réputations\"."
       },
       "rights": {
         "title": "Vos droits",
-        "content": "Conformement au RGPD, vous disposez d'un droit d'acces, de rectification, de suppression et de portabilite de vos donnees. Pour exercer ces droits, contactez-nous par email."
+        "content": "Conformément au RGPD, vous disposez d'un droit d'accès, de rectification, de suppression et de portabilité de vos données. Pour exercer ces droits, contactez-nous par email."
       }
     },
     "cookies": {
       "title": "Cookies",
-      "description": "Ce site utilise des cookies strictement necessaires au fonctionnement du service :",
+      "description": "Ce site utilise des cookies strictement nécessaires au fonctionnement du service :",
       "session": "Cookie de session (authentification)",
-      "preferences": "Cookie de preferences (langue, theme)",
-      "noTracking": "Aucun cookie de suivi publicitaire ou analytique n'est utilise."
+      "preferences": "Cookie de préférences (langue, thème)",
+      "noTracking": "Aucun cookie de suivi publicitaire ou analytique n'est utilisé."
     },
     "liability": {
-      "title": "Responsabilite",
-      "accuracy": "Les informations fournies sur ce site sont presentees a titre indicatif. Nous nous efforccons de maintenir des informations exactes mais ne pouvons garantir l'absence d'erreurs.",
-      "availability": "Nous ne pouvons garantir la disponibilite permanente du service. Le site peut etre interrompu pour maintenance ou mise a jour.",
+      "title": "Responsabilité",
+      "accuracy": "Les informations fournies sur ce site sont présentées à titre indicatif. Nous nous efforçons de maintenir des informations exactes mais ne pouvons garantir l'absence d'erreurs.",
+      "availability": "Nous ne pouvons garantir la disponibilité permanente du service. Le site peut être interrompu pour maintenance ou mise à jour.",
       "thirdParty": "Ce site n'est pas responsable du contenu des sites externes vers lesquels il peut renvoyer."
     },
     "law": {
       "title": "Droit applicable",
-      "content": "Les presentes mentions legales sont soumises au droit francais. En cas de litige, les tribunaux francais seront seuls competents."
+      "content": "Les présentes mentions légales sont soumises au droit français. En cas de litige, les tribunaux français seront seuls compétents."
     }
   }
 }
