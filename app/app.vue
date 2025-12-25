@@ -135,6 +135,11 @@ async function handleLogout() {
           SoT Reputations
         </p>
       </template>
+      <template #right>
+        <NuxtLink to="/mentions-legales" class="text-sm text-muted hover:text-foreground transition-colors">
+          {{ $t('legal.title') }}
+        </NuxtLink>
+      </template>
     </UFooter>
   </UApp>
 </template>

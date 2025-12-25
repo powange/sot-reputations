@@ -153,6 +153,18 @@ async function handleCreateGroup() {
               block
               @click="loginWithMicrosoft"
             />
+
+            <div class="text-xs text-muted space-y-1 pt-2 border-t border-muted/20">
+              <p class="flex items-start gap-1.5">
+                <UIcon name="i-lucide-info" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{{ $t('auth.dataCollectedInfo') }}</span>
+              </p>
+              <p class="pl-5">
+                <NuxtLink to="/mentions-legales" class="text-primary hover:underline">
+                  {{ $t('auth.seePrivacyPolicy') }}
+                </NuxtLink>
+              </p>
+            </div>
           </div>
 
           <template #footer>

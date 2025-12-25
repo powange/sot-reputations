@@ -34,7 +34,9 @@
     "checkTutorial": "Consulta el tutorial",
     "toImportData": "para importar tus datos",
     "loginError": "Error de inicio de sesion",
-    "loginErrorMessage": "El inicio de sesion Xbox ha fallado. Por favor, intentalo de nuevo."
+    "loginErrorMessage": "El inicio de sesion Xbox ha fallado. Por favor, intentalo de nuevo.",
+    "dataCollectedInfo": "Al iniciar sesion, solo se recuperan tu Gamertag de Xbox y tu identificador para identificarte.",
+    "seePrivacyPolicy": "Ver aviso legal"
   },
   "groups": {
     "title": "Mis Grupos",
@@ -284,5 +286,64 @@
     "notLoggedIn": "Debes estar conectado a Sea of Thieves.",
     "ensureLoggedIn": "Asegurate de estar conectado en seaofthieves.com",
     "login": "Iniciar sesion"
+  },
+  "legal": {
+    "title": "Aviso Legal",
+    "lastUpdate": "Ultima actualizacion: Diciembre 2025",
+    "editor": {
+      "title": "Editor del sitio",
+      "name": "SoT Reputations",
+      "status": "Sitio personal sin fines de lucro",
+      "contact": "Contacto: "
+    },
+    "hosting": {
+      "title": "Alojamiento",
+      "provider": "Alojamiento: Servidor personal",
+      "address": "Francia"
+    },
+    "intellectual": {
+      "title": "Propiedad Intelectual",
+      "content": "El contenido de este sitio (textos, imagenes, codigo fuente) es propiedad de su autor, salvo indicacion contraria.",
+      "trademark": "Sea of Thieves es una marca registrada de Microsoft Corporation y Rare Ltd. Este sitio no esta afiliado, respaldado ni patrocinado por Microsoft o Rare.",
+      "disclaimer": "Los nombres, logotipos e imagenes relacionados con Sea of Thieves se utilizan unicamente con fines informativos y pertenecen a sus respectivos propietarios."
+    },
+    "privacy": {
+      "title": "Datos Personales y RGPD",
+      "dataCollected": {
+        "title": "Datos Recopilados",
+        "gamertag": "Gamertag de Xbox (via autenticacion de Microsoft)",
+        "visitorId": "Identificador de Xbox (XUID) para autenticacion",
+        "reputation": "Datos de reputacion de Sea of Thieves (importados voluntariamente por el usuario)"
+      },
+      "purpose": {
+        "title": "Finalidad del Tratamiento",
+        "content": "Los datos recopilados se utilizan unicamente para permitir a los usuarios comparar su progresion en Sea of Thieves con otros jugadores."
+      },
+      "retention": {
+        "title": "Retencion de Datos",
+        "content": "Los datos se conservan mientras la cuenta de usuario este activa. Puede eliminar sus datos en cualquier momento desde la pagina \"Mis Reputaciones\"."
+      },
+      "rights": {
+        "title": "Sus Derechos",
+        "content": "De acuerdo con el RGPD, tiene derecho a acceder, rectificar, eliminar y portar sus datos. Para ejercer estos derechos, contactenos por correo electronico."
+      }
+    },
+    "cookies": {
+      "title": "Cookies",
+      "description": "Este sitio utiliza cookies estrictamente necesarias para el funcionamiento del servicio:",
+      "session": "Cookie de sesion (autenticacion)",
+      "preferences": "Cookie de preferencias (idioma, tema)",
+      "noTracking": "No se utilizan cookies de seguimiento publicitario ni analitico."
+    },
+    "liability": {
+      "title": "Responsabilidad",
+      "accuracy": "La informacion proporcionada en este sitio es solo con fines informativos. Nos esforzamos por mantener informacion precisa pero no podemos garantizar la ausencia de errores.",
+      "availability": "No podemos garantizar la disponibilidad permanente del servicio. El sitio puede ser interrumpido por mantenimiento o actualizaciones.",
+      "thirdParty": "Este sitio no es responsable del contenido de los sitios externos a los que pueda enlazar."
+    },
+    "law": {
+      "title": "Ley Aplicable",
+      "content": "Estos avisos legales estan sujetos a la ley francesa. En caso de disputa, los tribunales franceses tendran jurisdiccion exclusiva."
+    }
   }
 }

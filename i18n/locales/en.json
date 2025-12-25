@@ -34,7 +34,9 @@
     "checkTutorial": "Check the tutorial",
     "toImportData": "to import your data",
     "loginError": "Login Error",
-    "loginErrorMessage": "Xbox login failed. Please try again."
+    "loginErrorMessage": "Xbox login failed. Please try again.",
+    "dataCollectedInfo": "By logging in, only your Xbox Gamertag and identifier are retrieved to identify you.",
+    "seePrivacyPolicy": "See privacy policy"
   },
   "groups": {
     "title": "My Groups",
@@ -284,5 +286,64 @@
     "notLoggedIn": "You must be logged in to Sea of Thieves.",
     "ensureLoggedIn": "Make sure you are logged in on seaofthieves.com",
     "login": "Log in"
+  },
+  "legal": {
+    "title": "Legal Notice",
+    "lastUpdate": "Last updated: December 2025",
+    "editor": {
+      "title": "Site Editor",
+      "name": "SoT Reputations",
+      "status": "Personal non-profit website",
+      "contact": "Contact: "
+    },
+    "hosting": {
+      "title": "Hosting",
+      "provider": "Hosting: Personal server",
+      "address": "France"
+    },
+    "intellectual": {
+      "title": "Intellectual Property",
+      "content": "The content of this site (texts, images, source code) is the property of its author, unless otherwise stated.",
+      "trademark": "Sea of Thieves is a registered trademark of Microsoft Corporation and Rare Ltd. This site is not affiliated with, endorsed or sponsored by Microsoft or Rare.",
+      "disclaimer": "Names, logos and images related to Sea of Thieves are used for informational purposes only and belong to their respective owners."
+    },
+    "privacy": {
+      "title": "Personal Data and GDPR",
+      "dataCollected": {
+        "title": "Data Collected",
+        "gamertag": "Xbox Gamertag (via Microsoft authentication)",
+        "visitorId": "Xbox identifier (XUID) for authentication",
+        "reputation": "Sea of Thieves reputation data (voluntarily imported by the user)"
+      },
+      "purpose": {
+        "title": "Purpose of Processing",
+        "content": "The collected data is used solely to allow users to compare their Sea of Thieves progression with other players."
+      },
+      "retention": {
+        "title": "Data Retention",
+        "content": "Data is kept as long as the user account is active. You can delete your data at any time from the \"My Reputations\" page."
+      },
+      "rights": {
+        "title": "Your Rights",
+        "content": "In accordance with GDPR, you have the right to access, rectify, delete and port your data. To exercise these rights, contact us by email."
+      }
+    },
+    "cookies": {
+      "title": "Cookies",
+      "description": "This site uses cookies strictly necessary for the service to function:",
+      "session": "Session cookie (authentication)",
+      "preferences": "Preferences cookie (language, theme)",
+      "noTracking": "No advertising or analytics tracking cookies are used."
+    },
+    "liability": {
+      "title": "Liability",
+      "accuracy": "The information provided on this site is for informational purposes only. We strive to maintain accurate information but cannot guarantee the absence of errors.",
+      "availability": "We cannot guarantee the permanent availability of the service. The site may be interrupted for maintenance or updates.",
+      "thirdParty": "This site is not responsible for the content of external sites to which it may link."
+    },
+    "law": {
+      "title": "Applicable Law",
+      "content": "These legal notices are subject to French law. In case of dispute, French courts shall have exclusive jurisdiction."
+    }
   }
 }
