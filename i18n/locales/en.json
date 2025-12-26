@@ -88,6 +88,11 @@
     "no": "No",
     "grade": "Grade"
   },
+  "myReputations": {
+    "completedEmblems": "Completed emblems",
+    "completionRate": "Completion rate",
+    "totalEmblems": "Total emblems"
+  },
   "components": {
     "gradeEditor": {
       "grades": "grade | grades",
@@ -251,7 +256,13 @@
     "groupDeleted": "Group deleted",
     "dataUpdated": "Data updated",
     "memberUpdatedData": "{username} has updated their data",
-    "pseudoRequired": "Username required"
+    "pseudoRequired": "Username required",
+    "editName": "Edit name",
+    "editNameTitle": "Edit group name",
+    "groupName": "Group name",
+    "groupNamePlaceholder": "Enter group name",
+    "nameRequired": "Group name is required",
+    "nameUpdated": "Group name has been updated"
   },
   "admin": {
     "title": "Administration",

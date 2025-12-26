@@ -84,12 +84,12 @@ function toggleCampaign(campaignId: number) {
     <div class="space-y-4">
       <!-- Recherche -->
       <div class="flex items-center gap-3">
-        <span class="text-sm font-medium text-muted">{{ $t('common.search') }} :</span>
+        <span class="text-sm font-medium text-muted shrink-0">{{ $t('common.search') }} :</span>
         <UInput
           v-model="searchQuery"
           :placeholder="$t('reputations.searchPlaceholder')"
           icon="i-lucide-search"
-          class="max-w-md"
+          class="flex-1 max-w-2xl"
         />
       </div>
 

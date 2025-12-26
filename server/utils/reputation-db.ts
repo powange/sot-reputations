@@ -903,6 +903,11 @@ export function deleteGroup(groupId: number): void {
   db.prepare('DELETE FROM groups WHERE id = ?').run(groupId)
 }
 
+export function updateGroupName(groupId: number, name: string): void {
+  const db = getReputationDb()
+  db.prepare('UPDATE groups SET name = ? WHERE id = ?').run(name, groupId)
+}
+
 export function getUserByUsername(username: string): UserInfo | null {
   const db = getReputationDb()
   const row = db.prepare(`

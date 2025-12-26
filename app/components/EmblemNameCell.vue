@@ -4,6 +4,8 @@ defineProps<{
   description: string
   image?: string
 }>()
+
+const isImageModalOpen = ref(false)
 </script>
 
 <template>
@@ -12,7 +14,8 @@ defineProps<{
       v-if="image"
       :src="image"
       :alt="name"
-      class="w-10 h-10 object-contain shrink-0"
+      class="w-10 h-10 object-contain shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+      @click="isImageModalOpen = true"
     />
 
     <!-- Version mobile: nom + icône info -->
@@ -36,5 +39,20 @@ defineProps<{
       <div class="font-medium">{{ name }}</div>
       <div class="text-xs text-muted">{{ description }}</div>
     </div>
+
+    <!-- Modal image agrandie -->
+    <UModal v-if="image" v-model:open="isImageModalOpen">
+      <template #content>
+        <div class="p-4 flex flex-col items-center">
+          <img
+            :src="image"
+            :alt="name"
+            class="max-w-full max-h-[70vh] object-contain"
+          />
+          <p class="mt-4 text-lg font-medium text-center">{{ name }}</p>
+          <p v-if="description" class="mt-1 text-sm text-muted text-center max-w-md">{{ description }}</p>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

@@ -36,6 +36,39 @@ interface User {
 
 const { data: users, status, refresh } = await useFetch<User[]>('/api/admin/users')
 
+// Filtres
+const searchQuery = ref('')
+const selectedGroup = ref<string | null>(null)
+
+// Pagination
+const currentPage = ref(1)
+const perPage = ref(30)
+const perPageOptions = [
+  { value: 10, label: '10 par page' },
+  { value: 30, label: '30 par page' },
+  { value: 50, label: '50 par page' },
+  { value: 100, label: '100 par page' }
+]
+
+// Reset page quand les filtres ou le nombre par page changent
+watch([searchQuery, selectedGroup, perPage], () => {
+  currentPage.value = 1
+})
+
+// Liste des groupes disponibles pour le filtre
+const availableGroups = computed(() => {
+  if (!users.value) return []
+  const groups = new Map<string, string>()
+  for (const user of users.value) {
+    for (const group of user.groups) {
+      groups.set(group.uid, group.name)
+    }
+  }
+  return Array.from(groups.entries())
+    .map(([uid, name]) => ({ value: uid, label: name }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+})
+
 const roleLabels: Record<string, string> = {
   chef: 'Chef',
   moderator: 'Modérateur',
@@ -110,8 +143,8 @@ function formatDate(date: string | null): string {
   })
 }
 
-// Configuration du tri
-const sorting = ref([{ id: 'username', desc: false }])
+// Configuration du tri (par défaut: date d'inscription décroissante)
+const sorting = ref([{ id: 'createdAt', desc: true }])
 
 function getSortIcon(columnId: string) {
   const sort = sorting.value.find(s => s.id === columnId)
@@ -188,11 +221,28 @@ const columns: TableColumn<User>[] = [
   }
 ]
 
-// Données triées
+// Données filtrées et triées
 const sortedUsers = computed(() => {
   if (!users.value) return []
 
-  const sorted = [...users.value]
+  // Filtrage par recherche pseudo
+  let filtered = users.value.filter((user) => {
+    if (searchQuery.value) {
+      const query = searchQuery.value.toLowerCase()
+      if (!user.username.toLowerCase().includes(query)) {
+        return false
+      }
+    }
+    // Filtrage par groupe
+    if (selectedGroup.value) {
+      if (!user.groups.some(g => g.uid === selectedGroup.value)) {
+        return false
+      }
+    }
+    return true
+  })
+
+  const sorted = [...filtered]
   const sort = sorting.value[0]
 
   if (!sort) return sorted
@@ -233,6 +283,22 @@ const sortedUsers = computed(() => {
 
   return sorted
 })
+
+// Pagination
+const totalPages = computed(() => Math.ceil(sortedUsers.value.length / perPage.value))
+
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value
+  const end = start + perPage.value
+  return sortedUsers.value.slice(start, end)
+})
+
+// Reset page si elle dépasse le nombre de pages
+watch(totalPages, (newTotal) => {
+  if (currentPage.value > newTotal && newTotal > 0) {
+    currentPage.value = newTotal
+  }
+})
 </script>
 
 <template>
@@ -254,13 +320,35 @@ const sortedUsers = computed(() => {
     </div>
 
     <UCard>
+      <!-- Filtres -->
+      <div class="flex flex-wrap items-center gap-4 mb-6">
+        <UInput
+          v-model="searchQuery"
+          icon="i-lucide-search"
+          placeholder="Rechercher un pseudo..."
+          class="w-64"
+        />
+        <USelectMenu
+          v-model="selectedGroup"
+          :items="[{ value: null, label: 'Tous les groupes' }, ...availableGroups]"
+          value-key="value"
+          class="w-64"
+        />
+        <USelectMenu
+          v-model="perPage"
+          :items="perPageOptions"
+          value-key="value"
+          class="w-40"
+        />
+      </div>
+
       <div v-if="status === 'pending'" class="flex justify-center py-8">
         <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-muted" />
       </div>
 
       <div v-else-if="sortedUsers && sortedUsers.length > 0" class="overflow-x-auto">
         <UTable
-          :data="sortedUsers"
+          :data="paginatedUsers"
           :columns="columns"
           class="w-full"
         >
@@ -309,7 +397,7 @@ const sortedUsers = computed(() => {
                 v-for="group in row.original.groups"
                 :key="group.uid"
                 :color="roleColors[group.role] || 'neutral'"
-                size="xs"
+                size="lg"
                 variant="subtle"
               >
                 {{ group.name }} ({{ roleLabels[group.role] || group.role }})
@@ -333,9 +421,37 @@ const sortedUsers = computed(() => {
       </div>
 
       <template v-if="users" #footer>
-        <p class="text-sm text-muted">
-          {{ users.length }} utilisateur{{ users.length > 1 ? 's' : '' }}
-        </p>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <p class="text-sm text-muted">
+            <template v-if="sortedUsers.length !== users.length">
+              {{ sortedUsers.length }} / {{ users.length }} utilisateur{{ users.length > 1 ? 's' : '' }}
+            </template>
+            <template v-else>
+              {{ users.length }} utilisateur{{ users.length > 1 ? 's' : '' }}
+            </template>
+          </p>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="flex items-center gap-2">
+            <UButton
+              icon="i-lucide-chevron-left"
+              variant="ghost"
+              size="sm"
+              :disabled="currentPage <= 1"
+              @click="currentPage--"
+            />
+            <span class="text-sm text-muted px-2">
+              Page {{ currentPage }} / {{ totalPages }}
+            </span>
+            <UButton
+              icon="i-lucide-chevron-right"
+              variant="ghost"
+              size="sm"
+              :disabled="currentPage >= totalPages"
+              @click="currentPage++"
+            />
+          </div>
+        </div>
       </template>
     </UCard>
   </UContainer>

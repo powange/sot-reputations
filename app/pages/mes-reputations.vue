@@ -62,6 +62,40 @@ const user = computed(() => data.value?.user)
 const factions = computed(() => data.value?.factions || [])
 const hasImportedData = computed(() => !!user.value?.lastImportAt)
 
+// Statistiques de complétion
+const completionStats = computed(() => {
+  if (!hasImportedData.value) {
+    return { completed: 0, total: 0, percentage: 0, totalEmblems: 0 }
+  }
+
+  let completed = 0
+  let total = 0
+  let totalEmblems = 0
+
+  for (const faction of factions.value) {
+    for (const campaign of faction.campaigns) {
+      for (const emblem of campaign.emblems) {
+        totalEmblems++
+        const progress = emblem.progress
+        // Ne compter que les emblèmes avec des données de progression
+        if (progress !== null && progress !== undefined) {
+          total++
+          if (progress.completed) {
+            completed++
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    completed,
+    total,
+    percentage: total > 0 ? (completed === total ? 100 : Math.floor((completed / total) * 100)) : 0,
+    totalEmblems
+  }
+})
+
 // Utiliser le composable de filtres
 const {
   searchQuery,
@@ -90,7 +124,7 @@ const searchResults = computed(() => {
 
   for (const faction of factions.value) {
     for (const campaign of faction.campaigns) {
-      const matchingEmblems = campaign.emblems.filter(e => emblemMatchesSearch(e, query))
+      const matchingEmblems = campaign.emblems.filter(e => emblemMatchesSearch(e, query, { locale: locale.value }))
 
       if (matchingEmblems.length > 0) {
         results.push({
@@ -257,6 +291,37 @@ async function handleDelete() {
       </div>
 
       <template v-else>
+        <!-- Statistiques -->
+        <div
+          v-if="hasImportedData"
+          class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
+        >
+          <div class="bg-muted/30 rounded-lg p-4">
+            <div class="text-2xl font-bold text-success">
+              {{ completionStats.completed }}
+            </div>
+            <div class="text-sm text-muted">
+              {{ $t('myReputations.completedEmblems') }}
+            </div>
+          </div>
+          <div class="bg-muted/30 rounded-lg p-4">
+            <div class="text-2xl font-bold text-primary">
+              {{ completionStats.percentage }}%
+            </div>
+            <div class="text-sm text-muted">
+              {{ $t('myReputations.completionRate') }}
+            </div>
+          </div>
+          <div class="bg-muted/30 rounded-lg p-4">
+            <div class="text-2xl font-bold">
+              {{ completionStats.totalEmblems }}
+            </div>
+            <div class="text-sm text-muted">
+              {{ $t('myReputations.totalEmblems') }}
+            </div>
+          </div>
+        </div>
+
         <!-- Filtres -->
         <ReputationFilters
           v-model:search-query="searchQuery"

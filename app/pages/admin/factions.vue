@@ -214,7 +214,7 @@ const filteredFactions = computed(() => {
         .map(campaign => ({
           ...campaign,
           emblems: campaign.emblems.filter(e => {
-            const matchesSearch = emblemMatchesSearch(e, query, true)
+            const matchesSearch = emblemMatchesSearch(e, query, { includeKey: true })
             const matchesUnvalidated = !hasUnvalidatedFilter || e.validated === 0
             const matchesIncompleteGrades = !hasIncompleteGradesFilter || (e.maxGrade > 1 && e.gradesConfigured < e.maxGrade)
             return matchesSearch && matchesUnvalidated && matchesIncompleteGrades

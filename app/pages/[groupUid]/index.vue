@@ -91,6 +91,10 @@ const isLeaving = ref(false)
 const isDeleteModalOpen = ref(false)
 const isDeleting = ref(false)
 
+const isEditNameModalOpen = ref(false)
+const editedGroupName = ref('')
+const isEditingName = ref(false)
+
 const isImportModalOpen = ref(false)
 
 // Lien d'invitation
@@ -236,7 +240,7 @@ const searchResults = computed(() => {
 
   for (const faction of factions.value) {
     for (const campaign of faction.campaigns) {
-      const matchingEmblems = campaign.emblems.filter(e => emblemMatchesSearch(e, query))
+      const matchingEmblems = campaign.emblems.filter(e => emblemMatchesSearch(e, query, { locale: locale.value }))
 
       if (matchingEmblems.length > 0) {
         results.push({
@@ -606,6 +610,34 @@ async function handleDelete() {
   }
 }
 
+function openEditNameModal() {
+  editedGroupName.value = groupData.value?.group.name || ''
+  isEditNameModalOpen.value = true
+}
+
+async function handleEditName() {
+  if (!editedGroupName.value.trim()) {
+    toast.add({ title: t('common.error'), description: t('groupPage.nameRequired'), color: 'error' })
+    return
+  }
+
+  isEditingName.value = true
+  try {
+    await $fetch(`/api/groups/${groupUid}`, {
+      method: 'PATCH',
+      body: { name: editedGroupName.value.trim() }
+    })
+    toast.add({ title: t('common.success'), description: t('groupPage.nameUpdated'), color: 'success' })
+    isEditNameModalOpen.value = false
+    await refresh()
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
+  } finally {
+    isEditingName.value = false
+  }
+}
+
 // Fonctions pour le lien d'invitation
 async function fetchInviteLink() {
   isLoadingInviteLink.value = true
@@ -771,6 +803,14 @@ onUnmounted(() => {
           <h1 class="text-3xl font-pirate">
             {{ groupData?.group.name }}
           </h1>
+          <UButton
+            v-if="isChef"
+            icon="i-lucide-pencil"
+            size="xs"
+            variant="ghost"
+            :title="$t('groupPage.editName')"
+            @click="openEditNameModal"
+          />
         </div>
         <div class="flex items-center gap-4">
           <UBadge
@@ -1431,6 +1471,47 @@ onUnmounted(() => {
                 icon="i-lucide-trash-2"
                 :loading="isDeleting"
                 @click="handleDelete"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal Modifier le nom -->
+    <UModal v-model:open="isEditNameModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-xl font-semibold">
+              {{ $t('groupPage.editNameTitle') }}
+            </h2>
+          </template>
+          <div class="space-y-4">
+            <UFormField :label="$t('groupPage.groupName')">
+              <UInput
+                v-model="editedGroupName"
+                :placeholder="$t('groupPage.groupNamePlaceholder')"
+                icon="i-lucide-users"
+                class="w-full"
+                @keyup.enter="handleEditName"
+              />
+            </UFormField>
+          </div>
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton
+                :label="$t('common.cancel')"
+                color="neutral"
+                variant="outline"
+                @click="isEditNameModalOpen = false"
+              />
+              <UButton
+                :label="$t('common.save')"
+                icon="i-lucide-check"
+                :loading="isEditingName"
+                :disabled="!editedGroupName.trim()"
+                @click="handleEditName"
               />
             </div>
           </template>
