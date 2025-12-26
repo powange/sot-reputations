@@ -278,13 +278,11 @@ export function generateTranslationBookmarkletCode(siteUrl: string): string {
 
   // Lancer la récupération
   async function fetchAllLanguages() {
-    updateProgress();
-
     for (const lang of languages) {
+      updateProgress();
       try {
         results[lang.code] = await fetchLanguage(lang);
         currentStep++;
-        updateProgress();
       } catch (error) {
         // Afficher l'erreur
         modal.innerHTML = \`
