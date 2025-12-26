@@ -1,10 +1,36 @@
 <script setup lang="ts">
+import { generateTranslationBookmarkletCode, minifyTranslationBookmarkletCode, TRANSLATION_BOOKMARKLET_VERSION } from '~/utils/translation-bookmarklet'
+
 const { isAdminOrModerator, isAuthenticated } = useAuth()
 const toast = useToast()
+const route = useRoute()
+const config = useRuntimeConfig()
 
 useSeoMeta({
   title: 'Traductions - Administration'
 })
+
+// Bookmarklet - utilise l'URL courante pour fonctionner sur tous les environnements
+const siteUrl = computed(() => {
+  if (import.meta.client) {
+    return window.location.origin
+  }
+  return config.public.siteUrl || 'https://reputations.sot.powange.com'
+})
+const bookmarkletCode = computed(() => generateTranslationBookmarkletCode(siteUrl.value))
+const bookmarkletUrl = computed(() => minifyTranslationBookmarkletCode(bookmarkletCode.value))
+const copiedBookmarklet = ref(false)
+
+async function copyBookmarklet() {
+  try {
+    await navigator.clipboard.writeText(bookmarkletUrl.value)
+    copiedBookmarklet.value = true
+    toast.add({ title: 'Code copie', color: 'success' })
+    setTimeout(() => copiedBookmarklet.value = false, 3000)
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Impossible de copier', color: 'error' })
+  }
+}
 
 // Redirection si non admin/moderateur
 watchEffect(() => {
@@ -566,6 +592,210 @@ const stats = computed(() => {
 
   return { total, completeEn, completeEs, complete }
 })
+
+// ============ IMPORT VIA BOOKMARKLET ============
+
+interface BookmarkletData {
+  fr: GameJson
+  en: GameJson
+  es: GameJson
+}
+
+const isLoadingBookmarkletData = ref(false)
+const bookmarkletData = ref<BookmarkletData | null>(null)
+
+// Vérifier si on a un code d'import dans l'URL (attendre que les emblèmes soient chargés)
+watch(
+  () => status.value,
+  async (newStatus) => {
+    if (newStatus === 'success') {
+      const importCode = route.query.import as string
+      if (importCode && !bookmarkletData.value) {
+        await loadBookmarkletData(importCode)
+      }
+    }
+  },
+  { immediate: true }
+)
+
+// Charger les données depuis le code temporaire
+async function loadBookmarkletData(code: string) {
+  isLoadingBookmarkletData.value = true
+  try {
+    const response = await $fetch<{ success: boolean; data: BookmarkletData }>('/api/admin/import-translations-temp', {
+      query: { code }
+    })
+    if (response.success && response.data) {
+      bookmarkletData.value = response.data
+      // Lancer l'import automatique pour les deux langues
+      runBookmarkletImport()
+    }
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({
+      title: 'Erreur',
+      description: err.data?.message || 'Impossible de charger les donnees',
+      color: 'error'
+    })
+  } finally {
+    isLoadingBookmarkletData.value = false
+    // Nettoyer l'URL
+    if (import.meta.client) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('import')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+}
+
+// Lancer l'import avec les données du bookmarklet (EN + ES)
+function runBookmarkletImport() {
+  if (!bookmarkletData.value || !emblems.value) return
+
+  const frJson = bookmarkletData.value.fr
+  const enJson = bookmarkletData.value.en
+  const esJson = bookmarkletData.value.es
+
+  // Mapping nom FR -> image depuis JSON FR
+  const frNameToImage = buildFrenchNameToImageMap(frJson)
+
+  // Mapping image -> traductions EN et ES
+  const enEmblemsByImage = extractEmblemsByImage(enJson)
+  const esEmblemsByImage = extractEmblemsByImage(esJson)
+
+  // Stats
+  let alreadyTranslated = 0
+  let noMatchInFrJson = 0
+  let noMatchByImage = 0
+
+  // Trouver les correspondances
+  const matches: Array<{
+    emblem: EmblemWithTranslations
+    en: { name: string; description: string } | null
+    es: { name: string; description: string } | null
+  }> = []
+
+  for (const emblem of emblems.value) {
+    // Vérifier si les deux traductions existent déjà
+    const hasEn = emblem.translations.en?.name && emblem.translations.en?.description
+    const hasEs = emblem.translations.es?.name && emblem.translations.es?.description
+    if (hasEn && hasEs) {
+      alreadyTranslated++
+      continue
+    }
+
+    // Trouver l'image via le nom FR
+    const imageUrl = frNameToImage.get(emblem.key)
+    if (!imageUrl) {
+      noMatchInFrJson++
+      continue
+    }
+
+    // Récupérer les traductions
+    const enTranslation = hasEn ? null : enEmblemsByImage.get(imageUrl) || null
+    const esTranslation = hasEs ? null : esEmblemsByImage.get(imageUrl) || null
+
+    if (enTranslation || esTranslation) {
+      matches.push({
+        emblem,
+        en: enTranslation,
+        es: esTranslation
+      })
+    } else {
+      noMatchByImage++
+    }
+  }
+
+  console.log('=== Diagnostic Import Bookmarklet ===')
+  console.log(`Emblèmes dans la base: ${emblems.value.length}`)
+  console.log(`Déjà traduits (EN+ES): ${alreadyTranslated}`)
+  console.log(`Pas trouvé dans JSON FR: ${noMatchInFrJson}`)
+  console.log(`Pas de correspondance par image: ${noMatchByImage}`)
+  console.log(`Correspondances trouvées: ${matches.length}`)
+
+  if (matches.length === 0) {
+    toast.add({
+      title: 'Aucune correspondance',
+      description: `${alreadyTranslated} emblème(s) déjà traduit(s)`,
+      color: 'warning'
+    })
+    bookmarkletData.value = null
+    return
+  }
+
+  // Lancer l'import en masse
+  importAllFromBookmarklet(matches)
+}
+
+// Importer toutes les traductions trouvées
+const isImportingFromBookmarklet = ref(false)
+
+async function importAllFromBookmarklet(matches: Array<{
+  emblem: EmblemWithTranslations
+  en: { name: string; description: string } | null
+  es: { name: string; description: string } | null
+}>) {
+  isImportingFromBookmarklet.value = true
+  let savedCount = 0
+  let errorCount = 0
+
+  for (const match of matches) {
+    try {
+      const translations = []
+
+      // Ajouter traduction EN (nouvelle ou existante)
+      if (match.en) {
+        translations.push({
+          locale: 'en',
+          name: match.en.name || null,
+          description: match.en.description || null
+        })
+      } else if (match.emblem.translations.en) {
+        translations.push({
+          locale: 'en',
+          name: match.emblem.translations.en.name || null,
+          description: match.emblem.translations.en.description || null
+        })
+      }
+
+      // Ajouter traduction ES (nouvelle ou existante)
+      if (match.es) {
+        translations.push({
+          locale: 'es',
+          name: match.es.name || null,
+          description: match.es.description || null
+        })
+      } else if (match.emblem.translations.es) {
+        translations.push({
+          locale: 'es',
+          name: match.emblem.translations.es.name || null,
+          description: match.emblem.translations.es.description || null
+        })
+      }
+
+      if (translations.length > 0) {
+        await $fetch(`/api/admin/emblems/${match.emblem.id}/translations`, {
+          method: 'PUT',
+          body: { translations }
+        })
+        savedCount++
+      }
+    } catch {
+      errorCount++
+    }
+  }
+
+  isImportingFromBookmarklet.value = false
+  bookmarkletData.value = null
+
+  toast.add({
+    title: 'Import termine',
+    description: `${savedCount} traduction(s) sauvegardee(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
+    color: errorCount > 0 ? 'warning' : 'success'
+  })
+
+  refresh()
+}
 </script>
 
 <template>
@@ -638,6 +868,59 @@ const stats = computed(() => {
       </UCard>
     </div>
 
+    <!-- Bookmarklet -->
+    <UCard class="mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="p-2 rounded-lg bg-primary/10">
+            <UIcon name="i-lucide-bookmark" class="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h3 class="font-semibold">Import automatique via Bookmarklet</h3>
+            <p class="text-sm text-muted">
+              Recupere automatiquement les traductions FR, EN et ES depuis Sea of Thieves
+              <span class="text-xs">(v{{ TRANSLATION_BOOKMARKLET_VERSION }})</span>
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a
+            :href="bookmarkletUrl"
+            draggable="true"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium cursor-grab active:cursor-grabbing select-none text-sm"
+            @click.prevent
+          >
+            <span>⚓</span>
+            <span>Import Traductions</span>
+          </a>
+          <UButton
+            :icon="copiedBookmarklet ? 'i-lucide-check' : 'i-lucide-copy'"
+            variant="outline"
+            size="sm"
+            @click="copyBookmarklet"
+          />
+        </div>
+      </div>
+    </UCard>
+
+    <!-- Loading import bookmarklet -->
+    <div
+      v-if="isLoadingBookmarkletData || isImportingFromBookmarklet"
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+    >
+      <UCard class="max-w-md">
+        <div class="text-center py-4">
+          <UIcon name="i-lucide-loader-2" class="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <h3 class="text-lg font-semibold mb-2">
+            {{ isLoadingBookmarkletData ? 'Chargement des donnees...' : 'Import en cours...' }}
+          </h3>
+          <p class="text-sm text-muted">
+            {{ isLoadingBookmarkletData ? 'Recuperation des traductions' : 'Sauvegarde des traductions EN et ES' }}
+          </p>
+        </div>
+      </UCard>
+    </div>
+
     <!-- Recherche, Filtres et Import -->
     <div class="flex flex-wrap items-center gap-4 mb-6">
       <UInput
@@ -660,7 +943,7 @@ const stats = computed(() => {
       />
       <UButton
         icon="i-lucide-upload"
-        label="Import automatique"
+        label="Import manuel (JSON)"
         variant="soft"
         @click="openImportModal"
       />
