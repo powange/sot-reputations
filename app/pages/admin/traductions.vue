@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { generateTranslationBookmarkletCode, minifyTranslationBookmarkletCode, TRANSLATION_BOOKMARKLET_VERSION } from '~/utils/translation-bookmarklet'
 
+// Désactiver le SSR pour cette page admin (évite les erreurs d'hydratation)
+definePageMeta({
+  ssr: false
+})
+
 const { isAdminOrModerator, isAuthenticated } = useAuth()
 const toast = useToast()
 const route = useRoute()
@@ -11,15 +16,13 @@ useSeoMeta({
 })
 
 // Bookmarklet - utilise l'URL courante pour fonctionner sur tous les environnements
-const siteUrl = computed(() => {
-  if (import.meta.client) {
-    return window.location.origin
-  }
-  return config.public.siteUrl || 'https://reputations.sot.powange.com'
-})
+const siteUrl = ref(config.public.siteUrl || 'https://reputations.sot.powange.com')
 const bookmarkletCode = computed(() => generateTranslationBookmarkletCode(siteUrl.value))
 const bookmarkletUrl = computed(() => minifyTranslationBookmarkletCode(bookmarkletCode.value))
 const copiedBookmarklet = ref(false)
+
+// Mettre à jour l'URL côté client pour éviter hydration mismatch
+// (déplacé dans le onMounted principal plus bas)
 
 async function copyBookmarklet() {
   try {
@@ -54,13 +57,16 @@ interface EmblemWithTranslations {
   translations: Record<string, { name: string | null; description: string | null }>
 }
 
-const { data: emblems, status, refresh } = await useFetch<EmblemWithTranslations[]>('/api/admin/translations')
+const { data: emblems, status, refresh } = useLazyFetch<EmblemWithTranslations[]>('/api/admin/translations')
 
 // Recherche
 const searchQuery = ref('')
 
 // Filtre par statut de traduction
 const translationFilter = ref<'all' | 'missing_en' | 'missing_es' | 'complete'>('all')
+
+// Mode chaîne de traduction (déclaré ici car utilisé dans isEditModalOpen)
+const isChainMode = ref(false)
 
 // Emblème en cours d'édition
 const editingEmblem = ref<EmblemWithTranslations | null>(null)
@@ -167,8 +173,7 @@ interface MatchedTranslation {
   translatedDescription: string
 }
 
-// Mode chaîne de traduction
-const isChainMode = ref(false)
+// Données du mode chaîne
 const matchedTranslations = ref<MatchedTranslation[]>([])
 const currentMatchIndex = ref(0)
 const chainStats = ref({ saved: 0, skipped: 0 })
@@ -356,7 +361,7 @@ function analyzeJsons() {
       description: `${matches.length} correspondance(s) trouvée(s)`,
       color: 'success'
     })
-  } catch (e) {
+  } catch {
     toast.add({
       title: 'Erreur JSON',
       description: 'Format JSON invalide. Vérifiez vos données.',
@@ -375,7 +380,6 @@ function openChainTranslation() {
   editingEmblem.value = match.emblem
 
   // Pré-remplir seulement la langue cible
-  const otherLocale = targetLocale.value === 'en' ? 'es' : 'en'
   editForm.value = {
     en: targetLocale.value === 'en'
       ? { name: match.translatedName, description: match.translatedDescription }
@@ -604,15 +608,23 @@ interface BookmarkletData {
 const isLoadingBookmarkletData = ref(false)
 const bookmarkletData = ref<BookmarkletData | null>(null)
 
-// Vérifier si on a un code d'import dans l'URL (attendre que les emblèmes soient chargés)
+// Vérifier si on a un code d'import dans l'URL (uniquement côté client)
+const importCodeProcessed = ref(false)
+
+onMounted(() => {
+  // Mettre à jour l'URL du bookmarklet avec l'origine courante
+  siteUrl.value = window.location.origin
+})
+
+// Traiter le code d'import quand les données sont prêtes
+const importCode = computed(() => route.query.import as string | undefined)
+
 watch(
-  () => status.value,
-  async (newStatus) => {
-    if (newStatus === 'success') {
-      const importCode = route.query.import as string
-      if (importCode && !bookmarkletData.value) {
-        await loadBookmarkletData(importCode)
-      }
+  [status, isAdminOrModerator, importCode],
+  async ([newStatus, isAdmin, code]) => {
+    if (code && newStatus === 'success' && isAdmin && !importCodeProcessed.value) {
+      importCodeProcessed.value = true
+      await loadBookmarkletData(code)
     }
   },
   { immediate: true }
@@ -883,23 +895,30 @@ async function importAllFromBookmarklet(matches: Array<{
             </p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <a
-            :href="bookmarkletUrl"
-            draggable="true"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium cursor-grab active:cursor-grabbing select-none text-sm"
-            @click.prevent
-          >
-            <span>⚓</span>
-            <span>Import Traductions</span>
-          </a>
-          <UButton
-            :icon="copiedBookmarklet ? 'i-lucide-check' : 'i-lucide-copy'"
-            variant="outline"
-            size="sm"
-            @click="copyBookmarklet"
-          />
-        </div>
+        <ClientOnly>
+          <div class="flex items-center gap-2">
+            <a
+              :href="bookmarkletUrl"
+              draggable="true"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium cursor-grab active:cursor-grabbing select-none text-sm"
+              @click.prevent
+            >
+              <span>⚓</span>
+              <span>Import Traductions</span>
+            </a>
+            <UButton
+              :icon="copiedBookmarklet ? 'i-lucide-check' : 'i-lucide-copy'"
+              variant="outline"
+              size="sm"
+              @click="copyBookmarklet"
+            />
+          </div>
+          <template #fallback>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-muted">Chargement...</span>
+            </div>
+          </template>
+        </ClientOnly>
       </div>
     </UCard>
 
