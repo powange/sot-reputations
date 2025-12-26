@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { user, isAuthenticated, isAdmin, logout } = useAuth()
+const { user, isAuthenticated, isAdminOrModerator, logout } = useAuth()
 const toast = useToast()
 const { t, locale, locales, setLocale } = useI18n()
 
@@ -33,7 +33,7 @@ const navItems = computed(() => {
     { label: t('nav.admin'), to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
   ]
   return items.filter(item => {
-    if (item.requiresAdmin && !isAdmin.value) return false
+    if (item.requiresAdmin && !isAdminOrModerator.value) return false
     if (item.requiresAuth && !isAuthenticated.value) return false
     return true
   })
