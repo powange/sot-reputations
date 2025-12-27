@@ -1,5 +1,5 @@
 // Version du bookmarklet - doit correspondre à BOOKMARKLET_VERSION dans server/api/bookmarklet-version.get.ts
-export const BOOKMARKLET_VERSION = 4
+export const BOOKMARKLET_VERSION = 5
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {
@@ -237,10 +237,8 @@ export function generateBookmarkletCode(siteUrl: string): string {
     return count;
   }
 
-  // Détecter la langue du site depuis l'URL (ex: /fr/, /de/, /es/)
-  const langMatch = window.location.pathname.match(/^\\/([a-z]{2})\\//);
-  const langPrefix = langMatch ? '/' + langMatch[1] : '';
-  const apiUrl = 'https://www.seaofthieves.com' + langPrefix + '/api/profilev2/reputation';
+  // Toujours utiliser l'API française (les données doivent être en FR)
+  const apiUrl = 'https://www.seaofthieves.com/fr/api/profilev2/reputation';
 
   // Récupérer les données
   fetch(apiUrl, {

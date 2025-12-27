@@ -126,9 +126,7 @@
     "step2": {
       "title": "Go to Sea of Thieves",
       "description": "Go to the reputation page on the official website and sign in with your Xbox account.",
-      "openSoT": "Open Sea of Thieves",
-      "languageWarning": "Set the site to English",
-      "languageWarningDescription": "The language selector is at the bottom of the page. This is important for the import to work correctly."
+      "openSoT": "Open Sea of Thieves"
     },
     "step3": {
       "title": "Click the bookmarklet",

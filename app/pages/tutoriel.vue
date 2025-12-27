@@ -171,19 +171,6 @@ onMounted(() => {
               icon="i-lucide-external-link"
               :label="$t('tutorial.step2.openSoT')"
             />
-
-            <UAlert
-              icon="i-lucide-globe"
-              color="warning"
-              class="mt-4"
-            >
-              <template #title>
-                {{ $t('tutorial.step2.languageWarning') }}
-              </template>
-              <template #description>
-                {{ $t('tutorial.step2.languageWarningDescription') }}
-              </template>
-            </UAlert>
           </UCard>
 
           <!-- Etape 3 -->

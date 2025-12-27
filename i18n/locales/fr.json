@@ -126,9 +126,7 @@
     "step2": {
       "title": "Aller sur Sea of Thieves",
       "description": "Rendez-vous sur la page de réputation du site officiel et connectez-vous avec votre compte Xbox.",
-      "openSoT": "Ouvrir Sea of Thieves",
-      "languageWarning": "Mettez le site en français",
-      "languageWarningDescription": "Le sélecteur de langue se trouve en bas de page. C'est important pour que l'import fonctionne correctement."
+      "openSoT": "Ouvrir Sea of Thieves"
     },
     "step3": {
       "title": "Cliquer sur le bookmarklet",
