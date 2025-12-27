@@ -91,7 +91,8 @@
   "myReputations": {
     "completedEmblems": "Emblèmes complétés",
     "completionRate": "Taux de complétion",
-    "totalEmblems": "Emblèmes totaux"
+    "totalEmblems": "Emblèmes totaux",
+    "completionByFaction": "Complétion par faction"
   },
   "components": {
     "gradeEditor": {

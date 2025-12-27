@@ -58,6 +58,9 @@ const isImportModalOpen = ref(false)
 const isDeleteModalOpen = ref(false)
 const isDeleting = ref(false)
 
+// Modal Stats par faction
+const isStatsModalOpen = ref(false)
+
 const user = computed(() => data.value?.user)
 const factions = computed(() => data.value?.factions || [])
 const hasImportedData = computed(() => !!user.value?.lastImportAt)
@@ -94,6 +97,36 @@ const completionStats = computed(() => {
     percentage: total > 0 ? (completed === total ? 100 : Math.floor((completed / total) * 100)) : 0,
     totalEmblems
   }
+})
+
+// Stats par faction
+const factionStats = computed(() => {
+  if (!hasImportedData.value) return []
+
+  return factions.value.map(faction => {
+    let completed = 0
+    let total = 0
+
+    for (const campaign of faction.campaigns) {
+      for (const emblem of campaign.emblems) {
+        const progress = emblem.progress
+        if (progress !== null && progress !== undefined) {
+          total++
+          if (progress.completed) {
+            completed++
+          }
+        }
+      }
+    }
+
+    return {
+      name: faction.name,
+      key: faction.key,
+      completed,
+      total,
+      percentage: total > 0 ? (completed === total ? 100 : Math.floor((completed / total) * 100)) : 0
+    }
+  }).sort((a, b) => b.percentage - a.percentage)
 })
 
 // Utiliser le composable de filtres
@@ -304,12 +337,16 @@ async function handleDelete() {
               {{ $t('myReputations.completedEmblems') }}
             </div>
           </div>
-          <div class="bg-muted/30 rounded-lg p-4">
+          <div
+            class="bg-muted/30 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+            @click="isStatsModalOpen = true"
+          >
             <div class="text-2xl font-bold text-primary">
               {{ completionStats.percentage }}%
             </div>
-            <div class="text-sm text-muted">
+            <div class="text-sm text-muted flex items-center gap-1">
               {{ $t('myReputations.completionRate') }}
+              <UIcon name="i-lucide-chevron-right" class="w-4 h-4" />
             </div>
           </div>
           <div class="bg-muted/30 rounded-lg p-4">
@@ -528,6 +565,63 @@ async function handleDelete() {
                   color="error"
                   :loading="isDeleting"
                   @click="handleDelete"
+                />
+              </div>
+            </template>
+          </UCard>
+        </template>
+      </UModal>
+
+      <!-- Modal Stats par faction -->
+      <UModal v-model:open="isStatsModalOpen">
+        <template #content>
+          <UCard>
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold">
+                  {{ $t('myReputations.completionByFaction') }}
+                </h2>
+                <div class="text-2xl font-bold text-primary">
+                  {{ completionStats.percentage }}%
+                </div>
+              </div>
+            </template>
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="faction in factionStats"
+                :key="faction.key"
+                class="flex items-center gap-3"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium truncate">{{ faction.name }}</span>
+                    <span class="text-sm text-muted ml-2">
+                      {{ faction.completed }}/{{ faction.total }}
+                    </span>
+                  </div>
+                  <div class="h-2 bg-muted/30 rounded-full overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="faction.percentage === 100 ? 'bg-success' : 'bg-primary'"
+                      :style="{ width: `${faction.percentage}%` }"
+                    />
+                  </div>
+                </div>
+                <div
+                  class="w-12 text-right font-bold"
+                  :class="faction.percentage === 100 ? 'text-success' : 'text-primary'"
+                >
+                  {{ faction.percentage }}%
+                </div>
+              </div>
+            </div>
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton
+                  :label="$t('common.close')"
+                  color="neutral"
+                  variant="outline"
+                  @click="isStatsModalOpen = false"
                 />
               </div>
             </template>
