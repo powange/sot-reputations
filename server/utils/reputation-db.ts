@@ -930,6 +930,94 @@ export function deleteUserReputationData(userId: number): void {
   db.prepare('UPDATE users SET last_import_at = NULL WHERE id = ?').run(userId)
 }
 
+// Informations sur les groupes dont l'utilisateur est chef
+export interface ChefGroupInfo {
+  groupId: number
+  groupUid: string
+  groupName: string
+  memberCount: number
+  members: Array<{ userId: number; username: string; role: GroupRole }>
+}
+
+// Récupère les groupes dont l'utilisateur est chef avec plus d'un membre
+export function getChefGroupsWithMembers(userId: number): ChefGroupInfo[] {
+  const db = getReputationDb()
+
+  // Récupérer les groupes dont l'utilisateur est chef
+  const chefGroups = db.prepare(`
+    SELECT g.id as groupId, g.uid as groupUid, g.name as groupName
+    FROM groups g
+    JOIN group_members gm ON g.id = gm.group_id
+    WHERE gm.user_id = ? AND gm.role = 'chef'
+  `).all(userId) as Array<{ groupId: number; groupUid: string; groupName: string }>
+
+  return chefGroups.map(group => {
+    const members = db.prepare(`
+      SELECT gm.user_id as userId, u.username, gm.role
+      FROM group_members gm
+      JOIN users u ON gm.user_id = u.id
+      WHERE gm.group_id = ? AND gm.user_id != ?
+      ORDER BY
+        CASE gm.role
+          WHEN 'moderator' THEN 1
+          ELSE 2
+        END,
+        u.username
+    `).all(group.groupId, userId) as Array<{ userId: number; username: string; role: GroupRole }>
+
+    return {
+      ...group,
+      memberCount: members.length + 1, // +1 pour le chef
+      members
+    }
+  }).filter(group => group.members.length > 0) // Seulement les groupes avec d'autres membres
+}
+
+// Supprime le compte utilisateur et gère les groupes
+export function deleteUserAccount(
+  userId: number,
+  chefTransfers: Array<{ groupId: number; newChefId: number }>
+): void {
+  const db = getReputationDb()
+
+  const transaction = db.transaction(() => {
+    // 1. Transférer les rôles de chef pour les groupes spécifiés
+    for (const transfer of chefTransfers) {
+      db.prepare(`
+        UPDATE group_members SET role = 'chef' WHERE group_id = ? AND user_id = ?
+      `).run(transfer.groupId, transfer.newChefId)
+    }
+
+    // 2. Récupérer les groupes où l'utilisateur est le seul membre
+    const soloGroups = db.prepare(`
+      SELECT g.id
+      FROM groups g
+      JOIN group_members gm ON g.id = gm.group_id
+      WHERE gm.user_id = ?
+      AND (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) = 1
+    `).all(userId) as Array<{ id: number }>
+
+    // 3. Supprimer ces groupes (les members seront supprimés en cascade)
+    for (const group of soloGroups) {
+      db.prepare('DELETE FROM groups WHERE id = ?').run(group.id)
+    }
+
+    // 4. Retirer l'utilisateur des groupes restants
+    db.prepare('DELETE FROM group_members WHERE user_id = ?').run(userId)
+
+    // 5. Supprimer les invitations en attente liées à cet utilisateur
+    db.prepare('DELETE FROM group_pending_invites WHERE user_id = ? OR invited_by = ?').run(userId, userId)
+
+    // 6. Supprimer les données de réputation
+    db.prepare('DELETE FROM user_emblems WHERE user_id = ?').run(userId)
+
+    // 7. Supprimer l'utilisateur
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+  })
+
+  transaction()
+}
+
 // ============ INVITATIONS EN ATTENTE ============
 
 export interface PendingInvite {

@@ -57,6 +57,55 @@ const isImportModalOpen = ref(false)
 // Modal Suppression
 const isDeleteModalOpen = ref(false)
 const isDeleting = ref(false)
+const deleteAccountToo = ref(false)
+const loadingChefGroups = ref(false)
+
+interface ChefGroupInfo {
+  groupId: number
+  groupUid: string
+  groupName: string
+  memberCount: number
+  members: Array<{ userId: number; username: string; role: string }>
+}
+const chefGroups = ref<ChefGroupInfo[]>([])
+const chefTransfers = ref<Record<number, number>>({})
+
+// Charger les groupes dont l'utilisateur est chef quand le switch est activé
+watch(deleteAccountToo, async (newValue) => {
+  if (newValue) {
+    loadingChefGroups.value = true
+    try {
+      const response = await $fetch<{ chefGroups: ChefGroupInfo[] }>('/api/my-account/chef-groups')
+      chefGroups.value = response.chefGroups
+      // Réinitialiser les transferts
+      chefTransfers.value = {}
+    } catch {
+      chefGroups.value = []
+    } finally {
+      loadingChefGroups.value = false
+    }
+  } else {
+    chefGroups.value = []
+    chefTransfers.value = {}
+  }
+})
+
+// Vérifier si on peut supprimer (tous les chefs doivent être désignés)
+const canDelete = computed(() => {
+  if (!deleteAccountToo.value) return true
+  if (loadingChefGroups.value) return false
+  // Vérifier que chaque groupe a un nouveau chef désigné
+  return chefGroups.value.every(group => chefTransfers.value[group.groupId])
+})
+
+// Réinitialiser le modal quand il se ferme
+watch(isDeleteModalOpen, (open) => {
+  if (!open) {
+    deleteAccountToo.value = false
+    chefGroups.value = []
+    chefTransfers.value = {}
+  }
+})
 
 // Modal Stats par faction
 const isStatsModalOpen = ref(false)
@@ -235,10 +284,26 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
 async function handleDelete() {
   isDeleting.value = true
   try {
-    await $fetch('/api/my-reputations', { method: 'DELETE' })
-    toast.add({ title: t('common.success'), description: t('reputations.dataDeleted'), color: 'success' })
-    isDeleteModalOpen.value = false
-    await refresh()
+    if (deleteAccountToo.value) {
+      // Supprimer le compte complet
+      const transfers = Object.entries(chefTransfers.value).map(([groupId, newChefId]) => ({
+        groupId: Number(groupId),
+        newChefId
+      }))
+      await $fetch('/api/my-account', {
+        method: 'DELETE',
+        body: { chefTransfers: transfers }
+      })
+      toast.add({ title: t('common.success'), description: t('reputations.accountDeleted'), color: 'success' })
+      // Rediriger vers la page d'accueil
+      navigateTo('/')
+    } else {
+      // Supprimer seulement les données de réputation
+      await $fetch('/api/my-reputations', { method: 'DELETE' })
+      toast.add({ title: t('common.success'), description: t('reputations.dataDeleted'), color: 'success' })
+      isDeleteModalOpen.value = false
+      await refresh()
+    }
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.add({ title: t('common.error'), description: err.data?.message || t('common.error'), color: 'error' })
@@ -536,7 +601,7 @@ async function handleDelete() {
           <UCard>
             <template #header>
               <h2 class="text-xl font-semibold text-error">
-                {{ $t('reputations.deleteMyData') }}
+                {{ deleteAccountToo ? $t('reputations.deleteMyAccount') : $t('reputations.deleteMyData') }}
               </h2>
             </template>
             <div class="space-y-4">
@@ -546,10 +611,52 @@ async function handleDelete() {
                 :title="$t('reputations.deleteWarning')"
               >
                 <template #description>
-                  {{ $t('reputations.deleteWarningMessage') }}
+                  {{ deleteAccountToo ? $t('reputations.deleteAccountWarningMessage') : $t('reputations.deleteWarningMessage') }}
                 </template>
               </UAlert>
-              <p>{{ $t('reputations.deleteConfirm') }}</p>
+
+              <!-- Switch pour supprimer le compte -->
+              <div class="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                <USwitch v-model="deleteAccountToo" />
+                <div>
+                  <div class="font-medium">{{ $t('reputations.deleteAccountToo') }}</div>
+                  <div class="text-sm text-muted">{{ $t('reputations.deleteAccountTooDescription') }}</div>
+                </div>
+              </div>
+
+              <!-- Sélection des nouveaux chefs si nécessaire -->
+              <div v-if="deleteAccountToo && loadingChefGroups" class="flex justify-center py-4">
+                <UIcon name="i-lucide-loader-2" class="w-6 h-6 animate-spin text-primary" />
+              </div>
+
+              <div v-if="deleteAccountToo && !loadingChefGroups && chefGroups.length > 0" class="space-y-4">
+                <UAlert
+                  icon="i-lucide-crown"
+                  color="warning"
+                  :title="$t('reputations.transferChefTitle')"
+                >
+                  <template #description>
+                    {{ $t('reputations.transferChefDescription') }}
+                  </template>
+                </UAlert>
+
+                <div
+                  v-for="group in chefGroups"
+                  :key="group.groupId"
+                  class="p-3 border border-muted rounded-lg space-y-2"
+                >
+                  <div class="font-medium">{{ group.groupName }}</div>
+                  <USelect
+                    v-model="chefTransfers[group.groupId]"
+                    :placeholder="$t('reputations.selectNewChef')"
+                    :items="group.members.map(m => ({ label: m.username, value: m.userId }))"
+                    class="w-full"
+                  />
+                </div>
+              </div>
+
+              <p v-if="!deleteAccountToo">{{ $t('reputations.deleteConfirm') }}</p>
+              <p v-else>{{ $t('reputations.deleteAccountConfirm') }}</p>
             </div>
             <template #footer>
               <div class="flex justify-end gap-2">
@@ -564,6 +671,7 @@ async function handleDelete() {
                   icon="i-lucide-trash-2"
                   color="error"
                   :loading="isDeleting"
+                  :disabled="!canDelete"
                   @click="handleDelete"
                 />
               </div>
