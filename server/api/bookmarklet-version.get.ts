@@ -1,6 +1,4 @@
-// Version actuelle du bookmarklet
-// Incrémenter cette valeur à chaque modification du bookmarklet
-export const BOOKMARKLET_VERSION = 5
+import { BOOKMARKLET_VERSION } from '~/utils/bookmarklet'
 
 export default defineEventHandler(() => {
   return {

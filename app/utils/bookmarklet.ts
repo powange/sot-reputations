@@ -1,4 +1,4 @@
-// Version du bookmarklet - doit correspondre à BOOKMARKLET_VERSION dans server/api/bookmarklet-version.get.ts
+// Version du bookmarklet - utilisée par l'API /api/bookmarklet-version
 export const BOOKMARKLET_VERSION = 5
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
