@@ -57,6 +57,8 @@ async function handleLogout() {
 
 <template>
   <UApp>
+    <!-- Easter egg: Konami code -->
+    <SharkEasterEgg />
     <UHeader>
       <template #left>
         <NuxtLink to="/" class="flex items-center gap-2">
