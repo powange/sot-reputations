@@ -43,11 +43,11 @@ export default defineNuxtConfig({
 
   vite: {
     server: {
-      allowedHosts: ['dev.reputations.sot.powange.com'],
-      origin: 'https://dev.reputations.sot.powange.com',
+      allowedHosts: ['dev.achievements-sot.powange.com'],
+      origin: 'https://dev.achievements-sot.powange.com',
       hmr: {
         protocol: 'wss',
-        host: 'dev.reputations.sot.powange.com',
+        host: 'dev.achievements-sot.powange.com',
         clientPort: 443
       },
       fs: {
@@ -66,7 +66,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://reputations.sot.powange.com'
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://achievements-sot.powange.com'
     },
     oauth: {
       microsoft: {

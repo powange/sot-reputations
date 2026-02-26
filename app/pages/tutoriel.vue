@@ -9,7 +9,7 @@ useSeoMeta({
 })
 
 const config = useRuntimeConfig()
-const siteUrl = config.public.siteUrl || 'https://reputations.sot.powange.com'
+const siteUrl = config.public.siteUrl || 'https://achievements-sot.powange.com'
 
 // Code du bookmarklet
 const bookmarkletCode = computed(() => generateBookmarkletCode(siteUrl))

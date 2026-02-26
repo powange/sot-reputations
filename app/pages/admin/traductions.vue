@@ -16,7 +16,7 @@ useSeoMeta({
 })
 
 // Bookmarklet - utilise l'URL courante pour fonctionner sur tous les environnements
-const siteUrl = ref(config.public.siteUrl || 'https://reputations.sot.powange.com')
+const siteUrl = ref(config.public.siteUrl || 'https://achievements-sot.powange.com')
 const bookmarkletCode = computed(() => generateTranslationBookmarkletCode(siteUrl.value))
 const bookmarkletUrl = computed(() => minifyTranslationBookmarkletCode(bookmarkletCode.value))
 const copiedBookmarklet = ref(false)
