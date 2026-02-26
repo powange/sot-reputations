@@ -1,5 +1,5 @@
 // Version du bookmarklet - utilisée par l'API /api/bookmarklet-version
-export const BOOKMARKLET_VERSION = 5
+export const BOOKMARKLET_VERSION = 6
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {

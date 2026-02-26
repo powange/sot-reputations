@@ -1,5 +1,5 @@
 // Version du bookmarklet traductions
-export const TRANSLATION_BOOKMARKLET_VERSION = 1
+export const TRANSLATION_BOOKMARKLET_VERSION = 2
 
 // Génère le code du bookmarklet pour les traductions (récupère FR, EN, ES)
 export function generateTranslationBookmarkletCode(siteUrl: string): string {
