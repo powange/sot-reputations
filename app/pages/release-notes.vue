@@ -31,7 +31,7 @@ const filteredNotes = computed(() => {
     )
   }
 
-  return releaseNotes.value
+  return []
 })
 
 const versionOptions = computed(() => {
