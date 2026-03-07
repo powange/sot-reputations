@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-const { isAdmin, isAuthenticated, user: currentUser } = useAuth()
+const { isAdmin, isAuthenticated, saveRedirectUrl, user: currentUser } = useAuth()
 const toast = useToast()
 
 useSeoMeta({
@@ -11,7 +11,10 @@ useSeoMeta({
 // Redirection si non admin
 watchEffect(() => {
   if (import.meta.client) {
-    if (!isAuthenticated.value || !isAdmin.value) {
+    if (!isAuthenticated.value) {
+      saveRedirectUrl()
+      navigateTo('/')
+    } else if (!isAdmin.value) {
       navigateTo('/')
     }
   }

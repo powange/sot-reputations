@@ -42,8 +42,21 @@ const factionsWithCampaigns = computed(() => {
 const hasMultipleCampaigns = computed(() => factionsWithCampaigns.value.length > 0)
 
 // Sélectionner toutes les campagnes quand on change de factions
+// Mais préserver la sélection initiale venant de l'URL
+let isFirstRun = true
 watch(selectedFactions, (factions) => {
   const allCampaignIds = factions.flatMap(f => f.campaigns.map(c => c.id))
+
+  if (isFirstRun) {
+    isFirstRun = false
+    // Au premier run, garder les campagnes de l'URL si elles sont valides
+    const validFromUrl = selectedCampaignIds.value.filter(id => allCampaignIds.includes(id))
+    if (validFromUrl.length > 0) {
+      selectedCampaignIds.value = validFromUrl
+      return
+    }
+  }
+
   selectedCampaignIds.value = allCampaignIds
 }, { immediate: true })
 

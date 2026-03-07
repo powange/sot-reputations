@@ -6,7 +6,7 @@ definePageMeta({
   ssr: false
 })
 
-const { isAdminOrModerator, isAuthenticated } = useAuth()
+const { isAdminOrModerator, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -38,7 +38,10 @@ async function copyBookmarklet() {
 // Redirection si non admin/moderateur
 watchEffect(() => {
   if (import.meta.client) {
-    if (!isAuthenticated.value || !isAdminOrModerator.value) {
+    if (!isAuthenticated.value) {
+      saveRedirectUrl()
+      navigateTo('/')
+    } else if (!isAdminOrModerator.value) {
       navigateTo('/')
     }
   }

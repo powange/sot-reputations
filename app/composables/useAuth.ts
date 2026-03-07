@@ -29,6 +29,23 @@ export function useAuth() {
     await clear()
   }
 
+  // Sauvegarder l'URL courante pour y revenir après connexion
+  function saveRedirectUrl() {
+    const route = useRoute()
+    if (route.fullPath !== '/') {
+      const cookie = useCookie('redirectTo', { maxAge: 300 })
+      cookie.value = route.fullPath
+    }
+  }
+
+  // Consommer l'URL de redirection après connexion
+  function consumeRedirectUrl(): string {
+    const cookie = useCookie('redirectTo')
+    const url = cookie.value || '/'
+    cookie.value = null
+    return url
+  }
+
   // Connexion via Microsoft/Xbox
   function loginWithMicrosoft() {
     window.location.href = '/auth/microsoft'
@@ -56,6 +73,8 @@ export function useAuth() {
     fetchUser,
     login,
     logout,
-    loginWithMicrosoft
+    loginWithMicrosoft,
+    saveRedirectUrl,
+    consumeRedirectUrl
   }
 }

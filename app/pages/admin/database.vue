@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { isAdmin, isAuthenticated } = useAuth()
+const { isAdmin, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
 
 useSeoMeta({
@@ -9,7 +9,10 @@ useSeoMeta({
 // Redirection si non admin
 watchEffect(() => {
   if (import.meta.client) {
-    if (!isAuthenticated.value || !isAdmin.value) {
+    if (!isAuthenticated.value) {
+      saveRedirectUrl()
+      navigateTo('/')
+    } else if (!isAdmin.value) {
       navigateTo('/')
     }
   }

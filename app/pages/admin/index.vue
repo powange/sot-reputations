@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const { t } = useI18n()
-const { isAdmin, isAdminOrModerator, isAuthenticated } = useAuth()
+const { isAdmin, isAdminOrModerator, isAuthenticated, saveRedirectUrl } = useAuth()
 
 useSeoMeta({
   title: () => `${t('admin.title')} - SoT Reputations`
@@ -10,6 +10,7 @@ useSeoMeta({
 watchEffect(() => {
   if (import.meta.client) {
     if (!isAuthenticated.value) {
+      saveRedirectUrl()
       navigateTo('/')
     } else if (!isAdminOrModerator.value) {
       navigateTo('/')

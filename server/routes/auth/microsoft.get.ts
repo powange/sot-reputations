@@ -181,7 +181,11 @@ export default defineEventHandler(async (event) => {
       }
     })
 
-    return sendRedirect(event, '/')
+    // Rediriger vers l'URL sauvegardée ou la page d'accueil
+    const redirectTo = getCookie(event, 'redirectTo') || '/'
+    const safeRedirect = redirectTo.startsWith('/') && !redirectTo.includes('//') ? redirectTo : '/'
+    deleteCookie(event, 'redirectTo')
+    return sendRedirect(event, safeRedirect)
 
   } catch (error) {
     console.error('Microsoft OAuth error:', error)

@@ -3,7 +3,7 @@ type GroupRole = 'chef' | 'moderator' | 'member'
 
 const { t } = useI18n()
 const toast = useToast()
-const { user, isAuthenticated, isLoading, loginWithMicrosoft } = useAuth()
+const { user, isAuthenticated, isLoading, loginWithMicrosoft, consumeRedirectUrl } = useAuth()
 const { groups, pendingInvites, isLoadingGroups, fetchGroups, createGroup, fetchPendingInvites, acceptInvite, rejectInvite } = useGroups()
 
 // Labels des rôles
@@ -35,8 +35,14 @@ const newGroupName = ref('')
 const isCreatingGroup = ref(false)
 
 // Charger les groupes et invitations si connecté
+// Et rediriger vers l'URL sauvegardée si elle existe
 watch(isAuthenticated, async (authenticated) => {
   if (authenticated) {
+    const redirectTo = consumeRedirectUrl()
+    if (redirectTo !== '/') {
+      navigateTo(redirectTo)
+      return
+    }
     await Promise.all([fetchGroups(), fetchPendingInvites()])
   }
 }, { immediate: true })

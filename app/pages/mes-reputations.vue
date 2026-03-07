@@ -38,8 +38,10 @@ function getTranslatedText(
   return emblem[field]
 }
 
-// Rediriger si non connecté
+// Rediriger si non connecté (en sauvegardant l'URL pour y revenir après connexion)
+const { saveRedirectUrl } = useAuth()
 if (!isAuthenticated.value) {
+  saveRedirectUrl()
   navigateTo('/')
 }
 
