@@ -4,6 +4,7 @@
     "myGroups": "Mis Grupos",
     "tutorial": "Tutorial",
     "admin": "Admin",
+    "releaseNotes": "Notas de version",
     "logout": "Cerrar sesion"
   },
   "common": {
@@ -364,5 +365,14 @@
       "title": "Ley Aplicable",
       "content": "Estos avisos legales estan sujetos a la ley francesa. En caso de disputa, los tribunales franceses tendran jurisdiccion exclusiva."
     }
+  },
+  "releaseNotes": {
+    "title": "Notas de version",
+    "subtitle": "Historial de actualizaciones de Sea of Thieves",
+    "noNotes": "No hay notas de version disponibles por el momento.",
+    "selectVersion": "Seleccionar una version",
+    "search": "Buscar en las notas...",
+    "results": "{count} / {total} notas",
+    "noResults": "Sin resultados para esta busqueda."
   }
 }

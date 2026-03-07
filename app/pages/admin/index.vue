@@ -83,6 +83,21 @@ watchEffect(() => {
         </UCard>
       </NuxtLink>
 
+      <!-- Notes de version - Admin et Moderateurs -->
+      <NuxtLink to="/admin/release-notes" class="block">
+        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-lg bg-primary/10">
+              <UIcon name="i-lucide-scroll-text" class="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 class="font-semibold">Notes de version</h3>
+              <p class="text-sm text-muted">Importer les notes de mise à jour depuis le site SoT</p>
+            </div>
+          </div>
+        </UCard>
+      </NuxtLink>
+
       <!-- Base de donnees - Admin seulement -->
       <NuxtLink v-if="isAdmin" to="/admin/database" class="block">
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">

@@ -4,6 +4,7 @@
     "myGroups": "My Groups",
     "tutorial": "Tutorial",
     "admin": "Admin",
+    "releaseNotes": "Release Notes",
     "logout": "Logout"
   },
   "common": {
@@ -364,5 +365,14 @@
       "title": "Applicable Law",
       "content": "These legal notices are subject to French law. In case of dispute, French courts shall have exclusive jurisdiction."
     }
+  },
+  "releaseNotes": {
+    "title": "Release Notes",
+    "subtitle": "Sea of Thieves update history",
+    "noNotes": "No release notes available yet.",
+    "selectVersion": "Select a version",
+    "search": "Search in notes...",
+    "results": "{count} / {total} notes",
+    "noResults": "No results for this search."
   }
 }

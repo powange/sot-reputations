@@ -30,6 +30,7 @@ const navItems = computed(() => {
     { label: t('nav.myReputations'), to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true, requiresAdmin: false },
     { label: t('nav.myGroups'), to: '/', icon: 'i-lucide-users', requiresAuth: true, requiresAdmin: false },
     { label: t('nav.tutorial'), to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false, requiresAdmin: false },
+    { label: t('nav.releaseNotes'), to: '/release-notes', icon: 'i-lucide-scroll-text', requiresAuth: false, requiresAdmin: false },
     { label: t('nav.admin'), to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
   ]
   return items.filter(item => {

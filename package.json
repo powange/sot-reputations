@@ -17,8 +17,11 @@
     "@nuxt/fonts": "^0.11.4",
     "@nuxt/ui": "^4.2.1",
     "@nuxtjs/i18n": "^10.2.1",
+    "@tailwindcss/typography": "^0.5.19",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.5.0",
+    "marked": "^17.0.4",
+    "node-html-parser": "^7.1.0",
     "nuxt": "^4.2.1",
     "nuxt-auth-utils": "^0.5.26"
   },
