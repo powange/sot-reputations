@@ -88,7 +88,8 @@ function htmlToMarkdown(html: string): string {
     /#{1,4}\s*Connect With Us:?\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
     /#{1,4}\s*Download and Installation\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
     /#{1,4}\s*Known Issues\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
-    /#{1,4}\s*Full Release Notes\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi
+    /#{1,4}\s*Full Release Notes\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
+    /#{1,4}\s*Looking For Crew\??\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi
   ]
   for (const regex of sectionsToRemove) {
     markdown = markdown.replace(regex, '')
