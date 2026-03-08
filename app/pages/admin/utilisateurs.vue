@@ -115,6 +115,43 @@ function getSiteRoleOrder(user: User): number {
   return 2
 }
 
+const deletingUserId = ref<number | null>(null)
+const deletingGroupUid = ref<string | null>(null)
+
+async function deleteUser(user: User) {
+  if (!confirm(`Supprimer l'utilisateur "${user.username}" ? Cette action est irréversible.`)) return
+  deletingUserId.value = user.id
+  try {
+    await $fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' })
+    toast.add({
+      title: `${user.username} supprimé`,
+      color: 'success'
+    })
+    await refresh()
+  } catch {
+    toast.add({ title: 'Erreur de suppression', color: 'error' })
+  } finally {
+    deletingUserId.value = null
+  }
+}
+
+async function deleteGroup(group: UserGroup) {
+  if (!confirm(`Supprimer le groupe "${group.name}" et tous ses membres ? Cette action est irréversible.`)) return
+  deletingGroupUid.value = group.uid
+  try {
+    await $fetch(`/api/admin/groups/${group.uid}`, { method: 'DELETE' })
+    toast.add({
+      title: `Groupe "${group.name}" supprimé`,
+      color: 'success'
+    })
+    await refresh()
+  } catch {
+    toast.add({ title: 'Erreur de suppression du groupe', color: 'error' })
+  } finally {
+    deletingGroupUid.value = null
+  }
+}
+
 async function changeUserRole(user: User, newRole: string) {
   try {
     await $fetch(`/api/admin/users/${user.id}/role`, {
@@ -220,6 +257,10 @@ const columns: TableColumn<User>[] = [
       'Dernier import',
       h(resolveComponent('UIcon'), { name: getSortIcon('lastImportAt'), class: 'w-4 h-4' })
     ])
+  },
+  {
+    id: 'actions',
+    header: ''
   }
 ]
 
@@ -407,15 +448,27 @@ watch(totalPages, (newTotal) => {
               v-if="row.original.groups.length > 0"
               class="flex flex-wrap gap-1"
             >
-              <UBadge
+              <div
                 v-for="group in row.original.groups"
                 :key="group.uid"
-                :color="roleColors[group.role] || 'neutral'"
-                size="lg"
-                variant="subtle"
+                class="flex items-center gap-0.5"
               >
-                {{ group.name }} ({{ roleLabels[group.role] || group.role }})
-              </UBadge>
+                <UBadge
+                  :color="roleColors[group.role] || 'neutral'"
+                  size="lg"
+                  variant="subtle"
+                >
+                  {{ group.name }} ({{ roleLabels[group.role] || group.role }})
+                </UBadge>
+                <UButton
+                  icon="i-lucide-x"
+                  size="2xs"
+                  variant="ghost"
+                  color="error"
+                  :loading="deletingGroupUid === group.uid"
+                  @click="deleteGroup(group)"
+                />
+              </div>
             </div>
             <span
               v-else
@@ -429,6 +482,18 @@ watch(totalPages, (newTotal) => {
 
           <template #lastImportAt-cell="{ row }">
             <span class="text-muted">{{ formatDate(row.original.lastImportAt) }}</span>
+          </template>
+
+          <template #actions-cell="{ row }">
+            <UButton
+              v-if="row.original.id !== currentUser?.id"
+              icon="i-lucide-trash-2"
+              size="xs"
+              variant="ghost"
+              color="error"
+              :loading="deletingUserId === row.original.id"
+              @click="deleteUser(row.original)"
+            />
           </template>
         </UTable>
       </div>
