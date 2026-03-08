@@ -293,81 +293,113 @@ function formatDate(dateStr: string): string {
     </div>
   </UContainer>
 
-  <!-- Header fixe de la note visible -->
+  <!-- Header fixe -->
   <div
-    v-if="visibleNote"
+    v-if="visibleNote || (debouncedSearch.trim() && filteredNotes.length > 0)"
     class="fixed top-16 left-0 right-0 z-30 bg-default/95 backdrop-blur border-b border-muted shadow-sm"
   >
     <div class="max-w-4xl mx-auto px-4 py-2 flex items-center">
-      <!-- Navigation gauche -->
-      <div class="flex items-center gap-1 min-w-0 shrink-0">
-        <template v-if="selectedVersion && releaseNotes">
+      <!-- Mode recherche -->
+      <template v-if="debouncedSearch.trim() && !selectedVersion">
+        <div
+          v-if="visibleNote"
+          class="flex items-center gap-2 shrink-0 mr-3"
+        >
+          <UBadge
+            color="primary"
+            variant="solid"
+            size="sm"
+          >
+            v{{ visibleNote.display_version || visibleNote.version }}
+          </UBadge>
+          <span class="text-muted text-sm whitespace-nowrap hidden sm:inline">
+            {{ formatDate(visibleNote.date) }}
+          </span>
+        </div>
+        <UInput
+          :model-value="search"
+          :placeholder="$t('releaseNotes.search')"
+          icon="i-lucide-search"
+          class="flex-1"
+          size="sm"
+          @update:model-value="search = String($event)"
+        />
+        <div
+          v-if="occurrenceCount > 0"
+          class="flex items-center gap-1 ml-3 shrink-0"
+        >
+          <span class="text-sm text-muted whitespace-nowrap">
+            {{ currentOccurrence }}/{{ occurrenceCount }}
+          </span>
           <UButton
+            icon="i-lucide-chevron-up"
+            size="xs"
+            variant="ghost"
+            @click="prevOccurrenceFn"
+          />
+          <UButton
+            icon="i-lucide-chevron-down"
+            size="xs"
+            variant="ghost"
+            @click="nextOccurrenceFn"
+          />
+        </div>
+        <UButton
+          icon="i-lucide-x"
+          variant="ghost"
+          size="xs"
+          class="ml-1"
+          @click="search = ''"
+        />
+      </template>
+
+      <!-- Mode version sélectionnée -->
+      <template v-else-if="visibleNote">
+        <!-- Navigation gauche -->
+        <div class="flex items-center gap-1 min-w-0 shrink-0">
+          <UButton
+            v-if="selectedVersion && releaseNotes && currentVersionIndex > 0"
             size="xs"
             variant="ghost"
             icon="i-lucide-chevron-left"
-            :label="`v${releaseNotes[currentVersionIndex - 1]?.display_version || releaseNotes[currentVersionIndex - 1]?.version || ''}`"
-            :disabled="currentVersionIndex <= 0"
+            :label="`v${releaseNotes[currentVersionIndex - 1]?.display_version || releaseNotes[currentVersionIndex - 1]?.version}`"
             @click="prevVersion"
           />
-        </template>
-      </div>
+        </div>
 
-      <!-- Centre : version + date -->
-      <div class="flex-1 flex items-center justify-center gap-2">
-        <UBadge
-          color="primary"
-          variant="solid"
-        >
-          v{{ visibleNote.display_version || visibleNote.version }}
-        </UBadge>
-        <span class="text-muted text-sm">
-          {{ formatDate(visibleNote.date) }}
-        </span>
-        <UButton
-          :to="`https://www.seaofthieves.com/release-notes/${visibleNote.display_version || visibleNote.version}`"
-          target="_blank"
-          variant="ghost"
-          icon="i-lucide-external-link"
-          size="xs"
-        />
-      </div>
-
-      <!-- Navigation droite -->
-      <div class="flex items-center gap-1 min-w-0 shrink-0">
-        <template v-if="selectedVersion && releaseNotes">
+        <!-- Centre : version + date -->
+        <div class="flex-1 flex items-center justify-center gap-2">
+          <UBadge
+            color="primary"
+            variant="solid"
+          >
+            v{{ visibleNote.display_version || visibleNote.version }}
+          </UBadge>
+          <span class="text-muted text-sm">
+            {{ formatDate(visibleNote.date) }}
+          </span>
           <UButton
+            :to="`https://www.seaofthieves.com/release-notes/${visibleNote.display_version || visibleNote.version}`"
+            target="_blank"
+            variant="ghost"
+            icon="i-lucide-external-link"
+            size="xs"
+          />
+        </div>
+
+        <!-- Navigation droite -->
+        <div class="flex items-center gap-1 min-w-0 shrink-0">
+          <UButton
+            v-if="selectedVersion && releaseNotes && currentVersionIndex < releaseNotes.length - 1"
             size="xs"
             variant="ghost"
             trailing-icon="i-lucide-chevron-right"
-            :label="`v${releaseNotes[currentVersionIndex + 1]?.display_version || releaseNotes[currentVersionIndex + 1]?.version || ''}`"
-            :disabled="currentVersionIndex >= releaseNotes.length - 1"
+            :label="`v${releaseNotes[currentVersionIndex + 1]?.display_version || releaseNotes[currentVersionIndex + 1]?.version}`"
             @click="nextVersion"
           />
-        </template>
-      </div>
+        </div>
+      </template>
     </div>
   </div>
 
-  <!-- Navigation occurrences sticky -->
-  <div
-    v-if="occurrenceCount > 0"
-    class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-default/90 backdrop-blur border border-muted rounded-full px-4 py-2 shadow-lg"
-  >
-    <span class="text-sm font-medium">
-      {{ currentOccurrence }} / {{ occurrenceCount }}
-    </span>
-    <UButton
-      icon="i-lucide-chevron-up"
-      size="xs"
-      variant="ghost"
-      @click="prevOccurrenceFn"
-    />
-    <UButton
-      icon="i-lucide-chevron-down"
-      size="xs"
-      variant="ghost"
-      @click="nextOccurrenceFn"
-    />
-  </div>
 </template>
