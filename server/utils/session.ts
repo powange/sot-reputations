@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { H3Event } from 'h3'
 import { getCookie, setCookie, deleteCookie } from 'h3'
-import { getReputationDb, type UserInfo } from './reputation-db'
+import { getReputationDb } from './reputation-db'
 
 const SESSION_COOKIE_NAME = 'session_token'
 const SESSION_DURATION_DAYS = 7
@@ -56,7 +56,7 @@ export function deleteUserSessions(userId: number): void {
 
 export function cleanExpiredSessions(): void {
   const db = getReputationDb()
-  db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run()
+  db.prepare('DELETE FROM sessions WHERE expires_at <= datetime(\'now\')').run()
 }
 
 export function getSessionFromEvent(event: H3Event): SessionUser | null {

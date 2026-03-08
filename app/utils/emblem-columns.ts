@@ -26,7 +26,7 @@ export function createMaxColumn<T extends BaseTableRow>(): TableColumn<T> {
 /**
  * Crée la colonne "Progression" pour un utilisateur unique
  */
-export function createProgressColumn<T extends { progress: string; completed: boolean; hasProgress: boolean }>(): TableColumn<T> {
+export function createProgressColumn<T extends { progress: string, completed: boolean, hasProgress: boolean }>(): TableColumn<T> {
   return {
     accessorKey: 'progress',
     header: 'Progression',

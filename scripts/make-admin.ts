@@ -11,9 +11,9 @@ if (!username) {
 
 // Chercher la base de données dans plusieurs emplacements possibles
 const possiblePaths = [
-  join('/app/data', 'reputation.db'),           // Docker
+  join('/app/data', 'reputation.db'), // Docker
   join(process.cwd(), 'data', 'reputation.db'), // Local ./data
-  join(process.cwd(), 'reputation.db')          // Local racine
+  join(process.cwd(), 'reputation.db') // Local racine
 ]
 
 const dbPath = possiblePaths.find(p => existsSync(p))
@@ -27,7 +27,7 @@ if (!dbPath) {
 try {
   const db = new Database(dbPath)
 
-  const user = db.prepare('SELECT id, username, is_admin FROM users WHERE username = ?').get(username) as { id: number; username: string; is_admin: number } | undefined
+  const user = db.prepare('SELECT id, username, is_admin FROM users WHERE username = ?').get(username) as { id: number, username: string, is_admin: number } | undefined
 
   if (!user) {
     console.error(`Utilisateur "${username}" non trouve.`)

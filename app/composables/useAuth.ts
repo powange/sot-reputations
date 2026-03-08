@@ -1,5 +1,5 @@
 export function useAuth() {
-  const { loggedIn, user, session, clear, fetch: fetchSession } = useUserSession()
+  const { loggedIn, user, clear, fetch: fetchSession } = useUserSession()
 
   const isLoading = useState('auth-loading', () => false)
 

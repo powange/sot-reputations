@@ -10,7 +10,7 @@ export function normalizeForSearch(text: string): string {
 }
 
 interface EmblemTranslations {
-  translations?: Record<string, { name: string | null; description: string | null }>
+  translations?: Record<string, { name: string | null, description: string | null }>
 }
 
 /**
@@ -19,9 +19,9 @@ interface EmblemTranslations {
  * et dans les traductions de la langue courante si spécifiée
  */
 export function emblemMatchesSearch(
-  emblem: { name: string; description: string; key?: string } & EmblemTranslations,
+  emblem: { name: string, description: string, key?: string } & EmblemTranslations,
   query: string,
-  options: { includeKey?: boolean; locale?: string } = {}
+  options: { includeKey?: boolean, locale?: string } = {}
 ): boolean {
   const { includeKey = false, locale } = options
   const q = normalizeForSearch(query)

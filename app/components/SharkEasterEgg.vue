@@ -27,7 +27,10 @@ watch(isActive, (val) => {
 <template>
   <Teleport to="body">
     <Transition name="water">
-      <div v-if="isActive" class="shark-easter-egg">
+      <div
+        v-if="isActive"
+        class="shark-easter-egg"
+      >
         <!-- Vagues -->
         <div class="waves">
           <svg
@@ -57,7 +60,10 @@ watch(isActive, (val) => {
 
         <!-- Aileron de requin -->
         <div class="shark-fin">
-          <svg viewBox="30 20 400 360" class="fin">
+          <svg
+            viewBox="30 20 400 360"
+            class="fin"
+          >
             <g transform="scale(-1,1) translate(-460,0)">
               <path
                 fill="#f5f5f5"

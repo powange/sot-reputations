@@ -39,11 +39,18 @@ watchEffect(() => {
 
     <div class="grid gap-4 sm:grid-cols-2">
       <!-- Utilisateurs - Admin seulement -->
-      <NuxtLink v-if="isAdmin" to="/admin/utilisateurs" class="block">
+      <NuxtLink
+        v-if="isAdmin"
+        to="/admin/utilisateurs"
+        class="block"
+      >
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon name="i-lucide-users" class="w-6 h-6 text-primary" />
+              <UIcon
+                name="i-lucide-users"
+                class="w-6 h-6 text-primary"
+              />
             </div>
             <div>
               <h3 class="font-semibold">{{ $t('admin.users.title') }}</h3>
@@ -54,11 +61,17 @@ watchEffect(() => {
       </NuxtLink>
 
       <!-- Factions - Admin et Moderateurs -->
-      <NuxtLink to="/admin/factions" class="block">
+      <NuxtLink
+        to="/admin/factions"
+        class="block"
+      >
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon name="i-lucide-flag" class="w-6 h-6 text-primary" />
+              <UIcon
+                name="i-lucide-flag"
+                class="w-6 h-6 text-primary"
+              />
             </div>
             <div>
               <h3 class="font-semibold">{{ $t('admin.factions.title') }}</h3>
@@ -69,11 +82,17 @@ watchEffect(() => {
       </NuxtLink>
 
       <!-- Traductions - Admin et Moderateurs -->
-      <NuxtLink to="/admin/traductions" class="block">
+      <NuxtLink
+        to="/admin/traductions"
+        class="block"
+      >
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon name="i-lucide-languages" class="w-6 h-6 text-primary" />
+              <UIcon
+                name="i-lucide-languages"
+                class="w-6 h-6 text-primary"
+              />
             </div>
             <div>
               <h3 class="font-semibold">Traductions</h3>
@@ -84,11 +103,17 @@ watchEffect(() => {
       </NuxtLink>
 
       <!-- Notes de version - Admin et Moderateurs -->
-      <NuxtLink to="/admin/release-notes" class="block">
+      <NuxtLink
+        to="/admin/release-notes"
+        class="block"
+      >
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon name="i-lucide-scroll-text" class="w-6 h-6 text-primary" />
+              <UIcon
+                name="i-lucide-scroll-text"
+                class="w-6 h-6 text-primary"
+              />
             </div>
             <div>
               <h3 class="font-semibold">Notes de version</h3>
@@ -99,11 +124,18 @@ watchEffect(() => {
       </NuxtLink>
 
       <!-- Base de donnees - Admin seulement -->
-      <NuxtLink v-if="isAdmin" to="/admin/database" class="block">
+      <NuxtLink
+        v-if="isAdmin"
+        to="/admin/database"
+        class="block"
+      >
         <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
           <div class="flex items-center gap-4">
             <div class="p-3 rounded-lg bg-warning/10">
-              <UIcon name="i-lucide-database" class="w-6 h-6 text-warning" />
+              <UIcon
+                name="i-lucide-database"
+                class="w-6 h-6 text-warning"
+              />
             </div>
             <div>
               <h3 class="font-semibold">{{ $t('admin.database.title') }}</h3>

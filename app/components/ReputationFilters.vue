@@ -34,8 +34,8 @@ const selectedFactions = computed(() => {
 // Vérifier si on a des campagnes à afficher (exclure les factions avec seulement 'default')
 const factionsWithCampaigns = computed(() => {
   return selectedFactions.value.filter(f =>
-    f.campaigns.length > 1 ||
-    (f.campaigns.length === 1 && f.campaigns[0].key !== 'default')
+    f.campaigns.length > 1
+    || (f.campaigns.length === 1 && f.campaigns[0].key !== 'default')
   )
 })
 
@@ -107,7 +107,10 @@ function toggleCampaign(campaignId: number) {
       </div>
 
       <!-- Faction -->
-      <div v-if="!isSearchActive" class="flex items-center gap-3 flex-wrap">
+      <div
+        v-if="!isSearchActive"
+        class="flex items-center gap-3 flex-wrap"
+      >
         <span class="text-sm font-medium text-muted">{{ $t('reputations.factions') }}</span>
         <UButton
           :color="allFactionsSelected ? 'primary' : 'neutral'"
@@ -153,10 +156,16 @@ function toggleCampaign(campaignId: number) {
       </template>
 
       <!-- Slot pour filtres additionnels (ex: utilisateurs) -->
-      <slot name="extra-filters" :is-search-active="isSearchActive" />
+      <slot
+        name="extra-filters"
+        :is-search-active="isSearchActive"
+      />
 
       <!-- Filtre completion -->
-      <div v-if="!isSearchActive && showCompletionFilter" class="flex items-center gap-3 flex-wrap">
+      <div
+        v-if="!isSearchActive && showCompletionFilter"
+        class="flex items-center gap-3 flex-wrap"
+      >
         <span class="text-sm font-medium text-muted">{{ $t('reputations.filterAchievements') }}</span>
         <UButton
           :color="emblemCompletionFilter === 'all' ? 'primary' : 'neutral'"

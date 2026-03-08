@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const { userId, newRole } = body as { userId: number; newRole: GroupRole }
+  const { userId, newRole } = body as { userId: number, newRole: GroupRole }
 
   if (!userId || typeof userId !== 'number') {
     throw createError({

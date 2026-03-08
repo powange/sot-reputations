@@ -46,7 +46,7 @@ const { leaveGroup } = useGroups()
 
 // Helper pour obtenir le nom/description traduit
 function getTranslatedText(
-  emblem: { name: string; description: string; translations?: Record<string, { name: string | null; description: string | null }> },
+  emblem: { name: string, description: string, translations?: Record<string, { name: string | null, description: string | null }> },
   field: 'name' | 'description'
 ): string {
   const currentLocale = locale.value
@@ -199,9 +199,9 @@ const {
 
     // Ne sauvegarder les users que s'ils ne sont pas tous sélectionnés
     const allUserIds = users.value.map(u => u.id)
-    const allUsersSelected = allUserIds.length > 0 &&
-      selectedUserIds.value.length === allUserIds.length &&
-      allUserIds.every(id => selectedUserIds.value.includes(id))
+    const allUsersSelected = allUserIds.length > 0
+      && selectedUserIds.value.length === allUserIds.length
+      && allUserIds.every(id => selectedUserIds.value.includes(id))
     if (!allUsersSelected && selectedUserIds.value.length > 0) {
       params.users = selectedUserIds.value.join(',')
     }
@@ -295,7 +295,7 @@ const totalEmblems = computed(() => {
 
 // Statistiques de complétion par utilisateur (basé sur les filtres faction/campagne)
 const userCompletionStats = computed(() => {
-  const stats: Record<number, { completed: number; total: number; percentage: number }> = {}
+  const stats: Record<number, { completed: number, total: number, percentage: number }> = {}
 
   for (const u of users.value) {
     let completed = 0
@@ -477,7 +477,7 @@ const columns = computed<TableColumn<MultiUserTableRow>[]>(() => {
   return cols
 })
 
-function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress>; translations?: Record<string, { name: string | null; description: string | null }> }>): MultiUserTableRow[] {
+function getTableData(emblems: Array<EmblemInfo & { userProgress: Record<number, UserEmblemProgress>, translations?: Record<string, { name: string | null, description: string | null }> }>): MultiUserTableRow[] {
   return emblems.map((emblem) => {
     const row: MultiUserTableRow = {
       id: emblem.id,

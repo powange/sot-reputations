@@ -7,7 +7,7 @@ const { user, isAuthenticated, isLoading: authLoading, loginWithMicrosoft } = us
 const code = route.params.code as string
 
 // Récupérer les données temporaires
-const { data: tempData, error, status } = await useFetch<{ success: boolean; data: unknown }>(`/api/import-temp/${code}`)
+const { data: tempData, error, status } = await useFetch<{ success: boolean, data: unknown }>(`/api/import-temp/${code}`)
 
 const isImporting = ref(false)
 const importSuccess = ref(false)
@@ -75,19 +75,30 @@ const factionCount = computed(() => {
   <UContainer class="py-16">
     <div class="max-w-md mx-auto">
       <!-- Chargement -->
-      <div v-if="status === 'pending' || authLoading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+      <div
+        v-if="status === 'pending' || authLoading"
+        class="flex justify-center py-16"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-8 h-8 animate-spin text-primary"
+        />
       </div>
 
       <!-- Erreur : données non trouvées ou expirées -->
       <template v-else-if="error">
         <UCard>
           <div class="text-center py-8">
-            <UIcon name="i-lucide-clock" class="w-16 h-16 text-error mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">{{ $t('importPage.expired') }}</h1>
+            <UIcon
+              name="i-lucide-clock"
+              class="w-16 h-16 text-error mx-auto mb-4"
+            />
+            <h1 class="text-2xl font-pirate mb-2">
+              {{ $t('importPage.expired') }}
+            </h1>
             <p class="text-muted mb-6">
               {{ $t('importPage.expiredDescription') }}
-              <br />
+              <br>
               {{ $t('importPage.expiredHint') }}
             </p>
             <UButton
@@ -103,27 +114,46 @@ const factionCount = computed(() => {
       <template v-else-if="tempData?.data">
         <UCard>
           <div class="text-center py-4">
-            <UIcon name="i-lucide-download" class="w-16 h-16 text-primary mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">{{ $t('importPage.title') }}</h1>
+            <UIcon
+              name="i-lucide-download"
+              class="w-16 h-16 text-primary mx-auto mb-4"
+            />
+            <h1 class="text-2xl font-pirate mb-2">
+              {{ $t('importPage.title') }}
+            </h1>
 
             <!-- Résumé des données -->
             <div class="bg-muted/50 rounded-lg p-4 mb-6">
-              <p class="text-sm text-muted mb-2">{{ $t('importPage.dataRetrieved') }}</p>
+              <p class="text-sm text-muted mb-2">
+                {{ $t('importPage.dataRetrieved') }}
+              </p>
               <div class="flex justify-center gap-6">
                 <div class="text-center">
-                  <div class="text-2xl font-bold text-primary">{{ factionCount }}</div>
-                  <div class="text-xs text-muted">{{ $t('importPage.factions') }}</div>
+                  <div class="text-2xl font-bold text-primary">
+                    {{ factionCount }}
+                  </div>
+                  <div class="text-xs text-muted">
+                    {{ $t('importPage.factions') }}
+                  </div>
                 </div>
                 <div class="text-center">
-                  <div class="text-2xl font-bold text-primary">{{ emblemCount }}</div>
-                  <div class="text-xs text-muted">{{ $t('importPage.achievements') }}</div>
+                  <div class="text-2xl font-bold text-primary">
+                    {{ emblemCount }}
+                  </div>
+                  <div class="text-xs text-muted">
+                    {{ $t('importPage.achievements') }}
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Import réussi -->
             <template v-if="importSuccess">
-              <UAlert icon="i-lucide-check-circle" color="success" class="mb-4">
+              <UAlert
+                icon="i-lucide-check-circle"
+                color="success"
+                class="mb-4"
+              >
                 <template #description>
                   {{ $t('importPage.success') }}
                 </template>

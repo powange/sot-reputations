@@ -132,15 +132,24 @@ async function handleCreateGroup() {
 <template>
   <UContainer class="py-8">
     <!-- Chargement -->
-    <div v-if="isLoading" class="flex justify-center py-16">
-      <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+    <div
+      v-if="isLoading"
+      class="flex justify-center py-16"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="w-8 h-8 animate-spin text-primary"
+      />
     </div>
 
     <!-- Non connecté : Bouton connexion Xbox -->
     <template v-else-if="!isAuthenticated">
       <div class="max-w-md mx-auto">
         <div class="text-center mb-8">
-          <UIcon name="i-lucide-anchor" class="w-16 h-16 text-primary mx-auto mb-4" />
+          <UIcon
+            name="i-lucide-anchor"
+            class="w-16 h-16 text-primary mx-auto mb-4"
+          />
           <h1 class="text-3xl font-pirate mb-2">
             SoT Reputations
           </h1>
@@ -162,11 +171,17 @@ async function handleCreateGroup() {
 
             <div class="text-xs text-muted space-y-1 pt-2 border-t border-muted/20">
               <p class="flex items-start gap-1.5">
-                <UIcon name="i-lucide-info" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <UIcon
+                  name="i-lucide-info"
+                  class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                />
                 <span>{{ $t('auth.dataCollectedInfo') }}</span>
               </p>
               <p class="pl-5">
-                <NuxtLink to="/mentions-legales" class="text-primary hover:underline">
+                <NuxtLink
+                  to="/mentions-legales"
+                  class="text-primary hover:underline"
+                >
                   {{ $t('auth.seePrivacyPolicy') }}
                 </NuxtLink>
               </p>
@@ -176,7 +191,10 @@ async function handleCreateGroup() {
           <template #footer>
             <p class="text-sm text-muted text-center">
               {{ $t('auth.needHelp') }}
-              <NuxtLink to="/tutoriel" class="text-primary hover:underline">
+              <NuxtLink
+                to="/tutoriel"
+                class="text-primary hover:underline"
+              >
                 {{ $t('auth.checkTutorial') }}
               </NuxtLink>
               {{ $t('auth.toImportData') }}
@@ -205,14 +223,28 @@ async function handleCreateGroup() {
       </div>
 
       <!-- Invitations en attente -->
-      <div v-if="pendingInvites.length > 0" class="mb-8">
+      <div
+        v-if="pendingInvites.length > 0"
+        class="mb-8"
+      >
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-          <UIcon name="i-lucide-mail" class="w-5 h-5 text-primary" />
+          <UIcon
+            name="i-lucide-mail"
+            class="w-5 h-5 text-primary"
+          />
           {{ $t('groups.pendingInvitations') }}
-          <UBadge :label="String(pendingInvites.length)" color="primary" size="sm" />
+          <UBadge
+            :label="String(pendingInvites.length)"
+            color="primary"
+            size="sm"
+          />
         </h2>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <UCard v-for="invite in pendingInvites" :key="invite.id" class="border-2 border-primary/30">
+          <UCard
+            v-for="invite in pendingInvites"
+            :key="invite.id"
+            class="border-2 border-primary/30"
+          >
             <div class="space-y-3">
               <div>
                 <h3 class="font-semibold text-lg">
@@ -247,12 +279,24 @@ async function handleCreateGroup() {
       </div>
 
       <!-- Liste des groupes -->
-      <div v-if="isLoadingGroups" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+      <div
+        v-if="isLoadingGroups"
+        class="flex justify-center py-16"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-8 h-8 animate-spin text-primary"
+        />
       </div>
 
-      <div v-else-if="groups.length === 0" class="text-center py-16">
-        <UIcon name="i-lucide-users" class="w-16 h-16 text-muted mx-auto mb-4" />
+      <div
+        v-else-if="groups.length === 0"
+        class="text-center py-16"
+      >
+        <UIcon
+          name="i-lucide-users"
+          class="w-16 h-16 text-muted mx-auto mb-4"
+        />
         <h2 class="text-xl font-semibold mb-2">
           {{ $t('groups.noGroups') }}
         </h2>
@@ -266,7 +310,10 @@ async function handleCreateGroup() {
         />
       </div>
 
-      <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div
+        v-else
+        class="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+      >
         <NuxtLink
           v-for="group in groups"
           :key="group.uid"
@@ -286,7 +333,10 @@ async function handleCreateGroup() {
                   class="mt-2"
                 />
               </div>
-              <UIcon name="i-lucide-chevron-right" class="w-5 h-5 text-muted" />
+              <UIcon
+                name="i-lucide-chevron-right"
+                class="w-5 h-5 text-muted"
+              />
             </div>
           </UCard>
         </NuxtLink>
@@ -302,7 +352,10 @@ async function handleCreateGroup() {
               </h2>
             </template>
 
-            <form @submit.prevent="handleCreateGroup" class="space-y-4">
+            <form
+              class="space-y-4"
+              @submit.prevent="handleCreateGroup"
+            >
               <UFormField :label="$t('groups.groupName')">
                 <UInput
                   v-model="newGroupName"

@@ -57,7 +57,7 @@ interface EmblemWithTranslations {
   campaign_key: string
   faction_name: string
   faction_key: string
-  translations: Record<string, { name: string | null; description: string | null }>
+  translations: Record<string, { name: string | null, description: string | null }>
 }
 
 const { data: emblems, status, refresh } = useLazyFetch<EmblemWithTranslations[]>('/api/admin/translations')
@@ -152,10 +152,10 @@ const availableFactions = computed(() => {
 
 // Structure des données JSON du jeu
 interface GameEmblemData {
-  DisplayName?: string
+  'DisplayName'?: string
   '#Name'?: string
-  Description?: string
-  image?: string
+  'Description'?: string
+  'image'?: string
 }
 
 interface GameCampaignData {
@@ -191,8 +191,8 @@ function openImportModal() {
 }
 
 // Extraire tous les emblèmes d'un JSON du jeu avec l'image comme clé
-function extractEmblemsByImage(json: GameJson): Map<string, { name: string; description: string }> {
-  const result = new Map<string, { name: string; description: string }>()
+function extractEmblemsByImage(json: GameJson): Map<string, { name: string, description: string }> {
+  const result = new Map<string, { name: string, description: string }>()
 
   for (const factionData of Object.values(json)) {
     // Factions avec Campaigns (BilgeRats, HuntersCall)
@@ -637,7 +637,7 @@ watch(
 async function loadBookmarkletData(code: string) {
   isLoadingBookmarkletData.value = true
   try {
-    const response = await $fetch<{ success: boolean; data: BookmarkletData }>('/api/admin/import-translations-temp', {
+    const response = await $fetch<{ success: boolean, data: BookmarkletData }>('/api/admin/import-translations-temp', {
       query: { code }
     })
     if (response.success && response.data) {
@@ -686,8 +686,8 @@ function runBookmarkletImport() {
   // Trouver les correspondances
   const matches: Array<{
     emblem: EmblemWithTranslations
-    en: { name: string; description: string } | null
-    es: { name: string; description: string } | null
+    en: { name: string, description: string } | null
+    es: { name: string, description: string } | null
   }> = []
 
   for (const emblem of emblems.value) {
@@ -747,8 +747,8 @@ const isImportingFromBookmarklet = ref(false)
 
 async function importAllFromBookmarklet(matches: Array<{
   emblem: EmblemWithTranslations
-  en: { name: string; description: string } | null
-  es: { name: string; description: string } | null
+  en: { name: string, description: string } | null
+  es: { name: string, description: string } | null
 }>) {
   isImportingFromBookmarklet.value = true
   let savedCount = 0
@@ -835,8 +835,12 @@ async function importAllFromBookmarklet(matches: Array<{
     <div class="grid grid-cols-4 gap-4 mb-8">
       <UCard>
         <div class="text-center">
-          <div class="text-3xl font-bold text-primary">{{ stats.total }}</div>
-          <div class="text-sm text-muted">Total</div>
+          <div class="text-3xl font-bold text-primary">
+            {{ stats.total }}
+          </div>
+          <div class="text-sm text-muted">
+            Total
+          </div>
         </div>
       </UCard>
       <UCard
@@ -847,10 +851,15 @@ async function importAllFromBookmarklet(matches: Array<{
         @click="translationFilter = translationFilter === 'missing_en' ? 'all' : 'missing_en'"
       >
         <div class="text-center">
-          <div class="text-3xl font-bold" :class="stats.completeEn === stats.total ? 'text-success' : 'text-warning'">
+          <div
+            class="text-3xl font-bold"
+            :class="stats.completeEn === stats.total ? 'text-success' : 'text-warning'"
+          >
             {{ stats.completeEn }}/{{ stats.total }}
           </div>
-          <div class="text-sm text-muted">Anglais</div>
+          <div class="text-sm text-muted">
+            Anglais
+          </div>
         </div>
       </UCard>
       <UCard
@@ -861,10 +870,15 @@ async function importAllFromBookmarklet(matches: Array<{
         @click="translationFilter = translationFilter === 'missing_es' ? 'all' : 'missing_es'"
       >
         <div class="text-center">
-          <div class="text-3xl font-bold" :class="stats.completeEs === stats.total ? 'text-success' : 'text-warning'">
+          <div
+            class="text-3xl font-bold"
+            :class="stats.completeEs === stats.total ? 'text-success' : 'text-warning'"
+          >
             {{ stats.completeEs }}/{{ stats.total }}
           </div>
-          <div class="text-sm text-muted">Espagnol</div>
+          <div class="text-sm text-muted">
+            Espagnol
+          </div>
         </div>
       </UCard>
       <UCard
@@ -875,10 +889,15 @@ async function importAllFromBookmarklet(matches: Array<{
         @click="translationFilter = translationFilter === 'complete' ? 'all' : 'complete'"
       >
         <div class="text-center">
-          <div class="text-3xl font-bold" :class="stats.complete === stats.total ? 'text-success' : 'text-primary'">
+          <div
+            class="text-3xl font-bold"
+            :class="stats.complete === stats.total ? 'text-success' : 'text-primary'"
+          >
             {{ stats.complete }}
           </div>
-          <div class="text-sm text-muted">Complets</div>
+          <div class="text-sm text-muted">
+            Complets
+          </div>
         </div>
       </UCard>
     </div>
@@ -888,10 +907,15 @@ async function importAllFromBookmarklet(matches: Array<{
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-4">
           <div class="p-2 rounded-lg bg-primary/10">
-            <UIcon name="i-lucide-bookmark" class="w-6 h-6 text-primary" />
+            <UIcon
+              name="i-lucide-bookmark"
+              class="w-6 h-6 text-primary"
+            />
           </div>
           <div>
-            <h3 class="font-semibold">Import automatique via Bookmarklet</h3>
+            <h3 class="font-semibold">
+              Import automatique via Bookmarklet
+            </h3>
             <p class="text-sm text-muted">
               Recupere automatiquement les traductions FR, EN et ES depuis Sea of Thieves
               <span class="text-xs">(v{{ TRANSLATION_BOOKMARKLET_VERSION }})</span>
@@ -932,7 +956,10 @@ async function importAllFromBookmarklet(matches: Array<{
     >
       <UCard class="max-w-md">
         <div class="text-center py-4">
-          <UIcon name="i-lucide-loader-2" class="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-12 h-12 animate-spin text-primary mx-auto mb-4"
+          />
           <h3 class="text-lg font-semibold mb-2">
             {{ isLoadingBookmarkletData ? 'Chargement des donnees...' : 'Import en cours...' }}
           </h3>
@@ -972,12 +999,21 @@ async function importAllFromBookmarklet(matches: Array<{
     </div>
 
     <!-- Loading -->
-    <div v-if="status === 'pending'" class="flex justify-center py-8">
-      <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-muted" />
+    <div
+      v-if="status === 'pending'"
+      class="flex justify-center py-8"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="w-8 h-8 animate-spin text-muted"
+      />
     </div>
 
     <!-- Liste des emblèmes -->
-    <div v-else-if="filteredEmblems.length > 0" class="space-y-4">
+    <div
+      v-else-if="filteredEmblems.length > 0"
+      class="space-y-4"
+    >
       <!-- Info pagination -->
       <div class="flex items-center justify-between text-sm text-muted">
         <span>{{ filteredEmblems.length }} emblème(s) trouvé(s)</span>
@@ -991,57 +1027,70 @@ async function importAllFromBookmarklet(matches: Array<{
           class="flex items-center gap-4 p-4 rounded-lg border border-muted/30 hover:bg-muted/10 cursor-pointer"
           @click="openEditModal(emblem)"
         >
-        <img
-          v-if="emblem.image"
-          :src="emblem.image"
-          :alt="emblem.name"
-          class="w-12 h-12 rounded shrink-0"
-        />
-        <div v-else class="w-12 h-12 rounded bg-muted/30 flex items-center justify-center shrink-0">
-          <UIcon name="i-lucide-image-off" class="w-6 h-6 text-muted" />
-        </div>
+          <img
+            v-if="emblem.image"
+            :src="emblem.image"
+            :alt="emblem.name"
+            class="w-12 h-12 rounded shrink-0"
+          >
+          <div
+            v-else
+            class="w-12 h-12 rounded bg-muted/30 flex items-center justify-center shrink-0"
+          >
+            <UIcon
+              name="i-lucide-image-off"
+              class="w-6 h-6 text-muted"
+            />
+          </div>
 
-        <div class="flex-1 min-w-0">
-          <div class="font-medium">{{ emblem.name }}</div>
-          <div class="text-xs text-muted truncate">{{ emblem.description }}</div>
-          <div class="text-xs text-muted mt-1">
-            {{ emblem.faction_name }} / {{ emblem.campaign_name }}
+          <div class="flex-1 min-w-0">
+            <div class="font-medium">
+              {{ emblem.name }}
+            </div>
+            <div class="text-xs text-muted truncate">
+              {{ emblem.description }}
+            </div>
+            <div class="text-xs text-muted mt-1">
+              {{ emblem.faction_name }} / {{ emblem.campaign_name }}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- Status EN -->
+            <UTooltip text="Anglais">
+              <div
+                class="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
+                :class="[
+                  hasTranslation(emblem, 'en') ? 'bg-success/20 text-success'
+                  : hasPartialTranslation(emblem, 'en') ? 'bg-warning/20 text-warning'
+                    : 'bg-muted/20 text-muted'
+                ]"
+              >
+                EN
+              </div>
+            </UTooltip>
+            <!-- Status ES -->
+            <UTooltip text="Espagnol">
+              <div
+                class="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
+                :class="[
+                  hasTranslation(emblem, 'es') ? 'bg-success/20 text-success'
+                  : hasPartialTranslation(emblem, 'es') ? 'bg-warning/20 text-warning'
+                    : 'bg-muted/20 text-muted'
+                ]"
+              >
+                ES
+              </div>
+            </UTooltip>
           </div>
         </div>
-
-        <div class="flex items-center gap-2 shrink-0">
-          <!-- Status EN -->
-          <UTooltip text="Anglais">
-            <div
-              class="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-              :class="[
-                hasTranslation(emblem, 'en') ? 'bg-success/20 text-success' :
-                hasPartialTranslation(emblem, 'en') ? 'bg-warning/20 text-warning' :
-                'bg-muted/20 text-muted'
-              ]"
-            >
-              EN
-            </div>
-          </UTooltip>
-          <!-- Status ES -->
-          <UTooltip text="Espagnol">
-            <div
-              class="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-              :class="[
-                hasTranslation(emblem, 'es') ? 'bg-success/20 text-success' :
-                hasPartialTranslation(emblem, 'es') ? 'bg-warning/20 text-warning' :
-                'bg-muted/20 text-muted'
-              ]"
-            >
-              ES
-            </div>
-          </UTooltip>
-        </div>
-      </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex justify-center mt-6">
+      <div
+        v-if="totalPages > 1"
+        class="flex justify-center mt-6"
+      >
         <UPagination
           v-model:page="currentPage"
           :total="filteredEmblems.length"
@@ -1051,7 +1100,10 @@ async function importAllFromBookmarklet(matches: Array<{
       </div>
     </div>
 
-    <div v-else class="text-center py-8 text-muted">
+    <div
+      v-else
+      class="text-center py-8 text-muted"
+    >
       <template v-if="searchQuery.trim()">
         Aucun accomplissement trouvé pour "{{ searchQuery }}"
       </template>
@@ -1061,7 +1113,10 @@ async function importAllFromBookmarklet(matches: Array<{
     </div>
 
     <!-- Modal édition -->
-    <UModal v-model:open="isEditModalOpen" :ui="{ width: 'max-w-2xl' }">
+    <UModal
+      v-model:open="isEditModalOpen"
+      :ui="{ width: 'max-w-2xl' }"
+    >
       <template #content>
         <UCard>
           <template #header>
@@ -1071,10 +1126,14 @@ async function importAllFromBookmarklet(matches: Array<{
                 :src="editingEmblem.image"
                 :alt="editingEmblem?.name"
                 class="w-10 h-10 rounded"
-              />
+              >
               <div>
-                <h2 class="text-lg font-semibold">{{ editingEmblem?.name }}</h2>
-                <p class="text-sm text-muted">{{ editingEmblem?.faction_name }} / {{ editingEmblem?.campaign_name }}</p>
+                <h2 class="text-lg font-semibold">
+                  {{ editingEmblem?.name }}
+                </h2>
+                <p class="text-sm text-muted">
+                  {{ editingEmblem?.faction_name }} / {{ editingEmblem?.campaign_name }}
+                </p>
               </div>
             </div>
           </template>
@@ -1082,15 +1141,23 @@ async function importAllFromBookmarklet(matches: Array<{
           <div class="space-y-6">
             <!-- Texte original (FR) -->
             <div class="p-4 bg-muted/20 rounded-lg">
-              <div class="text-sm font-medium text-muted mb-2">Français (original)</div>
-              <div class="font-medium">{{ editingEmblem?.name }}</div>
-              <div class="text-sm text-muted mt-1">{{ editingEmblem?.description }}</div>
+              <div class="text-sm font-medium text-muted mb-2">
+                Français (original)
+              </div>
+              <div class="font-medium">
+                {{ editingEmblem?.name }}
+              </div>
+              <div class="text-sm text-muted mt-1">
+                {{ editingEmblem?.description }}
+              </div>
             </div>
 
             <!-- Anglais -->
             <div class="space-y-3">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">EN</div>
+                <div class="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                  EN
+                </div>
                 <span class="font-medium">Anglais</span>
               </div>
               <div>
@@ -1115,7 +1182,9 @@ async function importAllFromBookmarklet(matches: Array<{
             <!-- Espagnol -->
             <div class="space-y-3">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">ES</div>
+                <div class="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                  ES
+                </div>
                 <span class="font-medium">Espagnol</span>
               </div>
               <div>
@@ -1159,17 +1228,27 @@ async function importAllFromBookmarklet(matches: Array<{
     </UModal>
 
     <!-- Modal import automatique -->
-    <UModal v-model:open="isImportModalOpen" :ui="{ width: 'max-w-3xl' }">
+    <UModal
+      v-model:open="isImportModalOpen"
+      :ui="{ width: 'max-w-3xl' }"
+    >
       <template #content>
         <UCard>
           <template #header>
             <div class="flex items-center gap-3">
               <div class="p-2 rounded-lg bg-primary/10">
-                <UIcon name="i-lucide-upload" class="w-5 h-5 text-primary" />
+                <UIcon
+                  name="i-lucide-upload"
+                  class="w-5 h-5 text-primary"
+                />
               </div>
               <div>
-                <h2 class="text-lg font-semibold">Import automatique des traductions</h2>
-                <p class="text-sm text-muted">Comparer les JSONs pour pré-remplir les traductions</p>
+                <h2 class="text-lg font-semibold">
+                  Import automatique des traductions
+                </h2>
+                <p class="text-sm text-muted">
+                  Comparer les JSONs pour pré-remplir les traductions
+                </p>
               </div>
             </div>
           </template>
@@ -1233,9 +1312,14 @@ async function importAllFromBookmarklet(matches: Array<{
 
             <div class="p-4 bg-info/10 rounded-lg text-sm">
               <div class="flex items-start gap-2">
-                <UIcon name="i-lucide-info" class="w-5 h-5 text-info shrink-0 mt-0.5" />
+                <UIcon
+                  name="i-lucide-info"
+                  class="w-5 h-5 text-info shrink-0 mt-0.5"
+                />
                 <div>
-                  <p class="font-medium text-info">Comment ça marche ?</p>
+                  <p class="font-medium text-info">
+                    Comment ça marche ?
+                  </p>
                   <p class="text-muted mt-1">
                     L'outil utilise les <strong>images</strong> comme pont entre les deux JSONs :
                     BDD (nom FR) → JSON FR (image) → JSON cible (traduction).
@@ -1267,7 +1351,10 @@ async function importAllFromBookmarklet(matches: Array<{
     </UModal>
 
     <!-- Modal traduction en chaîne -->
-    <UModal v-model:open="isChainMode" :ui="{ width: 'max-w-2xl' }">
+    <UModal
+      v-model:open="isChainMode"
+      :ui="{ width: 'max-w-2xl' }"
+    >
       <template #content>
         <UCard>
           <template #header>
@@ -1278,10 +1365,14 @@ async function importAllFromBookmarklet(matches: Array<{
                   :src="editingEmblem.image"
                   :alt="editingEmblem?.name"
                   class="w-10 h-10 rounded"
-                />
+                >
                 <div>
-                  <h2 class="text-lg font-semibold">{{ editingEmblem?.name }}</h2>
-                  <p class="text-sm text-muted">{{ editingEmblem?.faction_name }} / {{ editingEmblem?.campaign_name }}</p>
+                  <h2 class="text-lg font-semibold">
+                    {{ editingEmblem?.name }}
+                  </h2>
+                  <p class="text-sm text-muted">
+                    {{ editingEmblem?.faction_name }} / {{ editingEmblem?.campaign_name }}
+                  </p>
                 </div>
               </div>
               <!-- Indicateur de progression -->
@@ -1294,9 +1385,15 @@ async function importAllFromBookmarklet(matches: Array<{
           <div class="space-y-6">
             <!-- Texte original (FR) -->
             <div class="p-4 bg-muted/20 rounded-lg">
-              <div class="text-sm font-medium text-muted mb-2">Français (original)</div>
-              <div class="font-medium">{{ editingEmblem?.name }}</div>
-              <div class="text-sm text-muted mt-1">{{ editingEmblem?.description }}</div>
+              <div class="text-sm font-medium text-muted mb-2">
+                Français (original)
+              </div>
+              <div class="font-medium">
+                {{ editingEmblem?.name }}
+              </div>
+              <div class="text-sm text-muted mt-1">
+                {{ editingEmblem?.description }}
+              </div>
             </div>
 
             <!-- Traduction cible uniquement -->
@@ -1338,11 +1435,17 @@ async function importAllFromBookmarklet(matches: Array<{
             <!-- Stats en cours -->
             <div class="flex items-center justify-center gap-6 text-sm">
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-check" class="w-4 h-4 text-success" />
+                <UIcon
+                  name="i-lucide-check"
+                  class="w-4 h-4 text-success"
+                />
                 <span>{{ chainStats.saved }} sauvegardée(s)</span>
               </div>
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-skip-forward" class="w-4 h-4 text-muted" />
+                <UIcon
+                  name="i-lucide-skip-forward"
+                  class="w-4 h-4 text-muted"
+                />
                 <span>{{ chainStats.skipped }} ignorée(s)</span>
               </div>
             </div>

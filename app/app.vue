@@ -33,7 +33,7 @@ const navItems = computed(() => {
     { label: t('nav.releaseNotes'), to: '/release-notes', icon: 'i-lucide-scroll-text', requiresAuth: false, requiresAdmin: false },
     { label: t('nav.admin'), to: '/admin', icon: 'i-lucide-shield', requiresAuth: true, requiresAdmin: true }
   ]
-  return items.filter(item => {
+  return items.filter((item) => {
     if (item.requiresAdmin && !isAdminOrModerator.value) return false
     if (item.requiresAuth && !isAuthenticated.value) return false
     return true
@@ -62,8 +62,14 @@ async function handleLogout() {
     <SharkEasterEgg />
     <UHeader>
       <template #left>
-        <NuxtLink to="/" class="flex items-center gap-2">
-          <UIcon name="i-lucide-anchor" class="w-6 h-6 text-primary" />
+        <NuxtLink
+          to="/"
+          class="flex items-center gap-2"
+        >
+          <UIcon
+            name="i-lucide-anchor"
+            class="w-6 h-6 text-primary"
+          />
           <span class="font-pirate text-xl">SoT Reputations</span>
         </NuxtLink>
       </template>
@@ -77,7 +83,10 @@ async function handleLogout() {
           inactive-class="text-muted hover:text-foreground"
           class="flex items-center gap-1.5 text-sm font-medium transition-colors"
         >
-          <UIcon :name="item.icon" class="w-4 h-4" />
+          <UIcon
+            :name="item.icon"
+            class="w-4 h-4"
+          />
           {{ item.label }}
         </ULink>
       </nav>
@@ -92,7 +101,10 @@ async function handleLogout() {
             inactive-class="text-muted hover:text-foreground"
             class="flex items-center gap-2 py-2 text-sm font-medium transition-colors"
           >
-            <UIcon :name="item.icon" class="w-5 h-5" />
+            <UIcon
+              :name="item.icon"
+              class="w-5 h-5"
+            />
             {{ item.label }}
           </ULink>
           <button
@@ -100,7 +112,10 @@ async function handleLogout() {
             class="flex items-center gap-2 py-2 text-sm font-medium text-muted hover:text-foreground transition-colors"
             @click="handleLogout"
           >
-            <UIcon name="i-lucide-log-out" class="w-5 h-5" />
+            <UIcon
+              name="i-lucide-log-out"
+              class="w-5 h-5"
+            />
             {{ t('nav.logout') }}
           </button>
         </nav>
@@ -122,7 +137,11 @@ async function handleLogout() {
           <UDropdownMenu
             :items="availableLocales.map(l => ({ label: l.name, onSelect: () => setLocale(l.code) }))"
           >
-            <UButton variant="ghost" size="sm" icon="i-lucide-globe" />
+            <UButton
+              variant="ghost"
+              size="sm"
+              icon="i-lucide-globe"
+            />
           </UDropdownMenu>
         </div>
       </template>
@@ -139,7 +158,10 @@ async function handleLogout() {
         </p>
       </template>
       <template #right>
-        <NuxtLink to="/mentions-legales" class="text-sm text-muted hover:text-foreground transition-colors">
+        <NuxtLink
+          to="/mentions-legales"
+          class="text-sm text-muted hover:text-foreground transition-colors"
+        >
           {{ $t('legal.title') }}
         </NuxtLink>
       </template>

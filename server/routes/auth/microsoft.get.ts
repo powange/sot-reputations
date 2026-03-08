@@ -12,11 +12,11 @@ interface XboxUserTokenResponse {
 interface XboxXstsResponse {
   Token: string
   DisplayClaims: {
-    xui: Array<{ uhs: string; gtg?: string; xid?: string }>
+    xui: Array<{ uhs: string, gtg?: string, xid?: string }>
   }
 }
 
-async function getXboxGamertag(accessToken: string): Promise<{ gamertag: string; xuid: string } | null> {
+async function getXboxGamertag(accessToken: string): Promise<{ gamertag: string, xuid: string } | null> {
   try {
     // Étape 1: Obtenir un Xbox Live User Token
     const userTokenResponse = await $fetch<XboxUserTokenResponse>('https://user.auth.xboxlive.com/user/authenticate', {
@@ -69,7 +69,6 @@ async function getXboxGamertag(accessToken: string): Promise<{ gamertag: string;
 
     console.error('Xbox: No gamertag in XSTS response')
     return null
-
   } catch (error) {
     console.error('Xbox API error:', error)
     return null
@@ -139,7 +138,7 @@ export default defineEventHandler(async (event) => {
 
     let dbUser = db.prepare(`
       SELECT id, username, microsoft_id FROM users WHERE microsoft_id = ?
-    `).get(xuid) as { id: number; username: string; microsoft_id: string } | undefined
+    `).get(xuid) as { id: number, username: string, microsoft_id: string } | undefined
 
     if (!dbUser) {
       // Créer un nouvel utilisateur avec le gamertag
@@ -186,7 +185,6 @@ export default defineEventHandler(async (event) => {
     const safeRedirect = redirectTo.startsWith('/') && !redirectTo.includes('//') ? redirectTo : '/'
     deleteCookie(event, 'redirectTo')
     return sendRedirect(event, safeRedirect)
-
   } catch (error) {
     console.error('Microsoft OAuth error:', error)
     return sendRedirect(event, '/?error=oauth')

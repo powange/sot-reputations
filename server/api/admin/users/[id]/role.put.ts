@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const db = getReputationDb()
 
   // Verifier que l'utilisateur existe
-  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(id) as { id: number; username: string } | undefined
+  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(id) as { id: number, username: string } | undefined
   if (!user) {
     throw createError({ statusCode: 404, message: 'Utilisateur non trouve' })
   }

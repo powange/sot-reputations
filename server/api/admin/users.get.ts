@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
   }>
 
   // Associer les groupes aux utilisateurs
-  const groupsByUser = new Map<number, Array<{ uid: string; name: string; role: string }>>()
+  const groupsByUser = new Map<number, Array<{ uid: string, name: string, role: string }>>()
   for (const group of userGroups) {
     if (!groupsByUser.has(group.userId)) {
       groupsByUser.set(group.userId, [])

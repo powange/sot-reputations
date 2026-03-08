@@ -1,7 +1,7 @@
 import { deleteUserAccount, getChefGroupsWithMembers } from '../../utils/reputation-db'
 
 interface DeleteAccountBody {
-  chefTransfers?: Array<{ groupId: number; newChefId: number }>
+  chefTransfers?: Array<{ groupId: number, newChefId: number }>
 }
 
 export default defineEventHandler(async (event) => {

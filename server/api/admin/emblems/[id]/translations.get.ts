@@ -16,10 +16,10 @@ export default defineEventHandler(async (event) => {
     SELECT locale, name, description
     FROM emblem_translations
     WHERE emblem_id = ?
-  `).all(emblemId) as Array<{ locale: string; name: string | null; description: string | null }>
+  `).all(emblemId) as Array<{ locale: string, name: string | null, description: string | null }>
 
   // Convertir en objet par locale
-  const result: Record<string, { name: string | null; description: string | null }> = {}
+  const result: Record<string, { name: string | null, description: string | null }> = {}
   for (const t of translations) {
     result[t.locale] = { name: t.name, description: t.description }
   }

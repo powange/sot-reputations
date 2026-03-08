@@ -21,7 +21,7 @@ const { isAuthenticated } = useAuth()
 
 // Helper pour obtenir le nom/description traduit
 function getTranslatedText(
-  emblem: { name: string; description: string; translations?: Record<string, { name: string | null; description: string | null }> },
+  emblem: { name: string, description: string, translations?: Record<string, { name: string | null, description: string | null }> },
   field: 'name' | 'description'
 ): string {
   const currentLocale = locale.value
@@ -67,7 +67,7 @@ interface ChefGroupInfo {
   groupUid: string
   groupName: string
   memberCount: number
-  members: Array<{ userId: number; username: string; role: string }>
+  members: Array<{ userId: number, username: string, role: string }>
 }
 const chefGroups = ref<ChefGroupInfo[]>([])
 const chefTransfers = ref<Record<number, number>>({})
@@ -154,7 +154,7 @@ const completionStats = computed(() => {
 const factionStats = computed(() => {
   if (!hasImportedData.value) return []
 
-  return factions.value.map(faction => {
+  return factions.value.map((faction) => {
     let completed = 0
     let total = 0
 
@@ -188,7 +188,6 @@ const {
   emblemCompletionFilter,
   ignoreWithoutData,
   isSearchActive,
-  selectedFactions,
   filteredFactionsCampaigns
 } = useEmblemFilters({
   factions
@@ -232,8 +231,8 @@ function filterEmblemsList<T extends { progress: EmblemProgress | null }>(emblem
       ignoreWithoutData: ignoreWithoutData.value
     },
     {
-      isCompleted: (emblem) => emblem.progress?.completed || false,
-      hasData: (emblem) => emblem.progress !== null
+      isCompleted: emblem => emblem.progress?.completed || false,
+      hasData: emblem => emblem.progress !== null
     }
   )
 }
@@ -251,10 +250,10 @@ const columns = computed<TableColumn<SingleUserTableRow>[]>(() => {
   return cols
 })
 
-function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null; translations?: Record<string, { name: string | null; description: string | null }> }>): SingleUserTableRow[] {
+function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null, translations?: Record<string, { name: string | null, description: string | null }> }>): SingleUserTableRow[] {
   const filteredEmblems = filterEmblemsList(emblems)
 
-  return filteredEmblems.map(emblem => {
+  return filteredEmblems.map((emblem) => {
     const progress = emblem.progress
     let progressDisplay = '-'
     let completed = false
@@ -413,7 +412,10 @@ async function handleDelete() {
             </div>
             <div class="text-sm text-muted flex items-center gap-1">
               {{ $t('myReputations.completionRate') }}
-              <UIcon name="i-lucide-chevron-right" class="w-4 h-4" />
+              <UIcon
+                name="i-lucide-chevron-right"
+                class="w-4 h-4"
+              />
             </div>
           </div>
           <div class="bg-muted/30 rounded-lg p-4">
@@ -621,17 +623,30 @@ async function handleDelete() {
               <div class="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                 <USwitch v-model="deleteAccountToo" />
                 <div>
-                  <div class="font-medium">{{ $t('reputations.deleteAccountToo') }}</div>
-                  <div class="text-sm text-muted">{{ $t('reputations.deleteAccountTooDescription') }}</div>
+                  <div class="font-medium">
+                    {{ $t('reputations.deleteAccountToo') }}
+                  </div>
+                  <div class="text-sm text-muted">
+                    {{ $t('reputations.deleteAccountTooDescription') }}
+                  </div>
                 </div>
               </div>
 
               <!-- Sélection des nouveaux chefs si nécessaire -->
-              <div v-if="deleteAccountToo && loadingChefGroups" class="flex justify-center py-4">
-                <UIcon name="i-lucide-loader-2" class="w-6 h-6 animate-spin text-primary" />
+              <div
+                v-if="deleteAccountToo && loadingChefGroups"
+                class="flex justify-center py-4"
+              >
+                <UIcon
+                  name="i-lucide-loader-2"
+                  class="w-6 h-6 animate-spin text-primary"
+                />
               </div>
 
-              <div v-if="deleteAccountToo && !loadingChefGroups && chefGroups.length > 0" class="space-y-4">
+              <div
+                v-if="deleteAccountToo && !loadingChefGroups && chefGroups.length > 0"
+                class="space-y-4"
+              >
                 <UAlert
                   icon="i-lucide-crown"
                   color="warning"
@@ -647,7 +662,9 @@ async function handleDelete() {
                   :key="group.groupId"
                   class="p-3 border border-muted rounded-lg space-y-2"
                 >
-                  <div class="font-medium">{{ group.groupName }}</div>
+                  <div class="font-medium">
+                    {{ group.groupName }}
+                  </div>
                   <USelect
                     v-model="chefTransfers[group.groupId]"
                     :placeholder="$t('reputations.selectNewChef')"
@@ -657,8 +674,12 @@ async function handleDelete() {
                 </div>
               </div>
 
-              <p v-if="!deleteAccountToo">{{ $t('reputations.deleteConfirm') }}</p>
-              <p v-else>{{ $t('reputations.deleteAccountConfirm') }}</p>
+              <p v-if="!deleteAccountToo">
+                {{ $t('reputations.deleteConfirm') }}
+              </p>
+              <p v-else>
+                {{ $t('reputations.deleteAccountConfirm') }}
+              </p>
             </div>
             <template #footer>
               <div class="flex justify-end gap-2">

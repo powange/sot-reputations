@@ -112,9 +112,9 @@ function formatDate(dateStr: string): string {
       />
     </div>
 
-    <!-- Compteur de résultats -->
+    <!-- Compteur de résultats (uniquement pour la recherche) -->
     <p
-      v-if="releaseNotes && releaseNotes.length > 0 && (search || selectedVersion)"
+      v-if="releaseNotes && releaseNotes.length > 0 && search && !selectedVersion"
       class="text-muted text-sm mb-4"
     >
       {{ $t('releaseNotes.results', { count: filteredNotes.length, total: releaseNotes.length }) }}
@@ -149,7 +149,10 @@ function formatDate(dateStr: string): string {
     </div>
 
     <!-- Liste des notes de version -->
-    <div v-else class="space-y-6">
+    <div
+      v-else
+      class="space-y-6"
+    >
       <UCard
         v-for="note in filteredNotes"
         :key="note.id"

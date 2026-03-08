@@ -128,7 +128,9 @@ onMounted(() => {
               color="info"
               class="mb-4"
             >
-              <template #title>{{ $t('tutorial.step1.dragNotWorking') }}</template>
+              <template #title>
+                {{ $t('tutorial.step1.dragNotWorking') }}
+              </template>
               <template #description>
                 <ol class="list-decimal list-inside space-y-1 mt-2 text-sm">
                   <li>{{ $t('tutorial.step1.instructions.1') }}</li>
@@ -193,7 +195,10 @@ onMounted(() => {
             <div class="grid sm:grid-cols-2 gap-4">
               <div class="p-4 bg-muted/50 rounded-lg">
                 <div class="flex items-center gap-2 mb-2">
-                  <UIcon name="i-lucide-download" class="w-5 h-5 text-primary" />
+                  <UIcon
+                    name="i-lucide-download"
+                    class="w-5 h-5 text-primary"
+                  />
                   <span class="font-medium">{{ $t('tutorial.step3.optionImport') }}</span>
                 </div>
                 <p class="text-sm text-muted">
@@ -203,7 +208,10 @@ onMounted(() => {
 
               <div class="p-4 bg-muted/50 rounded-lg">
                 <div class="flex items-center gap-2 mb-2">
-                  <UIcon name="i-lucide-clipboard" class="w-5 h-5 text-primary" />
+                  <UIcon
+                    name="i-lucide-clipboard"
+                    class="w-5 h-5 text-primary"
+                  />
                   <span class="font-medium">{{ $t('tutorial.step3.optionCopy') }}</span>
                 </div>
                 <p class="text-sm text-muted">

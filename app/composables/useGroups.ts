@@ -7,7 +7,7 @@ interface Group {
   role: 'admin' | 'member'
 }
 
-interface GroupMember {
+interface _GroupMember {
   id: number
   groupId: number
   userId: number

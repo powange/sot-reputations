@@ -162,35 +162,35 @@ export function getReputationDb(): Database.Database {
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
-  const userColumns = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+  const userColumns = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>
   const hasLastImportAt = userColumns.some(col => col.name === 'last_import_at')
   if (!hasLastImportAt) {
     db.exec('ALTER TABLE users ADD COLUMN last_import_at DATETIME')
   }
 
   // Migration: ajouter sort_order aux campagnes si la colonne n'existe pas
-  const campaignColumns = db.prepare("PRAGMA table_info(campaigns)").all() as Array<{ name: string }>
+  const campaignColumns = db.prepare('PRAGMA table_info(campaigns)').all() as Array<{ name: string }>
   const hasSortOrder = campaignColumns.some(col => col.name === 'sort_order')
   if (!hasSortOrder) {
     db.exec('ALTER TABLE campaigns ADD COLUMN sort_order INTEGER DEFAULT 0')
   }
 
   // Migration: ajouter sort_order aux emblèmes si la colonne n'existe pas
-  const emblemColumns = db.prepare("PRAGMA table_info(emblems)").all() as Array<{ name: string }>
+  const emblemColumns = db.prepare('PRAGMA table_info(emblems)').all() as Array<{ name: string }>
   const hasEmblemSortOrder = emblemColumns.some(col => col.name === 'sort_order')
   if (!hasEmblemSortOrder) {
     db.exec('ALTER TABLE emblems ADD COLUMN sort_order INTEGER DEFAULT 0')
   }
 
   // Migration: ajouter description aux campagnes si la colonne n'existe pas
-  const campaignColumnsForDesc = db.prepare("PRAGMA table_info(campaigns)").all() as Array<{ name: string }>
+  const campaignColumnsForDesc = db.prepare('PRAGMA table_info(campaigns)').all() as Array<{ name: string }>
   const hasCampaignDesc = campaignColumnsForDesc.some(col => col.name === 'description')
   if (!hasCampaignDesc) {
     db.exec('ALTER TABLE campaigns ADD COLUMN description TEXT')
   }
 
   // Migration: ajouter microsoft_id aux utilisateurs pour OAuth Microsoft
-  const userColumnsForMicrosoft = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+  const userColumnsForMicrosoft = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>
   const hasMicrosoftId = userColumnsForMicrosoft.some(col => col.name === 'microsoft_id')
   if (!hasMicrosoftId) {
     db.exec('ALTER TABLE users ADD COLUMN microsoft_id TEXT')
@@ -198,7 +198,7 @@ export function getReputationDb(): Database.Database {
   }
 
   // Migration: ajouter is_admin aux utilisateurs pour le système d'administration
-  const userColumnsForAdmin = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+  const userColumnsForAdmin = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>
   const hasIsAdmin = userColumnsForAdmin.some(col => col.name === 'is_admin')
   if (!hasIsAdmin) {
     db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
@@ -211,7 +211,7 @@ export function getReputationDb(): Database.Database {
   }
 
   // Migration: ajouter validated aux emblèmes (nouveaux emblèmes non validés par défaut)
-  const emblemColumnsForValidated = db.prepare("PRAGMA table_info(emblems)").all() as Array<{ name: string }>
+  const emblemColumnsForValidated = db.prepare('PRAGMA table_info(emblems)').all() as Array<{ name: string }>
   const hasValidated = emblemColumnsForValidated.some(col => col.name === 'validated')
   if (!hasValidated) {
     db.exec('ALTER TABLE emblems ADD COLUMN validated INTEGER DEFAULT 0')
@@ -238,10 +238,10 @@ export function closeReputationDb(): void {
 
 // Noms des factions en français (seules ces factions seront importées)
 const FACTION_NAMES: Record<string, string> = {
-  AthenasFortune: "Fortune d'Athéna",
+  AthenasFortune: 'Fortune d\'Athéna',
   ReapersBones: 'Os de la faucheuse',
-  HuntersCall: "L'appel du chasseur",
-  GoldHoarders: "Collectionneurs d'or",
+  HuntersCall: 'L\'appel du chasseur',
+  GoldHoarders: 'Collectionneurs d\'or',
   SeaDogs: 'Loups de mer',
   TallTales: 'Fables du flibustier',
   OrderOfSouls: 'Ordre des âmes',
@@ -256,16 +256,16 @@ const FACTION_NAMES: Record<string, string> = {
 const VALID_FACTIONS = Object.keys(FACTION_NAMES)
 
 interface EmblemData {
-  DisplayName?: string
+  'DisplayName'?: string
   '#Name'?: string
-  Description?: string
-  Image?: string
-  image?: string
-  MaxGrade?: number
-  Value?: number
-  Threshold?: number
-  Grade?: number
-  Completed?: boolean
+  'Description'?: string
+  'Image'?: string
+  'image'?: string
+  'MaxGrade'?: number
+  'Value'?: number
+  'Threshold'?: number
+  'Grade'?: number
+  'Completed'?: boolean
 }
 
 interface CampaignData {
@@ -720,7 +720,7 @@ export function setUserModerator(userId: number, isModerator: boolean): void {
 
 export function isUserAdminOrModerator(userId: number): boolean {
   const db = getReputationDb()
-  const row = db.prepare('SELECT is_admin, is_moderator FROM users WHERE id = ?').get(userId) as { is_admin: number; is_moderator: number } | undefined
+  const row = db.prepare('SELECT is_admin, is_moderator FROM users WHERE id = ?').get(userId) as { is_admin: number, is_moderator: number } | undefined
   return row?.is_admin === 1 || row?.is_moderator === 1
 }
 
@@ -936,7 +936,7 @@ export interface ChefGroupInfo {
   groupUid: string
   groupName: string
   memberCount: number
-  members: Array<{ userId: number; username: string; role: GroupRole }>
+  members: Array<{ userId: number, username: string, role: GroupRole }>
 }
 
 // Récupère les groupes dont l'utilisateur est chef avec plus d'un membre
@@ -949,9 +949,9 @@ export function getChefGroupsWithMembers(userId: number): ChefGroupInfo[] {
     FROM groups g
     JOIN group_members gm ON g.id = gm.group_id
     WHERE gm.user_id = ? AND gm.role = 'chef'
-  `).all(userId) as Array<{ groupId: number; groupUid: string; groupName: string }>
+  `).all(userId) as Array<{ groupId: number, groupUid: string, groupName: string }>
 
-  return chefGroups.map(group => {
+  return chefGroups.map((group) => {
     const members = db.prepare(`
       SELECT gm.user_id as userId, u.username, gm.role
       FROM group_members gm
@@ -963,7 +963,7 @@ export function getChefGroupsWithMembers(userId: number): ChefGroupInfo[] {
           ELSE 2
         END,
         u.username
-    `).all(group.groupId, userId) as Array<{ userId: number; username: string; role: GroupRole }>
+    `).all(group.groupId, userId) as Array<{ userId: number, username: string, role: GroupRole }>
 
     return {
       ...group,
@@ -976,7 +976,7 @@ export function getChefGroupsWithMembers(userId: number): ChefGroupInfo[] {
 // Supprime le compte utilisateur et gère les groupes
 export function deleteUserAccount(
   userId: number,
-  chefTransfers: Array<{ groupId: number; newChefId: number }>
+  chefTransfers: Array<{ groupId: number, newChefId: number }>
 ): void {
   const db = getReputationDb()
 
@@ -1152,10 +1152,10 @@ export function getGroupReputationData(groupId: number) {
   // Récupérer toutes les traductions d'emblèmes
   const allTranslations = db.prepare(`
     SELECT emblem_id, locale, name, description FROM emblem_translations
-  `).all() as Array<{ emblem_id: number; locale: string; name: string | null; description: string | null }>
+  `).all() as Array<{ emblem_id: number, locale: string, name: string | null, description: string | null }>
 
   // Indexer par emblem_id
-  const translationsByEmblem: Record<number, Record<string, { name: string | null; description: string | null }>> = {}
+  const translationsByEmblem: Record<number, Record<string, { name: string | null, description: string | null }>> = {}
   for (const t of allTranslations) {
     if (!translationsByEmblem[t.emblem_id]) {
       translationsByEmblem[t.emblem_id] = {}
@@ -1169,7 +1169,7 @@ export function getGroupReputationData(groupId: number) {
       campaigns: Array<CampaignInfo & {
         emblems: Array<EmblemInfo & {
           userProgress: Record<number, UserEmblemProgress>
-          translations: Record<string, { name: string | null; description: string | null }>
+          translations: Record<string, { name: string | null, description: string | null }>
         }>
       }>
     }>

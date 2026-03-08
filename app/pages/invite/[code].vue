@@ -20,7 +20,7 @@ const hasJoined = ref(false)
 async function handleJoin() {
   isJoining.value = true
   try {
-    const result = await $fetch<{ success: boolean; message: string; groupUid: string }>(`/api/invite/${code}`, {
+    const result = await $fetch<{ success: boolean, message: string, groupUid: string }>(`/api/invite/${code}`, {
       method: 'POST'
     })
     toast.add({
@@ -56,16 +56,27 @@ function goToGroup() {
   <UContainer class="py-16">
     <div class="max-w-md mx-auto">
       <!-- Chargement -->
-      <div v-if="status === 'pending' || authLoading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary" />
+      <div
+        v-if="status === 'pending' || authLoading"
+        class="flex justify-center py-16"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-8 h-8 animate-spin text-primary"
+        />
       </div>
 
       <!-- Erreur : invitation non trouvée ou expirée -->
       <template v-else-if="error">
         <UCard>
           <div class="text-center py-8">
-            <UIcon name="i-lucide-link-2-off" class="w-16 h-16 text-error mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">{{ $t('invite.invalidInvitation') }}</h1>
+            <UIcon
+              name="i-lucide-link-2-off"
+              class="w-16 h-16 text-error mx-auto mb-4"
+            />
+            <h1 class="text-2xl font-pirate mb-2">
+              {{ $t('invite.invalidInvitation') }}
+            </h1>
             <p class="text-muted mb-6">
               {{ error.data?.message || $t('invite.invalidInvitationMessage') }}
             </p>
@@ -82,8 +93,13 @@ function goToGroup() {
       <template v-else-if="inviteInfo">
         <UCard>
           <div class="text-center py-4">
-            <UIcon name="i-lucide-users" class="w-16 h-16 text-primary mx-auto mb-4" />
-            <h1 class="text-2xl font-pirate mb-2">{{ $t('invite.invitationToGroup') }}</h1>
+            <UIcon
+              name="i-lucide-users"
+              class="w-16 h-16 text-primary mx-auto mb-4"
+            />
+            <h1 class="text-2xl font-pirate mb-2">
+              {{ $t('invite.invitationToGroup') }}
+            </h1>
             <p class="text-lg mb-6">
               {{ $t('invite.invitedToJoin') }}
               <strong class="text-primary">{{ inviteInfo.groupName }}</strong>
@@ -91,7 +107,11 @@ function goToGroup() {
 
             <!-- Déjà membre -->
             <template v-if="inviteInfo.alreadyMember">
-              <UAlert icon="i-lucide-check-circle" color="success" class="mb-4">
+              <UAlert
+                icon="i-lucide-check-circle"
+                color="success"
+                class="mb-4"
+              >
                 <template #description>
                   {{ $t('invite.alreadyMember') }}
                 </template>
@@ -105,7 +125,11 @@ function goToGroup() {
 
             <!-- A rejoint avec succès -->
             <template v-else-if="hasJoined">
-              <UAlert icon="i-lucide-check-circle" color="success" class="mb-4">
+              <UAlert
+                icon="i-lucide-check-circle"
+                color="success"
+                class="mb-4"
+              >
                 <template #description>
                   {{ $t('invite.joinedRedirecting') }}
                 </template>

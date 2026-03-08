@@ -3,7 +3,6 @@ import type { ReleaseNote } from '~/types/release-notes'
 
 const { isAdminOrModerator, isAdmin, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
-const { t } = useI18n()
 
 useSeoMeta({
   title: 'Notes de version - Administration'
@@ -41,7 +40,7 @@ const isSyncing = ref(false)
 async function syncFromForum() {
   isSyncing.value = true
   try {
-    const result = await $fetch<{ totalFound: number; added: number }>('/api/admin/release-notes/sync', { method: 'POST' })
+    const result = await $fetch<{ totalFound: number, added: number }>('/api/admin/release-notes/sync', { method: 'POST' })
     toast.add({
       title: 'Synchronisation terminée',
       description: `${result.totalFound} versions trouvées, ${result.added} nouvelles ajoutées`,
@@ -57,6 +56,8 @@ async function syncFromForum() {
 
 // Récupération du contenu
 const fetchingContentIds = ref<number[]>([])
+const batchImporting = ref<'missing' | 'all' | null>(null)
+const batchProgress = ref({ done: 0, total: 0, errors: 0 })
 
 async function fetchContent(note: ReleaseNote) {
   fetchingContentIds.value.push(note.id)
@@ -76,6 +77,72 @@ async function fetchContent(note: ReleaseNote) {
     })
   } finally {
     fetchingContentIds.value = fetchingContentIds.value.filter(id => id !== note.id)
+  }
+}
+
+async function batchImport(mode: 'missing' | 'all') {
+  if (!releaseNotes.value) return
+  const notes = mode === 'missing'
+    ? releaseNotes.value.filter(n => !n.content)
+    : [...releaseNotes.value]
+
+  if (notes.length === 0) {
+    toast.add({ title: 'Aucune note à importer', color: 'warning' })
+    return
+  }
+
+  batchImporting.value = mode
+  batchProgress.value = { done: 0, total: notes.length, errors: 0 }
+
+  for (const note of notes) {
+    try {
+      await $fetch(`/api/admin/release-notes/${note.id}/content`, { method: 'POST' })
+    } catch {
+      batchProgress.value.errors++
+    }
+    batchProgress.value.done++
+  }
+
+  toast.add({
+    title: 'Import terminé',
+    description: `${batchProgress.value.done - batchProgress.value.errors} réussis, ${batchProgress.value.errors} erreurs`,
+    color: batchProgress.value.errors ? 'warning' : 'success'
+  })
+
+  batchImporting.value = null
+  await refresh()
+}
+
+// Édition du contenu
+const isEditModalOpen = ref(false)
+const editingNote = ref<ReleaseNote | null>(null)
+const editContent = ref('')
+const isSaving = ref(false)
+
+function openEditor(note: ReleaseNote) {
+  editingNote.value = note
+  editContent.value = note.content || ''
+  isEditModalOpen.value = true
+}
+
+async function saveContent() {
+  if (!editingNote.value) return
+  isSaving.value = true
+  try {
+    await $fetch(`/api/admin/release-notes/${editingNote.value.id}/content`, {
+      method: 'PATCH',
+      body: { content: editContent.value }
+    })
+    toast.add({
+      title: `Contenu v${editingNote.value.version} sauvegardé`,
+      color: 'success'
+    })
+    isEditModalOpen.value = false
+    await refresh()
+  } catch {
+    toast.add({ title: 'Erreur de sauvegarde', color: 'error' })
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -127,14 +194,55 @@ function formatDate(dateStr: string): string {
             Importer les notes de mise à jour depuis le site Sea of Thieves
           </p>
         </div>
-        <UButton
-          v-if="isAdmin"
-          icon="i-lucide-refresh-cw"
-          label="Synchroniser"
-          :loading="isSyncing"
-          @click="syncFromForum"
-        />
+        <div class="flex items-center gap-2">
+          <UButton
+            v-if="isAdmin"
+            icon="i-lucide-refresh-cw"
+            label="Synchroniser"
+            :loading="isSyncing"
+            :disabled="!!batchImporting"
+            @click="syncFromForum"
+          />
+          <UButton
+            v-if="isAdmin && stats.withoutContent > 0"
+            icon="i-lucide-download"
+            :label="`Importer manquants (${stats.withoutContent})`"
+            variant="outline"
+            :loading="batchImporting === 'missing'"
+            :disabled="!!batchImporting && batchImporting !== 'missing'"
+            @click="batchImport('missing')"
+          />
+          <UButton
+            v-if="isAdmin && stats.total > 0"
+            icon="i-lucide-refresh-cw"
+            label="Tout ré-importer"
+            variant="outline"
+            color="warning"
+            :loading="batchImporting === 'all'"
+            :disabled="!!batchImporting && batchImporting !== 'all'"
+            @click="batchImport('all')"
+          />
+        </div>
       </div>
+    </div>
+
+    <!-- Progression batch -->
+    <div
+      v-if="batchImporting"
+      class="mb-6 p-4 bg-muted/30 rounded-lg"
+    >
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium">
+          Import en cours... {{ batchProgress.done }} / {{ batchProgress.total }}
+        </span>
+        <span
+          v-if="batchProgress.errors"
+          class="text-sm text-error"
+        >
+          {{ batchProgress.errors }} erreurs
+        </span>
+      </div>
+      <UProgress :value="batchProgress.total ? (batchProgress.done / batchProgress.total) * 100 : 0" />
     </div>
 
     <!-- Stats -->
@@ -198,7 +306,10 @@ function formatDate(dateStr: string): string {
     </div>
 
     <!-- Tableau -->
-    <div v-else class="space-y-2">
+    <div
+      v-else
+      class="space-y-2"
+    >
       <div
         v-for="note in releaseNotes"
         :key="note.id"
@@ -243,6 +354,13 @@ function formatDate(dateStr: string): string {
             @click="fetchContent(note)"
           />
           <UButton
+            v-if="note.content && isAdmin"
+            icon="i-lucide-pencil"
+            size="sm"
+            variant="ghost"
+            @click="openEditor(note)"
+          />
+          <UButton
             v-if="isAdmin"
             icon="i-lucide-trash-2"
             size="sm"
@@ -254,5 +372,49 @@ function formatDate(dateStr: string): string {
         </div>
       </div>
     </div>
+
+    <!-- Modal édition contenu -->
+    <UModal
+      v-model:open="isEditModalOpen"
+      :ui="{ width: 'max-w-4xl' }"
+    >
+      <template #content>
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold">
+                Éditer v{{ editingNote?.version }}
+              </h3>
+              <UButton
+                icon="i-lucide-x"
+                variant="ghost"
+                size="sm"
+                @click="isEditModalOpen = false"
+              />
+            </div>
+          </template>
+          <UTextarea
+            v-model="editContent"
+            :rows="20"
+            class="font-mono text-sm w-full"
+          />
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton
+                label="Annuler"
+                variant="ghost"
+                @click="isEditModalOpen = false"
+              />
+              <UButton
+                label="Sauvegarder"
+                icon="i-lucide-save"
+                :loading="isSaving"
+                @click="saveContent"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
   </UContainer>
 </template>

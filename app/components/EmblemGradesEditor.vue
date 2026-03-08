@@ -30,7 +30,7 @@ async function loadGrades() {
   error.value = null
 
   try {
-    const data = await $fetch<Array<{ grade: number; threshold: number }>>(
+    const data = await $fetch<Array<{ grade: number, threshold: number }>>(
       `/api/admin/emblems/${props.emblem.id}/grades`
     )
 
@@ -45,12 +45,10 @@ async function loadGrades() {
     }
 
     thresholds.value = values
-  }
-  catch (e) {
+  } catch (e) {
     error.value = t('components.gradeEditor.loadError')
     console.error(e)
-  }
-  finally {
+  } finally {
     isLoading.value = false
   }
 }
@@ -73,12 +71,10 @@ async function save() {
 
     emit('saved')
     emit('close')
-  }
-  catch (e) {
+  } catch (e) {
     error.value = t('components.gradeEditor.saveError')
     console.error(e)
-  }
-  finally {
+  } finally {
     isSaving.value = false
   }
 }
@@ -98,12 +94,15 @@ onMounted(() => {
           :src="emblem.image"
           :alt="emblem.name"
           class="w-12 h-12 rounded"
-        />
+        >
         <div
           v-else
           class="w-12 h-12 rounded bg-muted/30 flex items-center justify-center"
         >
-          <UIcon name="i-lucide-image-off" class="w-6 h-6 text-muted" />
+          <UIcon
+            name="i-lucide-image-off"
+            class="w-6 h-6 text-muted"
+          />
         </div>
         <div>
           <h3 class="text-lg font-semibold">
@@ -123,8 +122,14 @@ onMounted(() => {
     </div>
 
     <!-- Chargement -->
-    <div v-if="isLoading" class="flex justify-center py-8">
-      <UIcon name="i-lucide-loader-2" class="w-6 h-6 animate-spin text-muted" />
+    <div
+      v-if="isLoading"
+      class="flex justify-center py-8"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="w-6 h-6 animate-spin text-muted"
+      />
     </div>
 
     <!-- Erreur -->
@@ -136,7 +141,10 @@ onMounted(() => {
     />
 
     <!-- Formulaire -->
-    <div v-else class="space-y-4">
+    <div
+      v-else
+      class="space-y-4"
+    >
       <div
         v-for="(_, index) in thresholds"
         :key="index"

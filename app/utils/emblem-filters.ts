@@ -50,7 +50,7 @@ export function filterEmblems<T>(
     return emblems
   }
 
-  return emblems.filter(emblem => {
+  return emblems.filter((emblem) => {
     // Si "ignorer sans données" est activé, cacher les emblèmes sans données
     if (ignoreWithoutData && !hasData(emblem)) {
       return false

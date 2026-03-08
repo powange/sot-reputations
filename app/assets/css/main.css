@@ -38,3 +38,11 @@
   font-family: 'Pirata One', cursive;
 }
 
+/* Vidéos YouTube responsive dans le prose */
+.prose iframe {
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 0.5rem;
+}
+

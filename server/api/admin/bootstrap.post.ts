@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Trouver l'utilisateur
-  const user = db.prepare('SELECT id, username FROM users WHERE username = ?').get(username) as { id: number; username: string } | undefined
+  const user = db.prepare('SELECT id, username FROM users WHERE username = ?').get(username) as { id: number, username: string } | undefined
 
   if (!user) {
     throw createError({

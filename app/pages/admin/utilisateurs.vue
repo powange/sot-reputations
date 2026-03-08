@@ -127,8 +127,7 @@ async function changeUserRole(user: User, newRole: string) {
       color: 'success'
     })
     await refresh()
-  }
-  catch (e) {
+  } catch {
     toast.add({
       title: 'Erreur',
       description: 'Impossible de modifier les droits',
@@ -181,7 +180,7 @@ const columns: TableColumn<User>[] = [
   {
     accessorKey: 'role',
     id: 'role',
-    accessorFn: (row) => getSiteRoleOrder(row),
+    accessorFn: row => getSiteRoleOrder(row),
     header: () => h('button', {
       class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
       onClick: () => toggleSort('role')
@@ -193,7 +192,7 @@ const columns: TableColumn<User>[] = [
   {
     accessorKey: 'groups',
     id: 'groups',
-    accessorFn: (row) => row.groups.length,
+    accessorFn: row => row.groups.length,
     header: () => h('button', {
       class: 'flex items-center gap-1 font-medium hover:text-primary transition-colors',
       onClick: () => toggleSort('groups')
@@ -229,7 +228,7 @@ const sortedUsers = computed(() => {
   if (!users.value) return []
 
   // Filtrage par recherche pseudo
-  let filtered = users.value.filter((user) => {
+  const filtered = users.value.filter((user) => {
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
       if (!user.username.toLowerCase().includes(query)) {
@@ -251,8 +250,8 @@ const sortedUsers = computed(() => {
   if (!sort) return sorted
 
   sorted.sort((a, b) => {
-    let aVal: any
-    let bVal: any
+    let aVal: string | number | null
+    let bVal: string | number | null
 
     switch (sort.id) {
       case 'username':
@@ -345,11 +344,20 @@ watch(totalPages, (newTotal) => {
         />
       </div>
 
-      <div v-if="status === 'pending'" class="flex justify-center py-8">
-        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-muted" />
+      <div
+        v-if="status === 'pending'"
+        class="flex justify-center py-8"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-8 h-8 animate-spin text-muted"
+        />
       </div>
 
-      <div v-else-if="sortedUsers && sortedUsers.length > 0" class="overflow-x-auto">
+      <div
+        v-else-if="sortedUsers && sortedUsers.length > 0"
+        class="overflow-x-auto"
+      >
         <UTable
           :data="paginatedUsers"
           :columns="columns"
@@ -395,7 +403,10 @@ watch(totalPages, (newTotal) => {
           </template>
 
           <template #groups-cell="{ row }">
-            <div v-if="row.original.groups.length > 0" class="flex flex-wrap gap-1">
+            <div
+              v-if="row.original.groups.length > 0"
+              class="flex flex-wrap gap-1"
+            >
               <UBadge
                 v-for="group in row.original.groups"
                 :key="group.uid"
@@ -406,7 +417,10 @@ watch(totalPages, (newTotal) => {
                 {{ group.name }} ({{ roleLabels[group.role] || group.role }})
               </UBadge>
             </div>
-            <span v-else class="text-muted">-</span>
+            <span
+              v-else
+              class="text-muted"
+            >-</span>
           </template>
 
           <template #createdAt-cell="{ row }">
@@ -419,11 +433,17 @@ watch(totalPages, (newTotal) => {
         </UTable>
       </div>
 
-      <div v-else class="text-center py-8 text-muted">
+      <div
+        v-else
+        class="text-center py-8 text-muted"
+      >
         Aucun utilisateur
       </div>
 
-      <template v-if="users" #footer>
+      <template
+        v-if="users"
+        #footer
+      >
         <div class="flex flex-wrap items-center justify-between gap-4">
           <p class="text-sm text-muted">
             <template v-if="sortedUsers.length !== users.length">
@@ -435,7 +455,10 @@ watch(totalPages, (newTotal) => {
           </p>
 
           <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex items-center gap-2">
+          <div
+            v-if="totalPages > 1"
+            class="flex items-center gap-2"
+          >
             <UButton
               icon="i-lucide-chevron-left"
               variant="ghost"

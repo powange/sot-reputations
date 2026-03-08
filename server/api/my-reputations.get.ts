@@ -1,4 +1,4 @@
-import { getReputationDb, getAllFactions, getCampaignsByFaction, getUserProgressForEmblem, getAllGradeThresholdsForEmblems } from '../utils/reputation-db'
+import { getReputationDb, getAllFactions, getCampaignsByFaction, getAllGradeThresholdsForEmblems } from '../utils/reputation-db'
 import type { UserInfo, FactionInfo, CampaignInfo, EmblemInfo, UserEmblemProgress } from '../utils/reputation-db'
 
 interface EmblemTranslation {
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   // Récupérer toutes les traductions d'emblèmes
   const allTranslations = db.prepare(`
     SELECT emblem_id, locale, name, description FROM emblem_translations
-  `).all() as Array<{ emblem_id: number; locale: string; name: string | null; description: string | null }>
+  `).all() as Array<{ emblem_id: number, locale: string, name: string | null, description: string | null }>
 
   // Indexer par emblem_id
   const translationsByEmblem: Record<number, Record<string, EmblemTranslation>> = {}

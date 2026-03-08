@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { isUserAdmin, isUserAdminOrModerator } from './reputation-db'
 
-export async function requireAdmin(event: H3Event): Promise<{ id: number; username: string }> {
+export async function requireAdmin(event: H3Event): Promise<{ id: number, username: string }> {
   const session = await getUserSession(event)
 
   if (!session?.user) {
@@ -21,7 +21,7 @@ export async function requireAdmin(event: H3Event): Promise<{ id: number; userna
   return session.user
 }
 
-export async function requireAdminOrModerator(event: H3Event): Promise<{ id: number; username: string }> {
+export async function requireAdminOrModerator(event: H3Event): Promise<{ id: number, username: string }> {
   const session = await getUserSession(event)
 
   if (!session?.user) {

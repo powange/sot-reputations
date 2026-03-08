@@ -216,7 +216,7 @@ const filteredFactions = computed(() => {
       campaigns: faction.campaigns
         .map(campaign => ({
           ...campaign,
-          emblems: campaign.emblems.filter(e => {
+          emblems: campaign.emblems.filter((e) => {
             const matchesSearch = emblemMatchesSearch(e, query, { includeKey: true })
             const matchesUnvalidated = !hasUnvalidatedFilter || e.validated === 0
             const matchesIncompleteGrades = !hasIncompleteGradesFilter || (e.maxGrade > 1 && e.gradesConfigured < e.maxGrade)
@@ -278,20 +278,32 @@ watch(showOnlyIncompleteGrades, (value) => {
     <div class="grid grid-cols-4 gap-4 mb-8">
       <UCard>
         <div class="text-center">
-          <div class="text-3xl font-bold text-primary">{{ stats.factions }}</div>
-          <div class="text-sm text-muted">Factions</div>
+          <div class="text-3xl font-bold text-primary">
+            {{ stats.factions }}
+          </div>
+          <div class="text-sm text-muted">
+            Factions
+          </div>
         </div>
       </UCard>
       <UCard>
         <div class="text-center">
-          <div class="text-3xl font-bold text-primary">{{ stats.campaigns }}</div>
-          <div class="text-sm text-muted">Campagnes</div>
+          <div class="text-3xl font-bold text-primary">
+            {{ stats.campaigns }}
+          </div>
+          <div class="text-sm text-muted">
+            Campagnes
+          </div>
         </div>
       </UCard>
       <UCard>
         <div class="text-center">
-          <div class="text-3xl font-bold text-primary">{{ stats.emblems }}</div>
-          <div class="text-sm text-muted">Accomplissements</div>
+          <div class="text-3xl font-bold text-primary">
+            {{ stats.emblems }}
+          </div>
+          <div class="text-sm text-muted">
+            Accomplissements
+          </div>
         </div>
       </UCard>
       <UCard
@@ -302,12 +314,19 @@ watch(showOnlyIncompleteGrades, (value) => {
         @click="unvalidatedCount > 0 && toggleUnvalidatedFilter()"
       >
         <div class="text-center">
-          <div class="text-3xl font-bold" :class="unvalidatedCount > 0 ? 'text-warning' : 'text-success'">
+          <div
+            class="text-3xl font-bold"
+            :class="unvalidatedCount > 0 ? 'text-warning' : 'text-success'"
+          >
             {{ unvalidatedCount }}
           </div>
           <div class="text-sm text-muted flex items-center justify-center gap-1">
             <span>A valider</span>
-            <UIcon v-if="showOnlyUnvalidated" name="i-lucide-filter" class="w-3 h-3" />
+            <UIcon
+              v-if="showOnlyUnvalidated"
+              name="i-lucide-filter"
+              class="w-3 h-3"
+            />
           </div>
         </div>
       </UCard>
@@ -330,13 +349,25 @@ watch(showOnlyIncompleteGrades, (value) => {
     </div>
 
     <!-- Loading -->
-    <div v-if="status === 'pending'" class="flex justify-center py-8">
-      <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-muted" />
+    <div
+      v-if="status === 'pending'"
+      class="flex justify-center py-8"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="w-8 h-8 animate-spin text-muted"
+      />
     </div>
 
     <!-- Factions -->
-    <div v-else-if="filteredFactions && filteredFactions.length > 0" class="space-y-4">
-      <UCard v-for="faction in filteredFactions" :key="faction.id">
+    <div
+      v-else-if="filteredFactions && filteredFactions.length > 0"
+      class="space-y-4"
+    >
+      <UCard
+        v-for="faction in filteredFactions"
+        :key="faction.id"
+      >
         <!-- Header Faction -->
         <div
           class="flex items-center justify-between cursor-pointer"
@@ -348,18 +379,33 @@ watch(showOnlyIncompleteGrades, (value) => {
               class="w-5 h-5 text-muted"
             />
             <div>
-              <h3 class="font-semibold">{{ faction.name }}</h3>
-              <p v-if="faction.motto" class="text-sm text-muted italic">{{ faction.motto }}</p>
+              <h3 class="font-semibold">
+                {{ faction.name }}
+              </h3>
+              <p
+                v-if="faction.motto"
+                class="text-sm text-muted italic"
+              >
+                {{ faction.motto }}
+              </p>
             </div>
           </div>
           <div class="flex items-center gap-4 text-sm text-muted">
             <span>{{ faction.campaigns.length }} campagne{{ faction.campaigns.length > 1 ? 's' : '' }}</span>
-            <UBadge color="neutral" size="xs">{{ faction.key }}</UBadge>
+            <UBadge
+              color="neutral"
+              size="xs"
+            >
+              {{ faction.key }}
+            </UBadge>
           </div>
         </div>
 
         <!-- Campagnes -->
-        <div v-if="isFactionOpen(faction.key)" class="mt-4 ml-8 space-y-3">
+        <div
+          v-if="isFactionOpen(faction.key)"
+          class="mt-4 ml-8 space-y-3"
+        >
           <div
             v-for="campaign in faction.campaigns"
             :key="campaign.id"
@@ -379,19 +425,38 @@ watch(showOnlyIncompleteGrades, (value) => {
               </div>
               <div class="flex items-center gap-3 text-sm text-muted">
                 <span>{{ campaign.emblems.length }} accomplissement{{ campaign.emblems.length > 1 ? 's' : '' }}</span>
-                <UBadge color="neutral" size="xs">{{ campaign.key }}</UBadge>
+                <UBadge
+                  color="neutral"
+                  size="xs"
+                >
+                  {{ campaign.key }}
+                </UBadge>
               </div>
             </div>
 
             <!-- Emblèmes -->
-            <div v-if="isCampaignOpen(`${faction.key}-${campaign.key}`)" class="p-3">
-              <table v-if="campaign.emblems.length > 0" class="w-full text-sm">
+            <div
+              v-if="isCampaignOpen(`${faction.key}-${campaign.key}`)"
+              class="p-3"
+            >
+              <table
+                v-if="campaign.emblems.length > 0"
+                class="w-full text-sm"
+              >
                 <thead>
                   <tr class="border-b border-muted/30">
-                    <th class="text-left py-2 px-2 font-medium">Accomplissement</th>
-                    <th class="text-left py-2 px-2 font-medium">Key</th>
-                    <th class="text-center py-2 px-2 font-medium">Grades</th>
-                    <th class="text-center py-2 px-2 font-medium">Joueurs</th>
+                    <th class="text-left py-2 px-2 font-medium">
+                      Accomplissement
+                    </th>
+                    <th class="text-left py-2 px-2 font-medium">
+                      Key
+                    </th>
+                    <th class="text-center py-2 px-2 font-medium">
+                      Grades
+                    </th>
+                    <th class="text-center py-2 px-2 font-medium">
+                      Joueurs
+                    </th>
                     <th class="w-10" />
                   </tr>
                 </thead>
@@ -408,18 +473,31 @@ watch(showOnlyIncompleteGrades, (value) => {
                           :src="emblem.image"
                           :alt="emblem.name"
                           class="w-8 h-8 rounded"
-                        />
-                        <div v-else class="w-8 h-8 rounded bg-muted/30 flex items-center justify-center">
-                          <UIcon name="i-lucide-image-off" class="w-4 h-4 text-muted" />
+                        >
+                        <div
+                          v-else
+                          class="w-8 h-8 rounded bg-muted/30 flex items-center justify-center"
+                        >
+                          <UIcon
+                            name="i-lucide-image-off"
+                            class="w-4 h-4 text-muted"
+                          />
                         </div>
                         <div>
                           <div class="flex items-center gap-2">
                             <span class="font-medium">{{ emblem.name }}</span>
-                            <UBadge v-if="emblem.validated === 0" color="warning" size="xs">
+                            <UBadge
+                              v-if="emblem.validated === 0"
+                              color="warning"
+                              size="xs"
+                            >
                               Non valide
                             </UBadge>
                           </div>
-                          <div v-if="emblem.description" class="text-xs text-muted truncate max-w-xs">
+                          <div
+                            v-if="emblem.description"
+                            class="text-xs text-muted truncate max-w-xs"
+                          >
                             {{ emblem.description }}
                           </div>
                         </div>
@@ -432,10 +510,17 @@ watch(showOnlyIncompleteGrades, (value) => {
                       {{ emblem.maxGrade }}
                     </td>
                     <td class="py-2 px-2 text-center">
-                      <UBadge v-if="emblem.userCount > 0" color="success" size="xs">
+                      <UBadge
+                        v-if="emblem.userCount > 0"
+                        color="success"
+                        size="xs"
+                      >
                         {{ emblem.userCount }}
                       </UBadge>
-                      <span v-else class="text-muted">-</span>
+                      <span
+                        v-else
+                        class="text-muted"
+                      >-</span>
                     </td>
                     <td class="py-2 px-2 text-center">
                       <div class="flex items-center justify-center gap-1">
@@ -461,18 +546,29 @@ watch(showOnlyIncompleteGrades, (value) => {
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="text-muted text-center py-4">Aucun accomplissement</p>
+              <p
+                v-else
+                class="text-muted text-center py-4"
+              >
+                Aucun accomplissement
+              </p>
             </div>
           </div>
 
-          <p v-if="faction.campaigns.length === 0" class="text-muted text-center py-4">
+          <p
+            v-if="faction.campaigns.length === 0"
+            class="text-muted text-center py-4"
+          >
             Aucune campagne
           </p>
         </div>
       </UCard>
     </div>
 
-    <div v-else class="text-center py-8 text-muted">
+    <div
+      v-else
+      class="text-center py-8 text-muted"
+    >
       <template v-if="searchQuery.trim()">
         Aucun accomplissement trouve pour "{{ searchQuery }}"
       </template>

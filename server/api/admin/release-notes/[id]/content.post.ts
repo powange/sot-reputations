@@ -44,13 +44,24 @@ function htmlToMarkdown(html: string): string {
       case 'li': return `- ${children.trim()}\n`
       case 'br': return '\n'
       case 'a': {
-        const href = node.getAttribute('href')
+        const href = node.getAttribute('href') || ''
+        const ytMatch = href.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/)
+        if (ytMatch) {
+          return `\n\n<iframe width="560" height="315" src="https://www.youtube.com/embed/${ytMatch[1]}" frameborder="0" allowfullscreen></iframe>\n\n`
+        }
         return href ? `[${children.trim()}](${href})` : children
       }
       case 'img': {
         const alt = node.getAttribute('alt') || ''
         const src = node.getAttribute('src') || ''
         return src ? `![${alt}](${src})` : ''
+      }
+      case 'iframe': {
+        const src = node.getAttribute('src') || ''
+        if (src.includes('youtube.com') || src.includes('youtu.be')) {
+          return `\n\n<iframe width="560" height="315" src="${src}" frameborder="0" allowfullscreen></iframe>\n\n`
+        }
+        return ''
       }
       case 'div':
       case 'section':
@@ -76,7 +87,8 @@ function htmlToMarkdown(html: string): string {
   const sectionsToRemove = [
     /#{1,4}\s*Connect With Us:?\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
     /#{1,4}\s*Download and Installation\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
-    /#{1,4}\s*Known Issues\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi
+    /#{1,4}\s*Known Issues\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
+    /#{1,4}\s*Full Release Notes\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi
   ]
   for (const regex of sectionsToRemove) {
     markdown = markdown.replace(regex, '')
@@ -111,10 +123,10 @@ export default defineEventHandler(async (event) => {
         'Accept-Language': 'en-US,en;q=0.5'
       }
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw createError({
       statusCode: 502,
-      message: `Impossible de récupérer le contenu depuis ${url}: ${err?.message || err}`
+      message: `Impossible de récupérer le contenu depuis ${url}: ${err instanceof Error ? err.message : String(err)}`
     })
   }
 

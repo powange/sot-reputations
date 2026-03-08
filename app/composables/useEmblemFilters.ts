@@ -57,8 +57,8 @@ export function useEmblemFilters(options: UseEmblemFiltersOptions) {
     return selectedFactions.value.map(faction => ({
       faction,
       campaigns: faction.campaigns.filter(c =>
-        selectedCampaignIds.value.includes(c.id) &&
-        (c.key !== 'default' || faction.campaigns.length === 1)
+        selectedCampaignIds.value.includes(c.id)
+        && (c.key !== 'default' || faction.campaigns.length === 1)
       )
     }))
   })

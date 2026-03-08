@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getReputationDb()
-  const emblem = db.prepare('SELECT id, name FROM emblems WHERE id = ?').get(id) as { id: number; name: string } | undefined
+  const emblem = db.prepare('SELECT id, name FROM emblems WHERE id = ?').get(id) as { id: number, name: string } | undefined
   if (!emblem) {
     throw createError({ statusCode: 404, message: 'Embleme non trouve' })
   }

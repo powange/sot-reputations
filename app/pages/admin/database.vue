@@ -97,7 +97,7 @@ async function executeRestore() {
     const formData = new FormData()
     formData.append('database', selectedFile.value)
 
-    const response = await $fetch<{ success: boolean; message: string }>('/api/admin/database/restore', {
+    const response = await $fetch<{ success: boolean, message: string }>('/api/admin/database/restore', {
       method: 'POST',
       body: formData
     })
@@ -113,7 +113,7 @@ async function executeRestore() {
     const fileInput = document.getElementById('restore-file') as HTMLInputElement
     if (fileInput) fileInput.value = ''
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string }; message?: string }
+    const err = error as { data?: { message?: string }, message?: string }
     toast.add({
       title: 'Erreur de restauration',
       description: err.data?.message || err.message || 'Erreur inconnue',
@@ -148,8 +148,13 @@ async function executeRestore() {
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-download" class="w-5 h-5 text-primary" />
-            <h2 class="text-xl font-semibold">Sauvegarde</h2>
+            <UIcon
+              name="i-lucide-download"
+              class="w-5 h-5 text-primary"
+            />
+            <h2 class="text-xl font-semibold">
+              Sauvegarde
+            </h2>
           </div>
         </template>
 
@@ -170,8 +175,13 @@ async function executeRestore() {
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-upload" class="w-5 h-5 text-warning" />
-            <h2 class="text-xl font-semibold">Restauration</h2>
+            <UIcon
+              name="i-lucide-upload"
+              class="w-5 h-5 text-warning"
+            />
+            <h2 class="text-xl font-semibold">
+              Restauration
+            </h2>
           </div>
         </template>
 
@@ -186,7 +196,10 @@ async function executeRestore() {
 
         <div class="space-y-4">
           <div>
-            <label for="restore-file" class="block text-sm font-medium mb-2">
+            <label
+              for="restore-file"
+              class="block text-sm font-medium mb-2"
+            >
               Fichier de sauvegarde (.db)
             </label>
             <input
@@ -198,7 +211,10 @@ async function executeRestore() {
             >
           </div>
 
-          <div v-if="selectedFile" class="text-sm text-muted">
+          <div
+            v-if="selectedFile"
+            class="text-sm text-muted"
+          >
             Fichier selectionne : <strong>{{ selectedFile.name }}</strong>
             ({{ (selectedFile.size / 1024 / 1024).toFixed(2) }} Mo)
           </div>
@@ -221,8 +237,13 @@ async function executeRestore() {
         <UCard>
           <template #header>
             <div class="flex items-center gap-2 text-warning">
-              <UIcon name="i-lucide-alert-triangle" class="w-6 h-6" />
-              <h2 class="text-xl font-semibold">Confirmer la restauration</h2>
+              <UIcon
+                name="i-lucide-alert-triangle"
+                class="w-6 h-6"
+              />
+              <h2 class="text-xl font-semibold">
+                Confirmer la restauration
+              </h2>
             </div>
           </template>
 

@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
   // Écrire le nouveau fichier
   try {
     await writeFile(DB_PATH, file.data)
-  } catch (err) {
+  } catch {
     // En cas d'erreur, essayer de restaurer la sauvegarde
     try {
       await copyFile(backupPath, DB_PATH)
