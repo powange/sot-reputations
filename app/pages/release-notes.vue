@@ -2,7 +2,7 @@
 import { marked } from 'marked'
 import type { ReleaseNote } from '~/types/release-notes'
 
-const { t, d } = useI18n()
+const { t } = useI18n()
 
 useSeoMeta({
   title: () => t('releaseNotes.title'),
@@ -17,6 +17,32 @@ const selectedVersion = ref<string | null>(null)
 const notesContainer = ref<HTMLElement | null>(null)
 const occurrenceCount = ref(0)
 const currentOccurrence = ref(0)
+const visibleNote = ref<ReleaseNote | null>(null)
+
+onMounted(() => {
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const idx = Number((entry.target as HTMLElement).dataset.noteIdx)
+        if (filteredNotes.value[idx]) {
+          visibleNote.value = filteredNotes.value[idx]
+        }
+      }
+    }
+  }, { rootMargin: '-80px 0px -70% 0px' })
+
+  watch(() => filteredNotes.value, () => {
+    observer.disconnect()
+    visibleNote.value = null
+    nextTick(() => {
+      if (!notesContainer.value) return
+      const cards = notesContainer.value.querySelectorAll('[data-note-idx]')
+      cards.forEach(card => observer.observe(card))
+    })
+  }, { immediate: true })
+
+  onUnmounted(() => observer.disconnect())
+})
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 watch(search, (val) => {
@@ -123,7 +149,12 @@ function highlightHtml(html: string, query: string): string {
 }
 
 function formatDate(dateStr: string): string {
-  return d(new Date(dateStr + 'T00:00:00'), 'short')
+  try {
+    const date = new Date(dateStr + 'T00:00:00')
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return dateStr
+  }
 }
 </script>
 
@@ -215,11 +246,13 @@ function formatDate(dateStr: string): string {
       ref="notesContainer"
       class="space-y-6"
     >
-      <UCard
-        v-for="note in filteredNotes"
+      <div
+        v-for="(note, idx) in filteredNotes"
         :key="note.id"
+        :data-note-idx="idx"
+        class="rounded-lg border border-muted"
       >
-        <template #header>
+        <div class="px-5 py-3 border-b border-muted">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
               <UBadge
@@ -241,14 +274,41 @@ function formatDate(dateStr: string): string {
               size="sm"
             />
           </div>
-        </template>
+        </div>
         <div
-          class="prose prose-sm dark:prose-invert max-w-none"
+          class="prose prose-sm dark:prose-invert max-w-none p-5"
           v-html="renderMarkdown(note.content ?? '')"
         />
-      </UCard>
+      </div>
     </div>
   </UContainer>
+
+  <!-- Header fixe de la note visible -->
+  <div
+    v-if="visibleNote"
+    class="fixed top-16 left-0 right-0 z-30 bg-default/95 backdrop-blur border-b border-muted shadow-sm"
+  >
+    <div class="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <UBadge
+          color="primary"
+          variant="solid"
+        >
+          v{{ visibleNote.display_version || visibleNote.version }}
+        </UBadge>
+        <span class="text-muted text-sm">
+          {{ formatDate(visibleNote.date) }}
+        </span>
+      </div>
+      <UButton
+        :to="`https://www.seaofthieves.com/release-notes/${visibleNote.display_version || visibleNote.version}`"
+        target="_blank"
+        variant="ghost"
+        icon="i-lucide-external-link"
+        size="xs"
+      />
+    </div>
+  </div>
 
   <!-- Navigation occurrences sticky -->
   <div
