@@ -12,19 +12,29 @@ useSeoMeta({
 const { data: releaseNotes } = await useFetch<ReleaseNote[]>('/api/release-notes')
 
 const search = ref('')
+const debouncedSearch = ref('')
 const selectedVersion = ref<string | null>(null)
+const notesContainer = ref<HTMLElement | null>(null)
+const occurrenceCount = ref(0)
+const currentOccurrence = ref(0)
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(search, (val) => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    debouncedSearch.value = val
+  }, 400)
+})
 
 const filteredNotes = computed(() => {
   if (!releaseNotes.value) return []
 
-  // Si une version est sélectionnée, afficher uniquement celle-ci
   if (selectedVersion.value) {
     return releaseNotes.value.filter(n => n.version === selectedVersion.value)
   }
 
-  // Sinon, filtrer par recherche dans le contenu et la version
-  if (search.value.trim()) {
-    const q = search.value.toLowerCase()
+  if (debouncedSearch.value.trim()) {
+    const q = debouncedSearch.value.toLowerCase()
     return releaseNotes.value.filter(n =>
       n.version.includes(q)
       || (n.content && n.content.toLowerCase().includes(q))
@@ -46,10 +56,60 @@ function clearSelection() {
   selectedVersion.value = null
 }
 
+function updateOccurrences() {
+  nextTick(() => {
+    if (!notesContainer.value) {
+      occurrenceCount.value = 0
+      currentOccurrence.value = 0
+      return
+    }
+    const marks = notesContainer.value.querySelectorAll('mark')
+    occurrenceCount.value = marks.length
+    if (marks.length > 0) {
+      currentOccurrence.value = 1
+      scrollToOccurrence(1)
+    } else {
+      currentOccurrence.value = 0
+    }
+  })
+}
+
+function scrollToOccurrence(index: number) {
+  if (!notesContainer.value) return
+  const marks = notesContainer.value.querySelectorAll('mark')
+  marks.forEach(m => m.classList.remove('ring-2', 'ring-primary'))
+  if (index >= 1 && index <= marks.length) {
+    const mark = marks[index - 1]
+    mark.classList.add('ring-2', 'ring-primary')
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+function nextOccurrenceFn() {
+  if (occurrenceCount.value === 0) return
+  currentOccurrence.value = currentOccurrence.value >= occurrenceCount.value ? 1 : currentOccurrence.value + 1
+  scrollToOccurrence(currentOccurrence.value)
+}
+
+function prevOccurrenceFn() {
+  if (occurrenceCount.value === 0) return
+  currentOccurrence.value = currentOccurrence.value <= 1 ? occurrenceCount.value : currentOccurrence.value - 1
+  scrollToOccurrence(currentOccurrence.value)
+}
+
+watch(filteredNotes, () => {
+  if (debouncedSearch.value.trim() && !selectedVersion.value) {
+    updateOccurrences()
+  } else {
+    occurrenceCount.value = 0
+    currentOccurrence.value = 0
+  }
+})
+
 function renderMarkdown(content: string): string {
   const html = marked.parse(content, { async: false }) as string
-  if (!search.value.trim()) return html
-  return highlightHtml(html, search.value.trim())
+  if (!debouncedSearch.value.trim()) return html
+  return highlightHtml(html, debouncedSearch.value.trim())
 }
 
 function highlightHtml(html: string, query: string): string {
@@ -98,11 +158,12 @@ function formatDate(dateStr: string): string {
         class="w-full sm:w-72"
       />
       <UInput
-        v-model="search"
+        :model-value="search"
         :placeholder="$t('releaseNotes.search')"
         icon="i-lucide-search"
         :disabled="!!selectedVersion"
         class="w-full sm:flex-1"
+        @update:model-value="search = String($event)"
       />
       <UButton
         v-if="selectedVersion || search"
@@ -112,7 +173,7 @@ function formatDate(dateStr: string): string {
       />
     </div>
 
-    <!-- Compteur de résultats (uniquement pour la recherche) -->
+    <!-- Compteur de résultats -->
     <p
       v-if="releaseNotes && releaseNotes.length > 0 && search && !selectedVersion"
       class="text-muted text-sm mb-4"
@@ -151,6 +212,7 @@ function formatDate(dateStr: string): string {
     <!-- Liste des notes de version -->
     <div
       v-else
+      ref="notesContainer"
       class="space-y-6"
     >
       <UCard
@@ -187,4 +249,26 @@ function formatDate(dateStr: string): string {
       </UCard>
     </div>
   </UContainer>
+
+  <!-- Navigation occurrences sticky -->
+  <div
+    v-if="occurrenceCount > 0"
+    class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-default/90 backdrop-blur border border-muted rounded-full px-4 py-2 shadow-lg"
+  >
+    <span class="text-sm font-medium">
+      {{ currentOccurrence }} / {{ occurrenceCount }}
+    </span>
+    <UButton
+      icon="i-lucide-chevron-up"
+      size="xs"
+      variant="ghost"
+      @click="prevOccurrenceFn"
+    />
+    <UButton
+      icon="i-lucide-chevron-down"
+      size="xs"
+      variant="ghost"
+      @click="nextOccurrenceFn"
+    />
+  </div>
 </template>

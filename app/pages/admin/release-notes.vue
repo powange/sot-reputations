@@ -354,7 +354,7 @@ function formatDate(dateStr: string): string {
             @click="fetchContent(note)"
           />
           <UButton
-            v-if="note.content && isAdmin"
+            v-if="isAdmin"
             icon="i-lucide-pencil"
             size="sm"
             variant="ghost"
