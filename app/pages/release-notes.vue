@@ -82,6 +82,21 @@ function clearSelection() {
   selectedVersion.value = null
 }
 
+const currentVersionIndex = computed(() => {
+  if (!selectedVersion.value || !releaseNotes.value) return -1
+  return releaseNotes.value.findIndex(n => n.version === selectedVersion.value)
+})
+
+function prevVersion() {
+  if (!releaseNotes.value || currentVersionIndex.value <= 0) return
+  selectedVersion.value = releaseNotes.value[currentVersionIndex.value - 1].version
+}
+
+function nextVersion() {
+  if (!releaseNotes.value || currentVersionIndex.value >= releaseNotes.value.length - 1) return
+  selectedVersion.value = releaseNotes.value[currentVersionIndex.value + 1].version
+}
+
 function updateOccurrences() {
   nextTick(() => {
     if (!notesContainer.value) {
@@ -133,7 +148,9 @@ watch(filteredNotes, () => {
 })
 
 function renderMarkdown(content: string): string {
-  const html = marked.parse(content, { async: false }) as string
+  let html = marked.parse(content, { async: false }) as string
+  // Ouvrir tous les liens dans un nouvel onglet
+  html = html.replace(/<a /g, '<a target="_blank" rel="noopener" ')
   if (!debouncedSearch.value.trim()) return html
   return highlightHtml(html, debouncedSearch.value.trim())
 }
@@ -161,13 +178,6 @@ function formatDate(dateStr: string): string {
 <template>
   <UContainer class="py-8 max-w-4xl">
     <div class="mb-8">
-      <UButton
-        to="/"
-        variant="ghost"
-        icon="i-lucide-arrow-left"
-        :label="$t('common.back')"
-        class="mb-4"
-      />
       <h1 class="text-4xl font-pirate">
         {{ $t('releaseNotes.title') }}
       </h1>
@@ -288,8 +298,23 @@ function formatDate(dateStr: string): string {
     v-if="visibleNote"
     class="fixed top-16 left-0 right-0 z-30 bg-default/95 backdrop-blur border-b border-muted shadow-sm"
   >
-    <div class="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+    <div class="max-w-4xl mx-auto px-4 py-2 flex items-center">
+      <!-- Navigation gauche -->
+      <div class="flex items-center gap-1 min-w-0 shrink-0">
+        <template v-if="selectedVersion && releaseNotes">
+          <UButton
+            size="xs"
+            variant="ghost"
+            icon="i-lucide-chevron-left"
+            :label="`v${releaseNotes[currentVersionIndex - 1]?.display_version || releaseNotes[currentVersionIndex - 1]?.version || ''}`"
+            :disabled="currentVersionIndex <= 0"
+            @click="prevVersion"
+          />
+        </template>
+      </div>
+
+      <!-- Centre : version + date -->
+      <div class="flex-1 flex items-center justify-center gap-2">
         <UBadge
           color="primary"
           variant="solid"
@@ -299,14 +324,28 @@ function formatDate(dateStr: string): string {
         <span class="text-muted text-sm">
           {{ formatDate(visibleNote.date) }}
         </span>
+        <UButton
+          :to="`https://www.seaofthieves.com/release-notes/${visibleNote.display_version || visibleNote.version}`"
+          target="_blank"
+          variant="ghost"
+          icon="i-lucide-external-link"
+          size="xs"
+        />
       </div>
-      <UButton
-        :to="`https://www.seaofthieves.com/release-notes/${visibleNote.display_version || visibleNote.version}`"
-        target="_blank"
-        variant="ghost"
-        icon="i-lucide-external-link"
-        size="xs"
-      />
+
+      <!-- Navigation droite -->
+      <div class="flex items-center gap-1 min-w-0 shrink-0">
+        <template v-if="selectedVersion && releaseNotes">
+          <UButton
+            size="xs"
+            variant="ghost"
+            trailing-icon="i-lucide-chevron-right"
+            :label="`v${releaseNotes[currentVersionIndex + 1]?.display_version || releaseNotes[currentVersionIndex + 1]?.version || ''}`"
+            :disabled="currentVersionIndex >= releaseNotes.length - 1"
+            @click="nextVersion"
+          />
+        </template>
+      </div>
     </div>
   </div>
 
