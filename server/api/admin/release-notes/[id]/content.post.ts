@@ -2,28 +2,12 @@ import { parse as parseHtml } from 'node-html-parser'
 import { requireAdmin } from '../../../../utils/admin'
 import { getReleaseNoteById, updateReleaseNoteContent } from '../../../../utils/release-notes-db'
 
-function htmlToMarkdown(html: string): string {
+function htmlFragmentToMarkdown(html: string): string {
   const root = parseHtml(html)
-
-  // Chercher le contenu principal de la release note
-  // Structure SoT : article.article > div.article__content > div.article__content-inner
-  const contentEl = root.querySelector('.article__content-inner')
-    || root.querySelector('.article__content')
-    || root.querySelector('article.article')
-    || root.querySelector('main')
-    || root
-
-  let markdown = ''
 
   function processNode(node: ReturnType<typeof parseHtml>): string {
     if (node.nodeType === 3) { // Text node
       return node.text
-    }
-
-    // Ignorer le header de page (titre générique "Release Notes" + version)
-    const classList = node.getAttribute?.('class') || ''
-    if (classList.includes('page-header') || classList.includes('breadcrumb') || classList.includes('cookie')) {
-      return ''
     }
 
     const tag = node.tagName?.toLowerCase()
@@ -81,7 +65,153 @@ function htmlToMarkdown(html: string): string {
     }
   }
 
-  markdown = processNode(contentEl)
+  return processNode(root)
+}
+
+interface AppPropsBlock {
+  '#Type'?: string
+  '#Name'?: string
+  Title?: string
+  BodyText?: string
+  YouTubeVideoCode?: string
+  Questions?: { Question?: string, Answer?: string }[]
+  data?: {
+    ArticlePageHeader?: { Title?: string, SnippetText?: string }
+    ArticleContentComponents?: AppPropsBlock[]
+  }
+}
+
+function extractJsonFromHtml(html: string): Record<string, unknown> | null {
+  const idx = html.indexOf('APP_PROPS')
+  if (idx === -1) return null
+  const eqIdx = html.indexOf('=', idx)
+  const jsonStart = html.indexOf('{', eqIdx)
+  if (jsonStart === -1) return null
+
+  // Matching de accolades pour trouver la fin du JSON
+  let depth = 0
+  let jsonEnd = -1
+  for (let i = jsonStart; i < html.length; i++) {
+    if (html[i] === '{') depth++
+    else if (html[i] === '}') {
+      depth--
+      if (depth === 0) {
+        jsonEnd = i + 1
+        break
+      }
+    }
+  }
+  if (jsonEnd === -1) return null
+
+  try {
+    return JSON.parse(html.substring(jsonStart, jsonEnd))
+  } catch {
+    return null
+  }
+}
+
+function extractFromAppProps(html: string): string | null {
+  const props = extractJsonFromHtml(html)
+  if (!props) return null
+
+  try {
+    const components = props?.data?.components as AppPropsBlock[] | undefined
+    if (!components) return null
+
+    let markdown = ''
+
+    for (const comp of components) {
+      // Structure : comp.data contient #Type, ArticlePageHeader, ArticleContentComponents
+      const compData = comp.data || comp
+      const type = compData['#Type'] || comp['#Type']
+      if (type !== 'Article') continue
+
+      // Titre depuis ArticlePageHeader
+      const header = compData.ArticlePageHeader as { Title?: string, SnippetText?: string } | undefined
+      const title = header?.SnippetText || header?.Title
+      if (title && title !== 'Release Notes') {
+        markdown += `# ${title}\n\n`
+      }
+
+      // Contenu depuis ArticleContentComponents
+      const blocks = compData.ArticleContentComponents as AppPropsBlock[] | undefined
+      if (!blocks) continue
+
+      for (const block of blocks) {
+        const blockType = block['#Type']
+
+        switch (blockType) {
+          case 'ArticleTextBlock':
+            if (block.BodyText) {
+              markdown += htmlFragmentToMarkdown(block.BodyText)
+            }
+            break
+          case 'ArticleSectionTitle':
+            if (block.Title) {
+              markdown += `## ${block.Title}\n\n`
+            }
+            break
+          case 'ArticleVideoPanel':
+            if (block.YouTubeVideoCode) {
+              markdown += `\n\n<iframe width="560" height="315" src="https://www.youtube.com/embed/${block.YouTubeVideoCode}" frameborder="0" allowfullscreen></iframe>\n\n`
+            }
+            if (block.BodyText) {
+              markdown += htmlFragmentToMarkdown(block.BodyText)
+            }
+            break
+          case 'FeatureBlock':
+            if (block.Title) {
+              markdown += `## ${block.Title}\n\n`
+            }
+            if (block.BodyText) {
+              markdown += htmlFragmentToMarkdown(block.BodyText)
+            }
+            break
+          case 'Faq':
+            if (block.Questions) {
+              for (const q of block.Questions) {
+                if (q.Question) {
+                  markdown += `### ${q.Question}\n\n`
+                }
+                if (q.Answer) {
+                  markdown += htmlFragmentToMarkdown(q.Answer)
+                }
+              }
+            }
+            break
+        }
+      }
+    }
+
+    return markdown || null
+  } catch {
+    return null
+  }
+}
+
+function htmlToMarkdown(html: string): string {
+  // Essayer d'abord l'extraction depuis APP_PROPS (pages React/SPA)
+  let markdown = extractFromAppProps(html)
+
+  if (!markdown) {
+    // Fallback : extraction depuis le HTML statique
+    const root = parseHtml(html)
+    const contentEl = root.querySelector('.article__content-inner')
+      || root.querySelector('.article__content')
+      || root.querySelector('article.article')
+      || root.querySelector('main')
+      || root
+
+    // Ignorer les sections non pertinentes
+    const classList = contentEl.getAttribute?.('class') || ''
+    if (classList.includes('page-header') || classList.includes('breadcrumb') || classList.includes('cookie')) {
+      markdown = ''
+    } else {
+      markdown = htmlFragmentToMarkdown(contentEl.toString())
+    }
+  }
+
+  if (!markdown) return ''
 
   // Supprimer les sections génériques (non spécifiques au patch note)
   const sectionsToRemove = [
