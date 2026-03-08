@@ -117,11 +117,13 @@ async function batchImport(mode: 'missing' | 'all') {
 const isEditModalOpen = ref(false)
 const editingNote = ref<ReleaseNote | null>(null)
 const editContent = ref('')
+const editDisplayVersion = ref('')
 const isSaving = ref(false)
 
 function openEditor(note: ReleaseNote) {
   editingNote.value = note
   editContent.value = note.content || ''
+  editDisplayVersion.value = note.display_version || note.version
   isEditModalOpen.value = true
 }
 
@@ -131,10 +133,13 @@ async function saveContent() {
   try {
     await $fetch(`/api/admin/release-notes/${editingNote.value.id}/content`, {
       method: 'PATCH',
-      body: { content: editContent.value }
+      body: {
+        content: editContent.value,
+        display_version: editDisplayVersion.value !== editingNote.value.version ? editDisplayVersion.value : undefined
+      }
     })
     toast.add({
-      title: `Contenu v${editingNote.value.version} sauvegardé`,
+      title: `Contenu v${editDisplayVersion.value} sauvegardé`,
       color: 'success'
     })
     isEditModalOpen.value = false
@@ -320,8 +325,15 @@ function formatDate(dateStr: string): string {
             :color="note.content ? 'success' : 'warning'"
             variant="solid"
           >
-            v{{ note.version }}
+            v{{ note.display_version || note.version }}
           </UBadge>
+          <span
+            v-if="note.display_version && note.display_version !== note.version"
+            class="text-xs text-muted"
+            :title="'Version originale : ' + note.version"
+          >
+            ({{ note.version }})
+          </span>
           <span class="text-sm text-muted">
             {{ formatDate(note.date) }}
           </span>
@@ -383,7 +395,7 @@ function formatDate(dateStr: string): string {
           <template #header>
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold">
-                Éditer v{{ editingNote?.version }}
+                Éditer v{{ editingNote?.display_version || editingNote?.version }}
               </h3>
               <UButton
                 icon="i-lucide-x"
@@ -393,6 +405,20 @@ function formatDate(dateStr: string): string {
               />
             </div>
           </template>
+          <div class="flex items-center gap-2 mb-4">
+            <label class="text-sm font-medium whitespace-nowrap">Version d'affichage</label>
+            <UInput
+              v-model="editDisplayVersion"
+              class="w-48"
+              placeholder="Ex: 3.3.2.1"
+            />
+            <span
+              v-if="editingNote && editDisplayVersion !== editingNote.version"
+              class="text-xs text-muted"
+            >
+              Originale : {{ editingNote.version }}
+            </span>
+          </div>
           <UTextarea
             v-model="editContent"
             :rows="20"

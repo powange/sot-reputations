@@ -22,12 +22,20 @@ export function getReleaseNotesDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_release_notes_date ON release_notes(date DESC);
   `)
 
+  // Migration : ajout colonne display_version
+  try {
+    db.exec('ALTER TABLE release_notes ADD COLUMN display_version TEXT')
+  } catch {
+    // Colonne déjà existante
+  }
+
   return db
 }
 
 export interface ReleaseNoteRow {
   id: number
   version: string
+  display_version: string | null
   date: string
   content: string | null
 }
@@ -35,23 +43,23 @@ export interface ReleaseNoteRow {
 // Toutes les release notes (pour l'admin)
 export function getReleaseNotes(): ReleaseNoteRow[] {
   const db = getReleaseNotesDb()
-  return db.prepare('SELECT id, version, date, content FROM release_notes ORDER BY date DESC').all() as ReleaseNoteRow[]
+  return db.prepare('SELECT id, version, display_version, date, content FROM release_notes ORDER BY date DESC').all() as ReleaseNoteRow[]
 }
 
 // Uniquement les release notes avec contenu (pour la page publique)
 export function getReleaseNotesWithContent(): ReleaseNoteRow[] {
   const db = getReleaseNotesDb()
-  return db.prepare('SELECT id, version, date, content FROM release_notes WHERE content IS NOT NULL ORDER BY date DESC').all() as ReleaseNoteRow[]
+  return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE content IS NOT NULL ORDER BY date DESC').all() as ReleaseNoteRow[]
 }
 
 export function getReleaseNoteById(id: number): ReleaseNoteRow | undefined {
   const db = getReleaseNotesDb()
-  return db.prepare('SELECT id, version, date, content FROM release_notes WHERE id = ?').get(id) as ReleaseNoteRow | undefined
+  return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE id = ?').get(id) as ReleaseNoteRow | undefined
 }
 
 export function getReleaseNoteByVersion(version: string): ReleaseNoteRow | undefined {
   const db = getReleaseNotesDb()
-  return db.prepare('SELECT id, version, date, content FROM release_notes WHERE version = ?').get(version) as ReleaseNoteRow | undefined
+  return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE version = ?').get(version) as ReleaseNoteRow | undefined
 }
 
 export function insertReleaseNote(version: string, date: string, content: string | null = null): number {
@@ -63,6 +71,11 @@ export function insertReleaseNote(version: string, date: string, content: string
 export function updateReleaseNoteContent(id: number, content: string): void {
   const db = getReleaseNotesDb()
   db.prepare('UPDATE release_notes SET content = ? WHERE id = ?').run(content, id)
+}
+
+export function updateReleaseNoteDisplayVersion(id: number, displayVersion: string): void {
+  const db = getReleaseNotesDb()
+  db.prepare('UPDATE release_notes SET display_version = ? WHERE id = ?').run(displayVersion, id)
 }
 
 export function deleteReleaseNote(id: number): void {

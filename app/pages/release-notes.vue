@@ -47,7 +47,7 @@ const filteredNotes = computed(() => {
 const versionOptions = computed(() => {
   if (!releaseNotes.value) return []
   return releaseNotes.value.map(n => ({
-    label: `v${n.version} — ${n.date}`,
+    label: `v${n.display_version || n.version} — ${n.date}`,
     value: n.version
   }))
 })
@@ -227,14 +227,14 @@ function formatDate(dateStr: string): string {
                 variant="solid"
                 size="lg"
               >
-                v{{ note.version }}
+                v{{ note.display_version || note.version }}
               </UBadge>
               <span class="text-muted text-sm">
                 {{ formatDate(note.date) }}
               </span>
             </div>
             <UButton
-              :to="`https://www.seaofthieves.com/release-notes/${note.version}`"
+              :to="`https://www.seaofthieves.com/release-notes/${note.display_version || note.version}`"
               target="_blank"
               variant="ghost"
               icon="i-lucide-external-link"

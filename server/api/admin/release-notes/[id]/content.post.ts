@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Fetch le contenu depuis le site SoT
-  const url = `https://www.seaofthieves.com/release-notes/${note.version}`
+  const url = `https://www.seaofthieves.com/release-notes/${note.display_version || note.version}`
   let html: string
   try {
     html = await $fetch<string>(url, {
