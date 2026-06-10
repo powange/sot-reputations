@@ -1,6 +1,9 @@
+import { randomUUID } from 'crypto'
 import { getQuery, sendRedirect } from 'h3'
 import { withQuery } from 'ufo'
 import { getReputationDb, isUserAdmin } from '../../utils/reputation-db'
+
+const OAUTH_STATE_COOKIE = 'ms_oauth_state'
 
 interface XboxUserTokenResponse {
   Token: string
@@ -91,13 +94,32 @@ export default defineEventHandler(async (event) => {
 
   // Étape 1: Rediriger vers Microsoft pour l'auth
   if (!query.code) {
+    // Anti-CSRF : générer un state aléatoire, le stocker en cookie et le transmettre
+    const state = randomUUID()
+    setCookie(event, OAUTH_STATE_COOKIE, state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/'
+    })
+
     const authURL = withQuery('https://login.live.com/oauth20_authorize.srf', {
       client_id: clientId,
       response_type: 'code',
       redirect_uri: redirectURL,
-      scope: 'Xboxlive.signin Xboxlive.offline_access'
+      scope: 'Xboxlive.signin Xboxlive.offline_access',
+      state
     })
     return sendRedirect(event, authURL)
+  }
+
+  // Anti-CSRF : valider le state renvoyé contre celui stocké en cookie
+  const expectedState = getCookie(event, OAUTH_STATE_COOKIE)
+  deleteCookie(event, OAUTH_STATE_COOKIE, { path: '/' })
+  if (!expectedState || query.state !== expectedState) {
+    console.error('Microsoft OAuth: state invalide')
+    return sendRedirect(event, '/?error=oauth')
   }
 
   // Étape 2: Échanger le code contre un token
@@ -182,7 +204,12 @@ export default defineEventHandler(async (event) => {
 
     // Rediriger vers l'URL sauvegardée ou la page d'accueil
     const redirectTo = getCookie(event, 'redirectTo') || '/'
-    const safeRedirect = redirectTo.startsWith('/') && !redirectTo.includes('//') ? redirectTo : '/'
+    // N'autoriser que des chemins internes : doit commencer par '/' mais pas par
+    // '//' ni '/\' (interprétés comme protocol-relative → open redirect)
+    const isSafePath = redirectTo.startsWith('/')
+      && redirectTo[1] !== '/'
+      && redirectTo[1] !== '\\'
+    const safeRedirect = isSafePath ? redirectTo : '/'
     deleteCookie(event, 'redirectTo')
     return sendRedirect(event, safeRedirect)
   } catch (error) {

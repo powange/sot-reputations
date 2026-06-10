@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { marked } from 'marked'
+import DOMPurify from 'isomorphic-dompurify'
 import type { ReleaseNote } from '~/types/release-notes'
+
+// N'autoriser que les iframes YouTube (embeds des release notes), supprimer les autres
+DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+  if (data.tagName === 'iframe') {
+    const src = (node as Element).getAttribute?.('src') || ''
+    if (!/^https:\/\/www\.youtube\.com\/embed\//.test(src)) {
+      node.parentNode?.removeChild(node)
+    }
+  }
+})
 
 const { t } = useI18n()
 
@@ -149,6 +160,11 @@ watch(filteredNotes, () => {
 
 function renderMarkdown(content: string): string {
   let html = marked.parse(content, { async: false }) as string
+  // Sanitiser le HTML (anti-XSS) en conservant les iframes YouTube
+  html = DOMPurify.sanitize(html, {
+    ADD_TAGS: ['iframe'],
+    ADD_ATTR: ['allowfullscreen', 'frameborder']
+  })
   // Ouvrir tous les liens dans un nouvel onglet
   html = html.replace(/<a /g, '<a target="_blank" rel="noopener" ')
   if (!debouncedSearch.value.trim()) return html

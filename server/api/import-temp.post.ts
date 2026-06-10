@@ -1,10 +1,9 @@
 import { storeTempData } from '../utils/temp-store'
+import { setBookmarkletCors } from '../utils/cors'
 
 export default defineEventHandler(async (event) => {
-  // Headers CORS pour permettre les requêtes depuis seaofthieves.com (bookmarklet)
-  setHeader(event, 'Access-Control-Allow-Origin', '*')
-  setHeader(event, 'Access-Control-Allow-Methods', 'POST, OPTIONS')
-  setHeader(event, 'Access-Control-Allow-Headers', 'Content-Type')
+  // CORS restreint à seaofthieves.com (bookmarklet)
+  setBookmarkletCors(event)
 
   const body = await readBody(event)
 
