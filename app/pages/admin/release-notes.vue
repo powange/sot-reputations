@@ -40,10 +40,13 @@ const isSyncing = ref(false)
 async function syncFromForum() {
   isSyncing.value = true
   try {
-    const result = await $fetch<{ totalFound: number, added: number }>('/api/admin/release-notes/sync', { method: 'POST' })
+    const result = await $fetch<{ totalFound: number, added: number, latestVersion: string | null, contentAdded: number }>('/api/admin/release-notes/sync', { method: 'POST' })
+    const contentInfo = result.contentAdded > 0 && result.latestVersion
+      ? `, contenu de la v${result.latestVersion} récupéré`
+      : ''
     toast.add({
       title: 'Synchronisation terminée',
-      description: `${result.totalFound} versions trouvées, ${result.added} nouvelles ajoutées`,
+      description: `${result.totalFound} versions trouvées, ${result.added} nouvelles ajoutées${contentInfo}`,
       color: 'success'
     })
     await refresh()
@@ -51,6 +54,38 @@ async function syncFromForum() {
     toast.add({ title: 'Erreur de synchronisation', color: 'error' })
   } finally {
     isSyncing.value = false
+  }
+}
+
+// Import d'une version spécifique
+const importVersion = ref('')
+const isImportingVersion = ref(false)
+
+async function importSpecificVersion() {
+  const version = importVersion.value.trim()
+  if (!version) return
+  isImportingVersion.value = true
+  try {
+    const result = await $fetch<{ created: boolean, version: string, contentLength: number }>(
+      '/api/admin/release-notes/import-version',
+      { method: 'POST', body: { version } }
+    )
+    toast.add({
+      title: result.created ? `Version v${result.version} ajoutée` : `Contenu v${result.version} mis à jour`,
+      description: `${result.contentLength} caractères récupérés`,
+      color: 'success'
+    })
+    importVersion.value = ''
+    await refresh()
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.add({
+      title: 'Erreur d\'import',
+      description: err.data?.message || 'Version introuvable sur le site',
+      color: 'error'
+    })
+  } finally {
+    isImportingVersion.value = false
   }
 }
 
@@ -200,6 +235,22 @@ function formatDate(dateStr: string): string {
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <UButtonGroup v-if="isAdmin">
+            <UInput
+              v-model="importVersion"
+              placeholder="ex: 3.7.1"
+              :disabled="isImportingVersion"
+              @keyup.enter="importSpecificVersion"
+            />
+            <UButton
+              icon="i-lucide-download"
+              label="Importer une version"
+              variant="outline"
+              :loading="isImportingVersion"
+              :disabled="!importVersion.trim()"
+              @click="importSpecificVersion"
+            />
+          </UButtonGroup>
           <UButton
             v-if="isAdmin"
             icon="i-lucide-refresh-cw"

@@ -401,5 +401,4 @@ function formatDate(dateStr: string): string {
       </template>
     </div>
   </div>
-
 </template>

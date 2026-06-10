@@ -1,14 +1,10 @@
 import { requireAdmin } from '../../../utils/admin'
-import { getReleaseNoteByVersion, insertReleaseNote } from '../../../utils/release-notes-db'
+import { getReleaseNoteByVersion, insertReleaseNote, updateReleaseNoteContent } from '../../../utils/release-notes-db'
+import { extractLatestVersionFromHtml, htmlToMarkdown, RELEASE_NOTES_FETCH_HEADERS as FETCH_HEADERS } from '../../../utils/release-notes-content'
 
 interface ForumTopic {
   version: string
   date: string
-}
-
-const FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 }
 
 // Liste complète des versions connues (source: wiki Sea of Thieves)
@@ -182,7 +178,28 @@ export default defineEventHandler(async (event) => {
     console.error('Erreur scraping forum:', error)
   }
 
-  // Étape 2 : Fusionner avec la liste connue (forum a priorité pour les dates)
+  // Étape 2 : Scraper la page principale des release notes pour récupérer
+  // la toute dernière version + son contenu. Utile car la dernière release
+  // n'est pas toujours présente sur le forum.
+  let latestVersion: string | null = null
+  let latestContent: string | null = null
+  try {
+    const html = await $fetch<string>(
+      'https://www.seaofthieves.com/release-notes',
+      { responseType: 'text', headers: FETCH_HEADERS }
+    )
+    latestVersion = extractLatestVersionFromHtml(html)
+    if (latestVersion) {
+      const content = htmlToMarkdown(html)
+      if (content && content.length >= 50) {
+        latestContent = content
+      }
+    }
+  } catch (error) {
+    console.error('Erreur scraping page release-notes:', error)
+  }
+
+  // Étape 3 : Fusionner avec la liste connue (forum a priorité pour les dates)
   const allTopics = new Map<string, ForumTopic>()
 
   // D'abord les versions connues (hardcodées)
@@ -195,19 +212,37 @@ export default defineEventHandler(async (event) => {
     allTopics.set(topic.version, topic)
   }
 
-  // Étape 3 : Insérer en DB
+  // Puis la dernière version détectée sur la page principale, si absente ailleurs.
+  // Date inconnue (pas exposée sur la page) : on retombe sur la date du jour.
+  if (latestVersion && !allTopics.has(latestVersion)) {
+    const today = new Date().toISOString().split('T')[0]
+    allTopics.set(latestVersion, { version: latestVersion, date: today })
+  }
+
+  // Étape 4 : Insérer en DB
   let added = 0
+  let contentAdded = 0
   for (const topic of allTopics.values()) {
+    const isLatest = topic.version === latestVersion
     const existing = getReleaseNoteByVersion(topic.version)
+
     if (!existing) {
-      insertReleaseNote(topic.version, topic.date)
+      // Insère la nouvelle version, avec son contenu si c'est la dernière
+      insertReleaseNote(topic.version, topic.date, isLatest ? latestContent : null)
       added++
+      if (isLatest && latestContent) contentAdded++
+    } else if (isLatest && latestContent && !existing.content) {
+      // Version déjà connue mais sans contenu : on le complète
+      updateReleaseNoteContent(existing.id, latestContent)
+      contentAdded++
     }
   }
 
   return {
     success: true,
     totalFound: allTopics.size,
-    added
+    added,
+    latestVersion,
+    contentAdded
   }
 })
