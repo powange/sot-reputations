@@ -9,6 +9,9 @@ services:
       - "3015:3000"
     volumes:
       - sot-data:/app/data
+    environment:
+      # Fuseau du serveur : la tâche planifiée "release-notes:sync" tourne à 15h locale
+      - TZ=Europe/Paris
     env_file:
       - stack.env
     healthcheck:

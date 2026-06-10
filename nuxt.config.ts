@@ -39,6 +39,16 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2025-01-15',
 
+  nitro: {
+    experimental: {
+      tasks: true
+    },
+    scheduledTasks: {
+      // Tous les jours à 15h (heure du serveur) : importe la dernière release note
+      '0 15 * * *': ['release-notes:sync']
+    }
+  },
+
   vite: {
     server: {
       allowedHosts: ['dev.achievements-sot.powange.com'],

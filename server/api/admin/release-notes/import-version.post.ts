@@ -1,6 +1,7 @@
 import { requireAdmin } from '../../../utils/admin'
 import { getReleaseNoteByVersion, insertReleaseNote, updateReleaseNoteContent } from '../../../utils/release-notes-db'
 import { htmlToMarkdown, RELEASE_NOTES_FETCH_HEADERS } from '../../../utils/release-notes-content'
+import { resolveReleaseDate } from '../../../utils/release-notes-sync'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
@@ -48,9 +49,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Nouvelle version : date inconnue (non exposée sur la page) -> date du jour
-  const today = new Date().toISOString().split('T')[0]
-  const id = insertReleaseNote(version, today, content)
+  // Nouvelle version : la page n'expose pas la date, on la résout via forum/KNOWN_VERSIONS
+  const date = await resolveReleaseDate(version)
+  const id = insertReleaseNote(version, date, content)
 
   return {
     success: true,

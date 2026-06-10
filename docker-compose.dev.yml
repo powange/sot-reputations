@@ -14,6 +14,7 @@ services:
     environment:
       - NODE_ENV=development
       - HOST=0.0.0.0
+      - TZ=Europe/Paris
     command: sh -c "npm install && npm run build && node .output/server/index.mjs"
 
 volumes:

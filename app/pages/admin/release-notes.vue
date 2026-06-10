@@ -153,12 +153,14 @@ const isEditModalOpen = ref(false)
 const editingNote = ref<ReleaseNote | null>(null)
 const editContent = ref('')
 const editDisplayVersion = ref('')
+const editDate = ref('')
 const isSaving = ref(false)
 
 function openEditor(note: ReleaseNote) {
   editingNote.value = note
   editContent.value = note.content || ''
   editDisplayVersion.value = note.display_version || note.version
+  editDate.value = note.date
   isEditModalOpen.value = true
 }
 
@@ -170,7 +172,8 @@ async function saveContent() {
       method: 'PATCH',
       body: {
         content: editContent.value,
-        display_version: editDisplayVersion.value !== editingNote.value.version ? editDisplayVersion.value : undefined
+        display_version: editDisplayVersion.value !== editingNote.value.version ? editDisplayVersion.value : undefined,
+        date: editDate.value !== editingNote.value.date ? editDate.value : undefined
       }
     })
     toast.add({
@@ -456,7 +459,7 @@ function formatDate(dateStr: string): string {
               />
             </div>
           </template>
-          <div class="flex items-center gap-2 mb-4">
+          <div class="flex flex-wrap items-center gap-2 mb-4">
             <label class="text-sm font-medium whitespace-nowrap">Version d'affichage</label>
             <UInput
               v-model="editDisplayVersion"
@@ -469,6 +472,12 @@ function formatDate(dateStr: string): string {
             >
               Originale : {{ editingNote.version }}
             </span>
+            <label class="text-sm font-medium whitespace-nowrap ml-4">Date</label>
+            <UInput
+              v-model="editDate"
+              type="date"
+              class="w-44"
+            />
           </div>
           <UTextarea
             v-model="editContent"

@@ -247,7 +247,9 @@ export function htmlToMarkdown(html: string): string {
     /#{1,4}\s*Download and Installation\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
     /#{1,4}\s*Known Issues\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
     /#{1,4}\s*Full Release Notes\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
-    /#{1,4}\s*Looking For Crew\??\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi
+    /#{1,4}\s*Looking For Crew\??\s*\n[\s\S]*?(?=\n#{1,4}\s|\n*$)/gi,
+    // Paragraphe générique renvoyant vers l'article "Known Issues" du support
+    /\n*To learn more about known issues[^\n]*/gi
   ]
   for (const regex of sectionsToRemove) {
     markdown = markdown.replace(regex, '')

@@ -78,6 +78,11 @@ export function updateReleaseNoteDisplayVersion(id: number, displayVersion: stri
   db.prepare('UPDATE release_notes SET display_version = ? WHERE id = ?').run(displayVersion, id)
 }
 
+export function updateReleaseNoteDate(id: number, date: string): void {
+  const db = getReleaseNotesDb()
+  db.prepare('UPDATE release_notes SET date = ? WHERE id = ?').run(date, id)
+}
+
 export function deleteReleaseNote(id: number): void {
   const db = getReleaseNotesDb()
   db.prepare('DELETE FROM release_notes WHERE id = ?').run(id)
