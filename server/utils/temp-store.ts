@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto'
 interface TempEntry {
   data: unknown
   createdAt: number
+  size: number
 }
 
 const tempStore = new Map<string, TempEntry>()
@@ -12,14 +13,28 @@ const EXPIRY_TIME = 5 * 60 * 1000 // 5 minutes
 
 // Garde-fous anti-DoS (le store est en mémoire et alimenté par des endpoints publics)
 const MAX_ENTRIES = 1000
-const MAX_DATA_BYTES = 1024 * 1024 // 1 Mo par entrée
+const MAX_TOTAL_BYTES = 128 * 1024 * 1024 // budget mémoire global : 128 Mo
+
+// Limites par type de payload (en octets)
+export const REPUTATION_MAX_BYTES = 8 * 1024 * 1024 // 8 Mo (réputation complète d'un compte)
+export const TRANSLATION_MAX_BYTES = 32 * 1024 * 1024 // 32 Mo (3 langues x tous les emblèmes)
+
+let totalBytes = 0
+
+function removeEntry(key: string): void {
+  const entry = tempStore.get(key)
+  if (entry) {
+    totalBytes -= entry.size
+    tempStore.delete(key)
+  }
+}
 
 // Nettoyer les entrées expirées
 function cleanup() {
   const now = Date.now()
   for (const [key, value] of tempStore.entries()) {
     if (now - value.createdAt > EXPIRY_TIME) {
-      tempStore.delete(key)
+      removeEntry(key)
     }
   }
 }
@@ -37,18 +52,27 @@ function generateCode(): string {
   return result
 }
 
-export function storeTempData(data: unknown): string {
+export function storeTempData(data: unknown, maxBytes: number = REPUTATION_MAX_BYTES): string {
   cleanup() // Nettoyer avant d'ajouter
 
-  // Refuser les payloads trop volumineux
-  if (JSON.stringify(data ?? null).length > MAX_DATA_BYTES) {
+  // Refuser les payloads trop volumineux (taille réelle en octets, accents inclus)
+  const size = Buffer.byteLength(JSON.stringify(data ?? null))
+  if (size > maxBytes) {
     throw createError({ statusCode: 413, message: 'Donnees trop volumineuses' })
   }
 
-  // Plafonner le nombre d'entrées : si plein, évincer la plus ancienne
-  if (tempStore.size >= MAX_ENTRIES) {
+  // Rester dans le budget mémoire global : évincer les plus anciennes entrées
+  while (totalBytes + size > MAX_TOTAL_BYTES && tempStore.size > 0) {
     const oldestKey = tempStore.keys().next().value
-    if (oldestKey) tempStore.delete(oldestKey)
+    if (!oldestKey) break
+    removeEntry(oldestKey)
+  }
+
+  // Plafonner le nombre d'entrées
+  while (tempStore.size >= MAX_ENTRIES) {
+    const oldestKey = tempStore.keys().next().value
+    if (!oldestKey) break
+    removeEntry(oldestKey)
   }
 
   // Générer un code unique (aléatoire cryptographique)
@@ -59,10 +83,8 @@ export function storeTempData(data: unknown): string {
     attempts++
   }
 
-  tempStore.set(code, {
-    data,
-    createdAt: Date.now()
-  })
+  tempStore.set(code, { data, createdAt: Date.now(), size })
+  totalBytes += size
 
   return code
 }
@@ -73,11 +95,11 @@ export function getTempData(code: string): unknown | null {
 
   // Vérifier l'expiration
   if (Date.now() - entry.createdAt > EXPIRY_TIME) {
-    tempStore.delete(code)
+    removeEntry(code)
     return null
   }
 
   // Supprimer après récupération (usage unique)
-  tempStore.delete(code)
+  removeEntry(code)
   return entry.data
 }

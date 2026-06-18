@@ -1,4 +1,4 @@
-import { storeTempData } from '../../utils/temp-store'
+import { storeTempData, TRANSLATION_MAX_BYTES } from '../../utils/temp-store'
 import { setBookmarkletCors } from '../../utils/cors'
 
 export default defineEventHandler(async (event) => {
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const code = storeTempData(body)
+  const code = storeTempData(body, TRANSLATION_MAX_BYTES)
 
   return {
     success: true,
