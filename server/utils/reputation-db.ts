@@ -149,6 +149,19 @@ export function getReputationDb(): Database.Database {
       UNIQUE(emblem_id, locale)
     );
 
+    -- Jetons d'API (accès lecture pour agents externes, gérés par un admin)
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      token_hash TEXT UNIQUE NOT NULL,
+      token_prefix TEXT NOT NULL,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_used_at DATETIME,
+      revoked_at DATETIME,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -159,6 +172,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_group_pending_invites_group ON group_pending_invites(group_id);
     CREATE INDEX IF NOT EXISTS idx_emblem_grade_thresholds_emblem ON emblem_grade_thresholds(emblem_id);
     CREATE INDEX IF NOT EXISTS idx_emblem_translations_emblem ON emblem_translations(emblem_id);
+    CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
