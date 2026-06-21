@@ -18,6 +18,7 @@ const MAX_TOTAL_BYTES = 128 * 1024 * 1024 // budget mémoire global : 128 Mo
 // Limites par type de payload (en octets)
 export const REPUTATION_MAX_BYTES = 8 * 1024 * 1024 // 8 Mo (réputation complète d'un compte)
 export const TRANSLATION_MAX_BYTES = 32 * 1024 * 1024 // 32 Mo (3 langues x tous les emblèmes)
+export const IMPORT_MAX_BYTES = 32 * 1024 * 1024 // 32 Mo (réputation + coffre, ~6000 items)
 
 let totalBytes = 0
 

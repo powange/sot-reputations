@@ -1,6 +1,7 @@
 {
   "nav": {
     "myReputations": "Mis Reputaciones",
+    "yourChest": "Tu Cofre",
     "myGroups": "Mis Grupos",
     "tutorial": "Tutorial",
     "admin": "Admin",
@@ -202,10 +203,23 @@
     "dataRetrieved": "Datos recuperados:",
     "factions": "Facciones",
     "achievements": "Alabanzas",
+    "chestItems": "Cofre",
     "loginToImport": "Inicia sesion con tu cuenta Xbox para importar estos datos.",
     "dataAssociated": "Estos datos se asociaran a tu cuenta",
     "importMyReputations": "Importar mis reputaciones",
     "importError": "Error durante la importacion"
+  },
+  "yourChest": {
+    "title": "Tu Cofre",
+    "subtitle": "Los objetos que posees en tu cuenta de Sea of Thieves.",
+    "searchPlaceholder": "Buscar un objeto...",
+    "allCategories": "Todas las categorías",
+    "allSubcategories": "Todas las subcategorías",
+    "itemsCount": "{count} objeto(s)",
+    "noData": "Cofre vacío",
+    "noDataDescription": "Importa tus datos desde el sitio de Sea of Thieves para ver el contenido de tu cofre.",
+    "noResults": "Ningún objeto encontrado",
+    "loadError": "No se pudo cargar tu cofre. Inténtalo de nuevo más tarde."
   },
   "groupPage": {
     "import": "Importar",

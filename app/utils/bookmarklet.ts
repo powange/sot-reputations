@@ -1,5 +1,5 @@
 // Version du bookmarklet - utilisée par l'API /api/bookmarklet-version
-export const BOOKMARKLET_VERSION = 6
+export const BOOKMARKLET_VERSION = 7
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {
@@ -250,7 +250,19 @@ export function generateBookmarkletCode(siteUrl: string): string {
     }
     return response.json();
   })
-  .then(data => {
+  .then(async (data) => {
+    // Récupérer aussi le coffre (best-effort : ne bloque pas l'import si échec)
+    let chestData = null;
+    try {
+      const chestResp = await fetch('https://www.seaofthieves.com/fr/api/profilev2/chest', { credentials: 'include' });
+      if (chestResp.ok) chestData = await chestResp.json();
+    } catch (e) { /* coffre optionnel */ }
+
+    const payload = { reputation: data, chest: chestData };
+    const chestCount = (chestData && chestData.chestData)
+      ? Object.values(chestData.chestData).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0)
+      : 0;
+
     const factionCount = Object.keys(data).length;
     const emblemCount = countEmblems(data);
 
@@ -265,6 +277,10 @@ export function generateBookmarkletCode(siteUrl: string): string {
         <div class="stat">
           <div class="stat-value">\${emblemCount}</div>
           <div class="stat-label">Accomplissements</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">\${chestCount}</div>
+          <div class="stat-label">Coffre</div>
         </div>
       </div>
       <div class="buttons">
@@ -294,7 +310,7 @@ export function generateBookmarkletCode(siteUrl: string): string {
         const response = await fetch(SITE_URL + '/api/import-temp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify(payload)
         });
         const result = await response.json();
         if (result.success && result.code) {
@@ -312,12 +328,12 @@ export function generateBookmarkletCode(siteUrl: string): string {
     // Bouton Copier
     copyBtn.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+        await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
         messageEl.innerHTML = '<div class="success">✓ Donnees copiees dans le presse-papier !</div>';
       } catch (err) {
         // Fallback pour les navigateurs qui ne supportent pas clipboard API
         const textarea = document.createElement('textarea');
-        textarea.value = JSON.stringify(data, null, 2);
+        textarea.value = JSON.stringify(payload, null, 2);
         textarea.style.position = 'fixed';
         textarea.style.opacity = '0';
         document.body.appendChild(textarea);

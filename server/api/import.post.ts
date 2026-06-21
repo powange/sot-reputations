@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt'
-import { getReputationDb, importReputationData, getGroupsByUserId } from '../utils/reputation-db'
+import { getReputationDb, importReputationData, importChestData, getGroupsByUserId } from '../utils/reputation-db'
 import { broadcastToGroups } from '../utils/sse'
 
 export default defineEventHandler(async (event) => {
@@ -23,6 +23,13 @@ export default defineEventHandler(async (event) => {
       message: 'jsonData doit etre un objet JSON valide'
     })
   }
+
+  // Format combiné { reputation, chest } (bookmarklet v7+) vs réputation brute
+  // (ancien bookmarklet / collage manuel) — rétro-compatible.
+  const wrapper = jsonData as { reputation?: unknown, chest?: unknown }
+  const hasWrapper = typeof wrapper.reputation === 'object' && wrapper.reputation !== null
+  const reputationData = hasWrapper ? wrapper.reputation : jsonData
+  const chestData = hasWrapper && wrapper.chest && typeof wrapper.chest === 'object' ? wrapper.chest : null
 
   const db = getReputationDb()
   let userId: number
@@ -66,7 +73,7 @@ export default defineEventHandler(async (event) => {
 
   // Importer les données de réputation
   try {
-    importReputationData(userId, jsonData)
+    importReputationData(userId, reputationData)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erreur inconnue'
     const isValidationError = message.includes('français') || message.includes('francais')
@@ -74,6 +81,17 @@ export default defineEventHandler(async (event) => {
       statusCode: isValidationError ? 400 : 500,
       message
     })
+  }
+
+  // Importer le coffre si présent (best-effort : ne fait pas échouer l'import
+  // de réputation déjà réussi en cas de données de coffre invalides).
+  if (chestData) {
+    try {
+      importChestData(userId, chestData)
+    } catch (error) {
+      // coffre optionnel : on n'échoue pas l'import de réputation, mais on trace.
+      console.error('[import] Échec de l\'import du coffre:', error instanceof Error ? error.message : error)
+    }
   }
 
   // Notifier les groupes de l'utilisateur via SSE

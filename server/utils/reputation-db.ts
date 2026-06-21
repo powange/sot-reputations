@@ -184,6 +184,28 @@ export function getReputationDb(): Database.Database {
       UNIQUE(campaign_id, locale)
     );
 
+    -- Catalogue partagé des items du coffre (cosmétiques/équipements du jeu).
+    -- sort_order conserve l'ordre d'import (intercalation des nouveaux items).
+    CREATE TABLE IF NOT EXISTS chest_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uid TEXT UNIQUE NOT NULL,
+      category TEXT NOT NULL,
+      subcategory TEXT,
+      name TEXT NOT NULL DEFAULT '',
+      description TEXT,
+      image TEXT,
+      sort_order REAL NOT NULL DEFAULT 0
+    );
+
+    -- Possession des items du coffre par utilisateur
+    CREATE TABLE IF NOT EXISTS user_chest_items (
+      user_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, item_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (item_id) REFERENCES chest_items(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -197,6 +219,8 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
     CREATE INDEX IF NOT EXISTS idx_faction_translations_faction ON faction_translations(faction_id);
     CREATE INDEX IF NOT EXISTS idx_campaign_translations_campaign ON campaign_translations(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_chest_items_category ON chest_items(category);
+    CREATE INDEX IF NOT EXISTS idx_user_chest_items_user ON user_chest_items(user_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -844,6 +868,198 @@ export function importCampaignTranslations(payload: {
   return counts
 }
 
+// ============ COFFRE (CHEST) ============
+
+// Ordre d'affichage des catégories (ordre du jeu) ; les catégories inconnues
+// sont ajoutées à la fin par ordre alphabétique.
+const CHEST_CATEGORY_ORDER = [
+  'Ship', 'Vanity', 'Equipment', 'Armory', 'Clothing', 'ShipDecoration', 'Pets', 'ShipTrinket', 'Bones'
+]
+
+export interface ChestItem {
+  id: number
+  uid: string
+  category: string
+  subcategory: string | null
+  name: string
+  description: string | null
+  image: string | null
+}
+
+interface ParsedChestItem {
+  uid: string
+  subcategory: string | null
+  name: string
+  description: string | null
+  image: string | null
+}
+
+function parseChestItem(raw: unknown): ParsedChestItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const uid = typeof o['#Name'] === 'string' ? o['#Name'] : null
+  if (!uid) return null
+  const tags = (o.Taxonomy as { Tags?: Array<{ '#Value'?: unknown }> } | undefined)?.Tags
+  const subRaw = tags?.[0]?.['#Value']
+  return {
+    uid,
+    subcategory: typeof subRaw === 'string' ? subRaw : null,
+    name: typeof o.title === 'string' ? o.title : '',
+    description: typeof o.subtitle === 'string' ? o.subtitle : null,
+    image: typeof o.image === 'string' ? o.image : null
+  }
+}
+
+/**
+ * Calcule un sort_order pour chaque uid d'un import (ordre de la catégorie).
+ * Les items connus gardent leur sort_order ; les nouveaux items sont intercalés
+ * (point médian) entre leurs voisins déjà connus.
+ */
+function computeChestSortOrders(uids: string[], existing: Map<string, number>): Map<string, number> {
+  const result = new Map<string, number>()
+  let lower: number | null = null
+  let pending: string[] = []
+
+  const flush = (upper: number | null) => {
+    if (pending.length === 0) return
+    if (lower === null && upper === null) {
+      // catalogue vide : numérotation séquentielle
+      pending.forEach((uid, i) => result.set(uid, i))
+    } else if (lower === null && upper !== null) {
+      // nouveaux items avant le premier connu : placés en dessous
+      pending.forEach((uid, i) => result.set(uid, upper - (pending.length - i)))
+    } else if (lower !== null && upper === null) {
+      // nouveaux items après le dernier connu : ajoutés à la suite
+      const base = lower
+      pending.forEach((uid, i) => result.set(uid, base + (i + 1)))
+    } else if (lower !== null && upper !== null) {
+      // intercalation régulière entre deux connus
+      const base = lower
+      const gap = (upper - base) / (pending.length + 1)
+      pending.forEach((uid, i) => result.set(uid, base + gap * (i + 1)))
+    }
+    pending = []
+  }
+
+  for (const uid of uids) {
+    const known = existing.get(uid)
+    if (known !== undefined) {
+      flush(known)
+      result.set(uid, known)
+      lower = known
+    } else {
+      pending.push(uid)
+    }
+  }
+  flush(null)
+  return result
+}
+
+/**
+ * Importe le coffre d'un utilisateur depuis /fr/api/profilev2/chest
+ * (payload = { chestData: { <catégorie>: [items] }, categoryMap }).
+ * Alimente le catalogue partagé (intercalation de l'ordre pour les nouveaux
+ * items, refresh nom/desc/image — le site fait foi) puis remplace la possession
+ * de l'utilisateur.
+ */
+export function importChestData(userId: number, payload: { chestData?: Record<string, unknown> }): { items: number, categories: number } {
+  const chestData = payload?.chestData
+  if (!chestData || typeof chestData !== 'object') {
+    throw new Error('Données de coffre invalides')
+  }
+
+  // Pré-parser toutes les catégories AVANT de toucher à la possession : un coffre
+  // vide ou illisible (réponse transitoire, compte vide) ne doit pas effacer le
+  // coffre déjà importé de l'utilisateur.
+  const parsed: Array<{ category: string, items: ParsedChestItem[] }> = []
+  let totalItems = 0
+  for (const category of Object.keys(chestData)) {
+    const rawItems = (chestData as Record<string, unknown>)[category]
+    if (!Array.isArray(rawItems)) continue
+    const items = rawItems
+      .map(parseChestItem)
+      .filter((it): it is ParsedChestItem => it !== null)
+    if (items.length === 0) continue
+    parsed.push({ category, items })
+    totalItems += items.length
+  }
+
+  if (totalItems === 0) {
+    return { items: 0, categories: 0 }
+  }
+
+  const db = getReputationDb()
+
+  // Catalogue partagé : ne pas écraser un nom/desc/image existant avec une valeur
+  // vide (un champ manquant chez un utilisateur ne doit pas vider l'item pour tous).
+  // RETURNING id évite un SELECT supplémentaire par item.
+  const upsertItem = db.prepare(`
+    INSERT INTO chest_items (uid, category, subcategory, name, description, image, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET
+      category = excluded.category,
+      subcategory = excluded.subcategory,
+      name = COALESCE(NULLIF(excluded.name, ''), chest_items.name),
+      description = COALESCE(NULLIF(excluded.description, ''), chest_items.description),
+      image = COALESCE(NULLIF(excluded.image, ''), chest_items.image)
+    RETURNING id
+  `)
+  const getExistingByCategory = db.prepare('SELECT uid, sort_order as sortOrder FROM chest_items WHERE category = ?')
+  const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
+  const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
+
+  const run = db.transaction(() => {
+    // Le coffre importé = possession courante : on remplace l'ensemble.
+    deleteOwnership.run(userId)
+
+    for (const { category, items } of parsed) {
+      const existing = new Map<string, number>()
+      for (const row of getExistingByCategory.all(category) as Array<{ uid: string, sortOrder: number }>) {
+        existing.set(row.uid, row.sortOrder)
+      }
+
+      const orders = computeChestSortOrders(items.map(i => i.uid), existing)
+
+      for (const item of items) {
+        const idRow = upsertItem.get(
+          item.uid, category, item.subcategory, item.name, item.description, item.image, orders.get(item.uid) ?? 0
+        ) as { id: number }
+        insertOwnership.run(userId, idRow.id)
+      }
+    }
+  })
+  run()
+
+  return { items: totalItems, categories: parsed.length }
+}
+
+/** Items du coffre possédés par un utilisateur, triés par catégorie puis ordre d'import. */
+export function getUserChestItems(userId: number): ChestItem[] {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT ci.id, ci.uid, ci.category, ci.subcategory, ci.name, ci.description, ci.image, ci.sort_order as sortOrder
+    FROM user_chest_items uci
+    JOIN chest_items ci ON ci.id = uci.item_id
+    WHERE uci.user_id = ?
+  `).all(userId) as Array<ChestItem & { sortOrder: number }>
+
+  const catRank = (cat: string) => {
+    const i = CHEST_CATEGORY_ORDER.indexOf(cat)
+    return i === -1 ? CHEST_CATEGORY_ORDER.length : i
+  }
+
+  rows.sort((a, b) => {
+    const ra = catRank(a.category)
+    const rb = catRank(b.category)
+    if (ra !== rb) return ra - rb
+    if (a.category !== b.category) return a.category.localeCompare(b.category)
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+    return a.id - b.id
+  })
+
+  return rows.map(({ sortOrder: _sortOrder, ...item }) => item)
+}
+
 export function getCampaignsByFaction(factionId: number): CampaignInfo[] {
   const db = getReputationDb()
   return db.prepare(`
@@ -1285,8 +1501,9 @@ export function deleteUserAccount(
     // 5. Supprimer les invitations en attente liées à cet utilisateur
     db.prepare('DELETE FROM group_pending_invites WHERE user_id = ? OR invited_by = ?').run(userId, userId)
 
-    // 6. Supprimer les données de réputation
+    // 6. Supprimer les données de réputation et le coffre
     db.prepare('DELETE FROM user_emblems WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM user_chest_items WHERE user_id = ?').run(userId)
 
     // 7. Supprimer l'utilisateur
     db.prepare('DELETE FROM users WHERE id = ?').run(userId)

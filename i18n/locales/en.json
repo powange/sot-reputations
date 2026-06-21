@@ -1,6 +1,7 @@
 {
   "nav": {
     "myReputations": "My Reputations",
+    "yourChest": "Your Chest",
     "myGroups": "My Groups",
     "tutorial": "Tutorial",
     "admin": "Admin",
@@ -202,10 +203,23 @@
     "dataRetrieved": "Data retrieved:",
     "factions": "Factions",
     "achievements": "Commendations",
+    "chestItems": "Chest",
     "loginToImport": "Sign in with your Xbox account to import this data.",
     "dataAssociated": "This data will be associated with your account",
     "importMyReputations": "Import my reputations",
     "importError": "Error during import"
+  },
+  "yourChest": {
+    "title": "Your Chest",
+    "subtitle": "The items you own on your Sea of Thieves account.",
+    "searchPlaceholder": "Search an item...",
+    "allCategories": "All categories",
+    "allSubcategories": "All subcategories",
+    "itemsCount": "{count} item(s)",
+    "noData": "Empty chest",
+    "noDataDescription": "Import your data from the Sea of Thieves website to see your chest contents.",
+    "noResults": "No item found",
+    "loadError": "Could not load your chest. Please try again later."
   },
   "groupPage": {
     "import": "Import",

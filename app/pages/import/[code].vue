@@ -45,10 +45,20 @@ async function handleImport() {
   }
 }
 
+// Le payload peut être { reputation, chest } (bookmarklet v7+) ou la réputation brute.
+type FactionData = Record<string, { Emblems?: { Emblems?: unknown[] }, Campaigns?: Record<string, { Emblems?: unknown[] }> }>
+
+const repData = computed<FactionData | null>(() => {
+  const raw = tempData.value?.data as { reputation?: unknown } | null
+  if (!raw) return null
+  if (raw.reputation && typeof raw.reputation === 'object') return raw.reputation as FactionData
+  return raw as FactionData
+})
+
 // Compter le nombre d'accomplissements dans les données
 const emblemCount = computed(() => {
-  if (!tempData.value?.data) return 0
-  const data = tempData.value.data as Record<string, { Emblems?: { Emblems?: unknown[] }, Campaigns?: Record<string, { Emblems?: unknown[] }> }>
+  const data = repData.value
+  if (!data) return 0
   let count = 0
   for (const faction of Object.values(data)) {
     if (faction.Emblems?.Emblems) {
@@ -65,9 +75,14 @@ const emblemCount = computed(() => {
   return count
 })
 
-const factionCount = computed(() => {
-  if (!tempData.value?.data) return 0
-  return Object.keys(tempData.value.data as object).length
+const factionCount = computed(() => repData.value ? Object.keys(repData.value).length : 0)
+
+// Nombre d'items du coffre (si présent dans le payload)
+const chestItemCount = computed(() => {
+  const raw = tempData.value?.data as { chest?: { chestData?: Record<string, unknown> } } | null
+  const chestData = raw?.chest?.chestData
+  if (!chestData) return 0
+  return Object.values(chestData).reduce<number>((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0)
 })
 </script>
 
@@ -142,6 +157,17 @@ const factionCount = computed(() => {
                   </div>
                   <div class="text-xs text-muted">
                     {{ $t('importPage.achievements') }}
+                  </div>
+                </div>
+                <div
+                  v-if="chestItemCount > 0"
+                  class="text-center"
+                >
+                  <div class="text-2xl font-bold text-primary">
+                    {{ chestItemCount }}
+                  </div>
+                  <div class="text-xs text-muted">
+                    {{ $t('importPage.chestItems') }}
                   </div>
                 </div>
               </div>
