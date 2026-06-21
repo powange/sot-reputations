@@ -159,6 +159,8 @@ interface GameEmblemData {
 }
 
 interface GameCampaignData {
+  Title?: string
+  Desc?: string
   Emblems?: GameEmblemData[]
 }
 
@@ -665,19 +667,21 @@ async function loadBookmarkletData(code: string) {
 
 // Importer les mottos de factions (FR/EN/ES) depuis le payload du bookmarklet.
 // Non bloquant : un échec n'interrompt pas l'import des emblèmes.
-async function importFactionMottosFromBookmarklet(data: BookmarkletData) {
-  const { importFactionMottos } = useFactionTranslationsImport()
+async function importReputationTranslationsFromBookmarklet(data: BookmarkletData) {
+  const { importReputationTranslations } = useReputationTranslationsImport()
   try {
-    const res = await importFactionMottos({ fr: data.fr, en: data.en, es: data.es })
-    if (res.updatedEn + res.updatedEs > 0) {
+    const res = await importReputationTranslations({ fr: data.fr, en: data.en, es: data.es })
+    const f = res.factions
+    const c = res.campaigns
+    if (f.en + f.es + c.en + c.es > 0) {
       toast.add({
-        title: 'Mottos de factions mis à jour',
-        description: `${res.updatedEn} EN, ${res.updatedEs} ES`,
+        title: 'Traductions de réputation mises à jour',
+        description: `Factions : ${f.en} EN / ${f.es} ES · Campagnes : ${c.en} EN / ${c.es} ES`,
         color: 'success'
       })
     }
   } catch {
-    // silencieux : l'import des mottos de factions est secondaire
+    // silencieux : l'import des traductions de réputation est secondaire
   }
 }
 
@@ -685,10 +689,10 @@ async function importFactionMottosFromBookmarklet(data: BookmarkletData) {
 function runBookmarkletImport() {
   if (!bookmarkletData.value) return
 
-  // Importer les mottos de factions (FR de base + traductions EN/ES) en
-  // arrière-plan : ces données sont dans le même payload (clé Motto) et ne
+  // Importer les traductions de réputation (mottos de factions + Title/Desc des
+  // campagnes) en arrière-plan : ces données sont dans le même payload et ne
   // dépendent pas du chargement des emblèmes — donc avant le garde ci-dessous.
-  void importFactionMottosFromBookmarklet(bookmarkletData.value)
+  void importReputationTranslationsFromBookmarklet(bookmarkletData.value)
 
   if (!emblems.value) return
 

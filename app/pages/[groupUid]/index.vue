@@ -245,7 +245,7 @@ const searchResults = computed(() => {
       if (matchingEmblems.length > 0) {
         results.push({
           factionName: translateFactionField(faction, 'name', locale.value),
-          campaignName: campaign.name,
+          campaignName: translateCampaignField(campaign, 'name', locale.value),
           campaignKey: campaign.key,
           emblems: matchingEmblems
         })
@@ -1041,14 +1041,14 @@ onUnmounted(() => {
                   />
                   <div>
                     <h3 class="text-lg font-semibold">
-                      {{ campaign.name }}
+                      {{ translateCampaignField(campaign, 'name', locale) }}
                       <span class="text-sm font-normal text-muted">({{ getFilteredEmblems(campaign.id).length }})</span>
                     </h3>
                     <p
-                      v-if="campaign.description && !isCampaignCollapsed(campaign.id)"
+                      v-if="translateCampaignField(campaign, 'description', locale) && !isCampaignCollapsed(campaign.id)"
                       class="text-sm text-muted italic"
                     >
-                      {{ campaign.description }}
+                      {{ translateCampaignField(campaign, 'description', locale) }}
                     </p>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { importFactionMottoTranslations } from '../../../utils/reputation-db'
+import { importFactionMottoTranslations, importCampaignTranslations } from '../../../utils/reputation-db'
 
-type ReputationLocalePayload = Record<string, { Motto?: unknown }>
+type ReputationLocalePayload = Record<string, Record<string, unknown>>
 
 interface ImportBody {
   fr?: ReputationLocalePayload
@@ -11,10 +11,10 @@ interface ImportBody {
 
 /**
  * POST /api/admin/factions-edition/import-translations
- * Importe les mottos de factions (FR de base + traductions EN/ES) depuis les
- * données de réputation officielles récupérées par langue (bookmarklet de
- * traductions). Aucune faction n'est créée : seules celles déjà en base sont
- * mises à jour.
+ * Importe les traductions de réputation (factions: motto ; campagnes: Title/Desc)
+ * depuis les données officielles récupérées par langue (bookmarklet de
+ * traductions). Met à jour le FR de base et les traductions EN/ES des entités
+ * déjà en base ; aucune entité n'est créée.
  */
 export default defineEventHandler(async (event) => {
   await requireAdminOrModerator(event)
@@ -31,16 +31,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const counts = importFactionMottoTranslations({
+  const payload = {
     fr: isObject(body.fr) ? body.fr : undefined,
     en: isObject(body.en) ? body.en : undefined,
     es: isObject(body.es) ? body.es : undefined
-  })
-
-  return {
-    success: true,
-    updatedFr: counts.fr,
-    updatedEn: counts.en,
-    updatedEs: counts.es
   }
+
+  const factions = importFactionMottoTranslations(payload)
+  const campaigns = importCampaignTranslations(payload)
+
+  return { success: true, factions, campaigns }
 })

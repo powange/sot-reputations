@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { isAdminOrModerator, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
-const { importFactionMottos } = useFactionTranslationsImport()
+const { importReputationTranslations } = useReputationTranslationsImport()
 
 useSeoMeta({
   title: 'Éditer les factions - Administration'
@@ -171,19 +171,19 @@ function translationBadge(faction: Faction, locale: string): {
   return { color: 'neutral', variant: 'outline', symbol: '—', title: 'Aucune traduction' }
 }
 
-// --- Import des mottos traduits depuis les données de réputation officielles ---
+// --- Import des traductions (mottos de factions + Title/Desc des campagnes) ---
 const importModalOpen = ref(false)
 const importing = ref(false)
 const importJson = reactive({ fr: '', en: '', es: '' })
 
-function openImportMottos() {
+function openImportTranslations() {
   importJson.fr = ''
   importJson.en = ''
   importJson.es = ''
   importModalOpen.value = true
 }
 
-async function importMottos() {
+async function importTranslations() {
   const body: Record<string, unknown> = {}
   try {
     if (importJson.fr.trim()) body.fr = JSON.parse(importJson.fr)
@@ -215,10 +215,11 @@ async function importMottos() {
 
   importing.value = true
   try {
-    const res = await importFactionMottos(body)
+    const res = await importReputationTranslations(body)
     toast.add({
       title: 'Import terminé',
-      description: `FR : ${res.updatedFr} · EN : ${res.updatedEn} · ES : ${res.updatedEs}`,
+      description: `Factions FR ${res.factions.fr}/EN ${res.factions.en}/ES ${res.factions.es}`
+        + ` · Campagnes FR ${res.campaigns.fr}/EN ${res.campaigns.en}/ES ${res.campaigns.es}`,
       color: 'success'
     })
     importModalOpen.value = false
@@ -254,10 +255,10 @@ async function importMottos() {
         <div class="flex items-center gap-2 shrink-0">
           <UButton
             icon="i-lucide-languages"
-            label="Importer les mottos"
+            label="Importer les traductions"
             color="neutral"
             variant="outline"
-            @click="openImportMottos"
+            @click="openImportTranslations"
           />
           <UButton
             icon="i-lucide-plus"
@@ -475,7 +476,7 @@ async function importMottos() {
         <UCard>
           <template #header>
             <h2 class="font-semibold">
-              Importer les mottos traduits
+              Importer les traductions de réputation
             </h2>
           </template>
 
@@ -487,9 +488,10 @@ async function importMottos() {
               />
               <p class="text-muted">
                 Collez les données de réputation officielles (<code class="text-xs">/api/profilev2/reputation</code>)
-                récupérées par langue. Le motto FR de base est rafraîchi et les mottos EN/ES sont enregistrés en
-                traduction. Le <strong>nom</strong> des factions n'est pas modifié (il reste manuel). Astuce : le
-                bookmarklet de la page <NuxtLink
+                récupérées par langue. Les <strong>mottos</strong> de factions et les <strong>noms/descriptions</strong>
+                de campagnes (Title/Desc) sont rafraîchis en FR et enregistrés en traduction EN/ES. Le
+                <strong>nom</strong> des factions n'est pas modifié (il reste manuel). Astuce : le bookmarklet de la
+                page <NuxtLink
                   to="/admin/traductions"
                   class="text-primary underline"
                 >Traductions</NuxtLink> le fait automatiquement.
@@ -532,9 +534,9 @@ async function importMottos() {
               />
               <UButton
                 icon="i-lucide-download"
-                label="Importer les mottos"
+                label="Importer les traductions"
                 :loading="importing"
-                @click="importMottos"
+                @click="importTranslations"
               />
             </div>
           </template>

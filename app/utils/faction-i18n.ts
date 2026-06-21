@@ -19,3 +19,25 @@ export function translateFactionField(
   const translated = faction.translations[locale]?.[field]
   return translated || base
 }
+
+interface TranslatableCampaign {
+  name: string
+  description?: string | null
+  translations?: Record<string, { name: string | null, description: string | null }> | null
+}
+
+/**
+ * Renvoie le nom ou la description d'une campagne dans la langue courante.
+ * Repli sur le texte de base (FR) si locale 'fr', absence de traduction, ou
+ * champ traduit vide.
+ */
+export function translateCampaignField(
+  campaign: TranslatableCampaign,
+  field: 'name' | 'description',
+  locale: string
+): string {
+  const base = campaign[field] || ''
+  if (locale === 'fr' || !campaign.translations) return base
+  const translated = campaign.translations[locale]?.[field]
+  return translated || base
+}

@@ -44,12 +44,18 @@ export interface UserEmblemProgress extends EmblemProgress {
   username: string
 }
 
+export interface CampaignTranslation {
+  name: string | null
+  description: string | null
+}
+
 export interface CampaignInfo {
   id: number
   key: string
   name: string
   description: string
   factionId: number
+  translations?: Record<string, CampaignTranslation>
 }
 
 export interface CampaignWithEmblems<T = EmblemProgress | null> extends CampaignInfo {

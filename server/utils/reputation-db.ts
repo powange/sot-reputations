@@ -173,6 +173,17 @@ export function getReputationDb(): Database.Database {
       UNIQUE(faction_id, locale)
     );
 
+    -- Traductions des campagnes (EN, ES) — le nom/description de base est en français
+    CREATE TABLE IF NOT EXISTS campaign_translations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      locale TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+      UNIQUE(campaign_id, locale)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -185,6 +196,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_emblem_translations_emblem ON emblem_translations(emblem_id);
     CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
     CREATE INDEX IF NOT EXISTS idx_faction_translations_faction ON faction_translations(faction_id);
+    CREATE INDEX IF NOT EXISTS idx_campaign_translations_campaign ON campaign_translations(campaign_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -343,9 +355,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
 
   const getFactionId = db.prepare(`SELECT id FROM factions WHERE key = ?`)
 
+  // Nom (Title) et description (Desc) viennent du site officiel (source de vérité) :
+  // rafraîchis à chaque import.
   const insertCampaign = db.prepare(`
     INSERT INTO campaigns (faction_id, key, name, description, sort_order) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(faction_id, key) DO UPDATE SET
+      name = excluded.name,
       description = COALESCE(excluded.description, campaigns.description),
       sort_order = excluded.sort_order
   `)
@@ -620,6 +635,30 @@ export function getAllFactionTranslations(): Record<number, Record<string, Facti
   return result
 }
 
+export interface CampaignTranslation {
+  name: string | null
+  description: string | null
+}
+
+/** Toutes les traductions de campagnes, indexées par campaign_id puis locale. */
+export function getAllCampaignTranslations(): Record<number, Record<string, CampaignTranslation>> {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT campaign_id, locale, name, description FROM campaign_translations
+  `).all() as Array<{ campaign_id: number, locale: string, name: string | null, description: string | null }>
+
+  const result: Record<number, Record<string, CampaignTranslation>> = {}
+  for (const t of rows) {
+    let bucket = result[t.campaign_id]
+    if (!bucket) {
+      bucket = {}
+      result[t.campaign_id] = bucket
+    }
+    bucket[t.locale] = { name: t.name, description: t.description }
+  }
+  return result
+}
+
 export interface FactionTranslationInput {
   locale: string
   name?: string | null
@@ -685,7 +724,7 @@ export function updateFaction(
   update()
 }
 
-type ReputationLocalePayload = Record<string, { Motto?: unknown }>
+export type ReputationLocaleData = Record<string, Record<string, unknown>>
 
 /**
  * Importe les mottos de factions depuis les données de réputation officielles
@@ -695,9 +734,9 @@ type ReputationLocalePayload = Record<string, { Motto?: unknown }>
  * sont mises à jour.
  */
 export function importFactionMottoTranslations(payload: {
-  fr?: ReputationLocalePayload
-  en?: ReputationLocalePayload
-  es?: ReputationLocalePayload
+  fr?: ReputationLocaleData
+  en?: ReputationLocaleData
+  es?: ReputationLocaleData
 }): { fr: number, en: number, es: number } {
   const db = getReputationDb()
   const factions = db.prepare('SELECT id, key FROM factions').all() as Array<{ id: number, key: string }>
@@ -711,7 +750,7 @@ export function importFactionMottoTranslations(payload: {
 
   const counts = { fr: 0, en: 0, es: 0 }
 
-  const readMotto = (loc: ReputationLocalePayload | undefined, key: string): string | null => {
+  const readMotto = (loc: ReputationLocaleData | undefined, key: string): string | null => {
     const raw = loc?.[key]?.Motto
     return typeof raw === 'string' && raw.trim() ? raw.trim() : null
   }
@@ -731,6 +770,71 @@ export function importFactionMottoTranslations(payload: {
       const es = readMotto(payload.es, f.key)
       if (es) {
         upsertTranslationMotto.run(f.id, 'es', es)
+        counts.es++
+      }
+    }
+  })
+  run()
+
+  return counts
+}
+
+/**
+ * Importe les traductions de campagnes (Title/Desc) depuis les données de
+ * réputation officielles par langue. Met à jour le nom/description FR de base et
+ * upsert les traductions EN/ES. Ne traite que les campagnes déjà en base
+ * (les campagnes "default" des factions standard ne sont pas concernées).
+ */
+export function importCampaignTranslations(payload: {
+  fr?: ReputationLocaleData
+  en?: ReputationLocaleData
+  es?: ReputationLocaleData
+}): { fr: number, en: number, es: number } {
+  const db = getReputationDb()
+  const campaigns = db.prepare(`
+    SELECT c.id, c.key as campaignKey, f.key as factionKey
+    FROM campaigns c
+    JOIN factions f ON c.faction_id = f.id
+  `).all() as Array<{ id: number, campaignKey: string, factionKey: string }>
+
+  const updateFr = db.prepare(
+    'UPDATE campaigns SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?'
+  )
+  // COALESCE : ne pas mettre à NULL une colonne déjà traduite si l'import courant
+  // n'apporte qu'un des deux champs (cohérent avec le rafraîchissement FR ci-dessus).
+  const upsertTranslation = db.prepare(`
+    INSERT INTO campaign_translations (campaign_id, locale, name, description)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(campaign_id, locale) DO UPDATE SET
+      name = COALESCE(excluded.name, campaign_translations.name),
+      description = COALESCE(excluded.description, campaign_translations.description)
+  `)
+
+  const counts = { fr: 0, en: 0, es: 0 }
+
+  const read = (loc: ReputationLocaleData | undefined, factionKey: string, campaignKey: string) => {
+    const faction = loc?.[factionKey] as { Campaigns?: Record<string, { Title?: unknown, Desc?: unknown }> } | undefined
+    const c = faction?.Campaigns?.[campaignKey]
+    const title = typeof c?.Title === 'string' && c.Title.trim() ? c.Title.trim() : null
+    const desc = typeof c?.Desc === 'string' && c.Desc.trim() ? c.Desc.trim() : null
+    return { title, desc }
+  }
+
+  const run = db.transaction(() => {
+    for (const c of campaigns) {
+      const fr = read(payload.fr, c.factionKey, c.campaignKey)
+      if (fr.title || fr.desc) {
+        updateFr.run(fr.title, fr.desc, c.id)
+        counts.fr++
+      }
+      const en = read(payload.en, c.factionKey, c.campaignKey)
+      if (en.title || en.desc) {
+        upsertTranslation.run(c.id, 'en', en.title, en.desc)
+        counts.en++
+      }
+      const es = read(payload.es, c.factionKey, c.campaignKey)
+      if (es.title || es.desc) {
+        upsertTranslation.run(c.id, 'es', es.title, es.desc)
         counts.es++
       }
     }
@@ -1322,6 +1426,7 @@ export function getGroupReputationData(groupId: number) {
 
   const factions = getAllFactions()
   const factionTranslations = getAllFactionTranslations()
+  const campaignTranslations = getAllCampaignTranslations()
 
   // Récupérer toutes les traductions d'emblèmes
   const allTranslations = db.prepare(`
@@ -1342,6 +1447,7 @@ export function getGroupReputationData(groupId: number) {
     factions: Array<FactionInfo & {
       translations: Record<string, FactionTranslation>
       campaigns: Array<CampaignInfo & {
+        translations: Record<string, CampaignTranslation>
         emblems: Array<EmblemInfo & {
           userProgress: Record<number, UserEmblemProgress>
           translations: Record<string, { name: string | null, description: string | null }>
@@ -1411,6 +1517,7 @@ export function getGroupReputationData(groupId: number) {
 
       factionWithCampaigns.campaigns.push({
         ...campaign,
+        translations: campaignTranslations[campaign.id] || {},
         emblems: emblemsWithProgress
       })
     }

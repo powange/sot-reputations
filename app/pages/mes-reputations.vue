@@ -212,7 +212,7 @@ const searchResults = computed(() => {
       if (matchingEmblems.length > 0) {
         results.push({
           factionName: translateFactionField(faction, 'name', locale.value),
-          campaignName: campaign.name,
+          campaignName: translateCampaignField(campaign, 'name', locale.value),
           campaignKey: campaign.key,
           emblems: matchingEmblems
         })
@@ -555,13 +555,13 @@ async function handleDelete() {
                     class="mb-4"
                   >
                     <h3 class="text-lg font-semibold">
-                      {{ campaign.name }}
+                      {{ translateCampaignField(campaign, 'name', locale) }}
                     </h3>
                     <p
-                      v-if="campaign.description"
+                      v-if="translateCampaignField(campaign, 'description', locale)"
                       class="text-sm text-muted italic"
                     >
-                      {{ campaign.description }}
+                      {{ translateCampaignField(campaign, 'description', locale) }}
                     </p>
                   </div>
                   <TableLoader>

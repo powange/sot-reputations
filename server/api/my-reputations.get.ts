@@ -1,5 +1,5 @@
-import { getReputationDb, getAllFactions, getAllFactionTranslations, getCampaignsByFaction, getAllGradeThresholdsForEmblems } from '../utils/reputation-db'
-import type { UserInfo, FactionInfo, FactionTranslation, CampaignInfo, EmblemInfo, UserEmblemProgress } from '../utils/reputation-db'
+import { getReputationDb, getAllFactions, getAllFactionTranslations, getAllCampaignTranslations, getCampaignsByFaction, getAllGradeThresholdsForEmblems } from '../utils/reputation-db'
+import type { UserInfo, FactionInfo, FactionTranslation, CampaignInfo, CampaignTranslation, EmblemInfo, UserEmblemProgress } from '../utils/reputation-db'
 
 interface EmblemTranslation {
   name: string | null
@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
 
   const factions = getAllFactions()
   const factionTranslations = getAllFactionTranslations()
+  const campaignTranslations = getAllCampaignTranslations()
 
   // Récupérer toutes les traductions d'emblèmes
   const allTranslations = db.prepare(`
@@ -53,6 +54,7 @@ export default defineEventHandler(async (event) => {
     factions: Array<FactionInfo & {
       translations: Record<string, FactionTranslation>
       campaigns: Array<CampaignInfo & {
+        translations: Record<string, CampaignTranslation>
         emblems: Array<EmblemInfo & {
           progress: UserEmblemProgress | null
           translations: Record<string, EmblemTranslation>
@@ -111,6 +113,7 @@ export default defineEventHandler(async (event) => {
 
       factionWithCampaigns.campaigns.push({
         ...campaign,
+        translations: campaignTranslations[campaign.id] || {},
         emblems: emblemsWithProgress
       })
     }

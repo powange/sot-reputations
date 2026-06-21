@@ -12,6 +12,8 @@ interface Campaign {
   id: number
   key: string
   name: string
+  description?: string | null
+  translations?: Record<string, { name: string | null, description: string | null }>
 }
 
 const props = defineProps<{
@@ -154,7 +156,7 @@ function toggleCampaign(campaignId: number) {
             size="sm"
             @click="toggleCampaign(campaign.id)"
           >
-            {{ campaign.name }}
+            {{ translateCampaignField(campaign, 'name', locale) }}
           </UButton>
         </div>
       </template>
