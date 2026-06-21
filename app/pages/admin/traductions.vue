@@ -663,9 +663,34 @@ async function loadBookmarkletData(code: string) {
   }
 }
 
+// Importer les mottos de factions (FR/EN/ES) depuis le payload du bookmarklet.
+// Non bloquant : un échec n'interrompt pas l'import des emblèmes.
+async function importFactionMottosFromBookmarklet(data: BookmarkletData) {
+  const { importFactionMottos } = useFactionTranslationsImport()
+  try {
+    const res = await importFactionMottos({ fr: data.fr, en: data.en, es: data.es })
+    if (res.updatedEn + res.updatedEs > 0) {
+      toast.add({
+        title: 'Mottos de factions mis à jour',
+        description: `${res.updatedEn} EN, ${res.updatedEs} ES`,
+        color: 'success'
+      })
+    }
+  } catch {
+    // silencieux : l'import des mottos de factions est secondaire
+  }
+}
+
 // Lancer l'import avec les données du bookmarklet (EN + ES)
 function runBookmarkletImport() {
-  if (!bookmarkletData.value || !emblems.value) return
+  if (!bookmarkletData.value) return
+
+  // Importer les mottos de factions (FR de base + traductions EN/ES) en
+  // arrière-plan : ces données sont dans le même payload (clé Motto) et ne
+  // dépendent pas du chargement des emblèmes — donc avant le garde ci-dessous.
+  void importFactionMottosFromBookmarklet(bookmarkletData.value)
+
+  if (!emblems.value) return
 
   const frJson = bookmarkletData.value.fr
   const enJson = bookmarkletData.value.en

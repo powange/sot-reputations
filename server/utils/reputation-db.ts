@@ -162,6 +162,17 @@ export function getReputationDb(): Database.Database {
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
     );
 
+    -- Traductions des factions (EN, ES) — le nom/motto de base est en français
+    CREATE TABLE IF NOT EXISTS faction_translations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      faction_id INTEGER NOT NULL,
+      locale TEXT NOT NULL,
+      name TEXT,
+      motto TEXT,
+      FOREIGN KEY (faction_id) REFERENCES factions(id) ON DELETE CASCADE,
+      UNIQUE(faction_id, locale)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -173,6 +184,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_emblem_grade_thresholds_emblem ON emblem_grade_thresholds(emblem_id);
     CREATE INDEX IF NOT EXISTS idx_emblem_translations_emblem ON emblem_translations(emblem_id);
     CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS idx_faction_translations_faction ON faction_translations(faction_id);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -322,8 +334,11 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
   }
   const db = getReputationDb()
 
+  // Le motto vient du site officiel (source de vérité) : on le rafraîchit à chaque
+  // import. Le nom n'est PAS touché en conflit (FACTION_NAMES / édition admin).
   const insertFaction = db.prepare(`
-    INSERT OR IGNORE INTO factions (key, name, motto) VALUES (?, ?, ?)
+    INSERT INTO factions (key, name, motto) VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET motto = excluded.motto
   `)
 
   const getFactionId = db.prepare(`SELECT id FROM factions WHERE key = ?`)
@@ -579,6 +594,150 @@ export function getAllUsers(): UserInfo[] {
 export function getAllFactions(): FactionInfo[] {
   const db = getReputationDb()
   return db.prepare('SELECT id, key, name, motto FROM factions ORDER BY name').all() as FactionInfo[]
+}
+
+export interface FactionTranslation {
+  name: string | null
+  motto: string | null
+}
+
+/** Toutes les traductions de factions, indexées par faction_id puis locale. */
+export function getAllFactionTranslations(): Record<number, Record<string, FactionTranslation>> {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT faction_id, locale, name, motto FROM faction_translations
+  `).all() as Array<{ faction_id: number, locale: string, name: string | null, motto: string | null }>
+
+  const result: Record<number, Record<string, FactionTranslation>> = {}
+  for (const t of rows) {
+    let bucket = result[t.faction_id]
+    if (!bucket) {
+      bucket = {}
+      result[t.faction_id] = bucket
+    }
+    bucket[t.locale] = { name: t.name, motto: t.motto }
+  }
+  return result
+}
+
+export interface FactionTranslationInput {
+  locale: string
+  name?: string | null
+  motto?: string | null
+}
+
+/**
+ * Upsert des traductions EN/ES d'une faction. Une traduction dont le nom ET la
+ * devise sont vides est supprimée. Les locales non gérées sont ignorées.
+ */
+export function setFactionTranslations(factionId: number, translations: FactionTranslationInput[]): void {
+  const db = getReputationDb()
+  const upsert = db.prepare(`
+    INSERT INTO faction_translations (faction_id, locale, name, motto)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(faction_id, locale) DO UPDATE SET
+      name = excluded.name,
+      motto = excluded.motto
+  `)
+  const del = db.prepare('DELETE FROM faction_translations WHERE faction_id = ? AND locale = ?')
+
+  for (const t of translations) {
+    if (!t.locale || !['en', 'es'].includes(t.locale)) continue
+    const name = t.name?.trim() || null
+    const motto = t.motto?.trim() || null
+    if (!name && !motto) {
+      del.run(factionId, t.locale)
+    } else {
+      upsert.run(factionId, t.locale, name, motto)
+    }
+  }
+}
+
+/** Crée une faction (clé + nom/devise FR) et ses traductions, en transaction. */
+export function createFaction(
+  key: string,
+  name: string,
+  motto: string | null,
+  translations: FactionTranslationInput[] = []
+): number {
+  const db = getReputationDb()
+  const create = db.transaction(() => {
+    const result = db.prepare('INSERT INTO factions (key, name, motto) VALUES (?, ?, ?)').run(key, name, motto)
+    const id = Number(result.lastInsertRowid)
+    setFactionTranslations(id, translations)
+    return id
+  })
+  return create()
+}
+
+/** Met à jour le nom/devise FR d'une faction et ses traductions, en transaction. */
+export function updateFaction(
+  id: number,
+  name: string,
+  motto: string | null,
+  translations: FactionTranslationInput[] = []
+): void {
+  const db = getReputationDb()
+  const update = db.transaction(() => {
+    db.prepare('UPDATE factions SET name = ?, motto = ? WHERE id = ?').run(name, motto, id)
+    setFactionTranslations(id, translations)
+  })
+  update()
+}
+
+type ReputationLocalePayload = Record<string, { Motto?: unknown }>
+
+/**
+ * Importe les mottos de factions depuis les données de réputation officielles
+ * récupérées par langue (clé `<FactionKey>.Motto`). Met à jour le motto FR de
+ * base et upsert les mottos EN/ES dans faction_translations (sans écraser un nom
+ * de traduction déjà saisi). Ne crée pas de faction : seules celles déjà en base
+ * sont mises à jour.
+ */
+export function importFactionMottoTranslations(payload: {
+  fr?: ReputationLocalePayload
+  en?: ReputationLocalePayload
+  es?: ReputationLocalePayload
+}): { fr: number, en: number, es: number } {
+  const db = getReputationDb()
+  const factions = db.prepare('SELECT id, key FROM factions').all() as Array<{ id: number, key: string }>
+
+  const updateFrMotto = db.prepare('UPDATE factions SET motto = ? WHERE id = ?')
+  const upsertTranslationMotto = db.prepare(`
+    INSERT INTO faction_translations (faction_id, locale, name, motto)
+    VALUES (?, ?, NULL, ?)
+    ON CONFLICT(faction_id, locale) DO UPDATE SET motto = excluded.motto
+  `)
+
+  const counts = { fr: 0, en: 0, es: 0 }
+
+  const readMotto = (loc: ReputationLocalePayload | undefined, key: string): string | null => {
+    const raw = loc?.[key]?.Motto
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : null
+  }
+
+  const run = db.transaction(() => {
+    for (const f of factions) {
+      const fr = readMotto(payload.fr, f.key)
+      if (fr) {
+        updateFrMotto.run(fr, f.id)
+        counts.fr++
+      }
+      const en = readMotto(payload.en, f.key)
+      if (en) {
+        upsertTranslationMotto.run(f.id, 'en', en)
+        counts.en++
+      }
+      const es = readMotto(payload.es, f.key)
+      if (es) {
+        upsertTranslationMotto.run(f.id, 'es', es)
+        counts.es++
+      }
+    }
+  })
+  run()
+
+  return counts
 }
 
 export function getCampaignsByFaction(factionId: number): CampaignInfo[] {
@@ -1162,6 +1321,7 @@ export function getGroupReputationData(groupId: number) {
   }))
 
   const factions = getAllFactions()
+  const factionTranslations = getAllFactionTranslations()
 
   // Récupérer toutes les traductions d'emblèmes
   const allTranslations = db.prepare(`
@@ -1180,6 +1340,7 @@ export function getGroupReputationData(groupId: number) {
   const result: {
     users: UserInfo[]
     factions: Array<FactionInfo & {
+      translations: Record<string, FactionTranslation>
       campaigns: Array<CampaignInfo & {
         emblems: Array<EmblemInfo & {
           userProgress: Record<number, UserEmblemProgress>
@@ -1199,6 +1360,7 @@ export function getGroupReputationData(groupId: number) {
     const campaigns = getCampaignsByFaction(faction.id)
     const factionWithCampaigns: typeof result.factions[0] = {
       ...faction,
+      translations: factionTranslations[faction.id] || {},
       campaigns: []
     }
 

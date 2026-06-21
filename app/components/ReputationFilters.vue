@@ -3,6 +3,8 @@ interface Faction {
   id: number
   key: string
   name: string
+  motto?: string | null
+  translations?: Record<string, { name: string | null, motto: string | null }>
   campaigns: Campaign[]
 }
 
@@ -16,6 +18,8 @@ const props = defineProps<{
   factions: Faction[]
   showCompletionFilter?: boolean
 }>()
+
+const { locale } = useI18n()
 
 const searchQuery = defineModel<string>('searchQuery', { default: '' })
 const selectedFactionKeys = defineModel<string[]>('selectedFactionKeys', { default: () => [] })
@@ -128,7 +132,7 @@ function toggleCampaign(campaignId: number) {
           size="sm"
           @click="toggleFaction(faction.key)"
         >
-          {{ faction.name }}
+          {{ translateFactionField(faction, 'name', locale) }}
         </UButton>
       </div>
 
@@ -140,7 +144,7 @@ function toggleCampaign(campaignId: number) {
           class="flex items-center gap-3 flex-wrap"
         >
           <span class="text-sm font-medium text-muted">
-            {{ factionsWithCampaigns.length > 1 ? `${faction.name} :` : $t('reputations.campaigns') }}
+            {{ factionsWithCampaigns.length > 1 ? `${translateFactionField(faction, 'name', locale)} :` : $t('reputations.campaigns') }}
           </span>
           <UButton
             v-for="campaign in faction.campaigns"

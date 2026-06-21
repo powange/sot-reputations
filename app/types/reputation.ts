@@ -5,11 +5,17 @@ export interface GradeThreshold {
   threshold: number
 }
 
+export interface FactionTranslation {
+  name: string | null
+  motto: string | null
+}
+
 export interface FactionInfo {
   id: number
   key: string
   name: string
   motto: string
+  translations?: Record<string, FactionTranslation>
 }
 
 export interface EmblemInfo {

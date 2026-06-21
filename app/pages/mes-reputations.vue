@@ -171,7 +171,7 @@ const factionStats = computed(() => {
     }
 
     return {
-      name: faction.name,
+      name: translateFactionField(faction, 'name', locale.value),
       key: faction.key,
       completed,
       total,
@@ -211,7 +211,7 @@ const searchResults = computed(() => {
 
       if (matchingEmblems.length > 0) {
         results.push({
-          factionName: faction.name,
+          factionName: translateFactionField(faction, 'name', locale.value),
           campaignName: campaign.name,
           campaignKey: campaign.key,
           emblems: matchingEmblems
@@ -533,13 +533,13 @@ async function handleDelete() {
               class="mb-8"
             >
               <h2 class="text-2xl font-pirate">
-                {{ faction.name }}
+                {{ translateFactionField(faction, 'name', locale) }}
               </h2>
               <p
-                v-if="faction.motto"
+                v-if="translateFactionField(faction, 'motto', locale)"
                 class="text-muted italic mb-4"
               >
-                « {{ faction.motto }} »
+                « {{ translateFactionField(faction, 'motto', locale) }} »
               </p>
 
               <template
