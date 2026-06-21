@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'crypto'
 import type { H3Event } from 'h3'
-import { getHeader, createError } from 'h3'
+import { getHeader, getQuery, createError } from 'h3'
 import { getReputationDb } from './reputation-db'
 
 const TOKEN_PREFIX = 'sotr_'
@@ -116,18 +116,29 @@ export function validateApiToken(token: string): ApiTokenInfo | null {
 }
 
 /**
- * Exige un jeton d'API valide dans l'en-tête `Authorization: Bearer <token>`.
+ * Exige un jeton d'API valide. Méthode recommandée : en-tête
+ * `Authorization: Bearer <token>`. Repli accepté : paramètre d'URL `?token=<token>`
+ * (pratique pour un agent qui ne peut transmettre qu'une URL, mais moins sûr car
+ * le jeton apparaît dans les journaux d'accès et l'historique).
  * Lève une erreur 401 sinon. À utiliser dans les endpoints réservés aux agents.
  */
 export function requireApiToken(event: H3Event): ApiTokenInfo {
   const authHeader = getHeader(event, 'authorization') || ''
   const match = authHeader.match(/^Bearer\s+(.+)$/i)
-  const token = match?.[1]?.trim()
+  let token = match?.[1]?.trim()
+
+  // Repli : jeton passé en paramètre d'URL (?token=...).
+  if (!token) {
+    const queryToken = getQuery(event).token
+    if (typeof queryToken === 'string') {
+      token = queryToken.trim()
+    }
+  }
 
   if (!token) {
     throw createError({
       statusCode: 401,
-      message: 'Jeton d\'API manquant (en-tête Authorization: Bearer <token>)'
+      message: 'Jeton d\'API manquant (en-tête Authorization: Bearer <token> ou paramètre ?token=<token>)'
     })
   }
 

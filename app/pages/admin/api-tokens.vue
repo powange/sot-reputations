@@ -310,8 +310,14 @@ const origin = computed(() => useRequestURL().origin)
       </template>
       <div class="space-y-4 text-sm">
         <p>
-          Authentifiez chaque requête avec l'en-tête
-          <code class="px-1.5 py-0.5 rounded bg-elevated">Authorization: Bearer &lt;jeton&gt;</code>.
+          Authentifiez chaque requête, au choix, avec l'en-tête
+          <code class="px-1.5 py-0.5 rounded bg-elevated">Authorization: Bearer &lt;jeton&gt;</code>
+          (recommandé) ou le paramètre d'URL
+          <code class="px-1.5 py-0.5 rounded bg-elevated">?token=&lt;jeton&gt;</code>.
+        </p>
+        <p class="text-warning">
+          ⚠️ Le paramètre d'URL est plus pratique mais moins sûr : le jeton apparaît dans les
+          journaux d'accès et l'historique du navigateur. Préférez l'en-tête quand c'est possible.
         </p>
         <div>
           <p class="font-medium mb-1">
@@ -327,9 +333,15 @@ const origin = computed(() => useRequestURL().origin)
         </div>
         <div>
           <p class="font-medium mb-1">
-            Exemple
+            Exemple (en-tête)
           </p>
           <code class="block px-3 py-2 rounded bg-elevated break-all whitespace-pre-wrap">curl -H "Authorization: Bearer &lt;jeton&gt;" {{ origin }}/api/agent/recommendations</code>
+        </div>
+        <div>
+          <p class="font-medium mb-1">
+            Exemple (URL)
+          </p>
+          <code class="block px-3 py-2 rounded bg-elevated break-all whitespace-pre-wrap">{{ origin }}/api/agent/recommendations?token=&lt;jeton&gt;</code>
         </div>
       </div>
     </UCard>
