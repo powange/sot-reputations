@@ -206,6 +206,17 @@ export function getReputationDb(): Database.Database {
       FOREIGN KEY (item_id) REFERENCES chest_items(id) ON DELETE CASCADE
     );
 
+    -- Traductions (FR/EN/ES) des libellés de catégories et sous-catégories du coffre.
+    -- subcategory = '' pour la traduction de la catégorie elle-même.
+    CREATE TABLE IF NOT EXISTS chest_taxonomy_translations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      subcategory TEXT NOT NULL DEFAULT '',
+      locale TEXT NOT NULL,
+      name TEXT,
+      UNIQUE(category, subcategory, locale)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -221,6 +232,7 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_campaign_translations_campaign ON campaign_translations(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_chest_items_category ON chest_items(category);
     CREATE INDEX IF NOT EXISTS idx_user_chest_items_user ON user_chest_items(user_id);
+    CREATE INDEX IF NOT EXISTS idx_chest_taxonomy_category ON chest_taxonomy_translations(category);
   `)
 
   // Migration: ajouter last_import_at si la colonne n'existe pas
@@ -876,6 +888,12 @@ const CHEST_CATEGORY_ORDER = [
   'Ship', 'Vanity', 'Equipment', 'Armory', 'Clothing', 'ShipDecoration', 'Pets', 'ShipTrinket', 'Bones'
 ]
 
+// Rang d'affichage d'une catégorie (ordre du jeu) ; inconnues en dernier.
+function chestCategoryRank(cat: string): number {
+  const i = CHEST_CATEGORY_ORDER.indexOf(cat)
+  return i === -1 ? CHEST_CATEGORY_ORDER.length : i
+}
+
 // Tri partagé des items du coffre : catégorie (ordre du jeu) puis ordre d'import,
 // avec un départage stable sur l'uid (les sort_order peuvent coïncider après
 // intercalation). Utilisé par le catalogue utilisateur et le catalogue agent.
@@ -883,12 +901,8 @@ function compareChestRows(
   a: { category: string, sortOrder: number, uid: string },
   b: { category: string, sortOrder: number, uid: string }
 ): number {
-  const rank = (cat: string) => {
-    const i = CHEST_CATEGORY_ORDER.indexOf(cat)
-    return i === -1 ? CHEST_CATEGORY_ORDER.length : i
-  }
-  const ra = rank(a.category)
-  const rb = rank(b.category)
+  const ra = chestCategoryRank(a.category)
+  const rb = chestCategoryRank(b.category)
   if (ra !== rb) return ra - rb
   if (a.category !== b.category) return a.category.localeCompare(b.category)
   if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
@@ -1124,6 +1138,116 @@ export function getChestCatalog(): ChestCatalogItem[] {
     description: r.description,
     image: r.image
   }))
+}
+
+// ---- Traductions des libellés de catégories / sous-catégories du coffre ----
+
+export interface ChestTaxonomyCategory {
+  category: string
+  subcategories: string[]
+}
+
+/**
+ * Catégories et sous-catégories présentes dans le catalogue, dans l'ordre du jeu
+ * (catégorie) puis alphabétique (sous-catégories).
+ */
+export function getChestTaxonomy(): ChestTaxonomyCategory[] {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT DISTINCT category, subcategory FROM chest_items
+  `).all() as Array<{ category: string, subcategory: string | null }>
+
+  const byCategory = new Map<string, Set<string>>()
+  for (const row of rows) {
+    let set = byCategory.get(row.category)
+    if (!set) {
+      set = new Set<string>()
+      byCategory.set(row.category, set)
+    }
+    if (row.subcategory) set.add(row.subcategory)
+  }
+
+  return [...byCategory.keys()]
+    .sort((a, b) => (chestCategoryRank(a) - chestCategoryRank(b)) || a.localeCompare(b))
+    .map(category => ({
+      category,
+      subcategories: [...byCategory.get(category)!].sort((a, b) => a.localeCompare(b))
+    }))
+}
+
+export interface ChestTaxonomyTranslations {
+  categories: Record<string, Record<string, string | null>>
+  subcategories: Record<string, Record<string, Record<string, string | null>>>
+}
+
+/** Toutes les traductions de taxonomie, indexées pour lookup (catégories + sous-catégories). */
+export function getChestTaxonomyTranslations(): ChestTaxonomyTranslations {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT category, subcategory, locale, name FROM chest_taxonomy_translations
+  `).all() as Array<{ category: string, subcategory: string, locale: string, name: string | null }>
+
+  const result: ChestTaxonomyTranslations = { categories: {}, subcategories: {} }
+  for (const r of rows) {
+    if (r.subcategory === '') {
+      let bucket = result.categories[r.category]
+      if (!bucket) {
+        bucket = {}
+        result.categories[r.category] = bucket
+      }
+      bucket[r.locale] = r.name
+    } else {
+      let subMap = result.subcategories[r.category]
+      if (!subMap) {
+        subMap = {}
+        result.subcategories[r.category] = subMap
+      }
+      let bucket = subMap[r.subcategory]
+      if (!bucket) {
+        bucket = {}
+        subMap[r.subcategory] = bucket
+      }
+      bucket[r.locale] = r.name
+    }
+  }
+  return result
+}
+
+export interface ChestTaxonomyTranslationInput {
+  category: string
+  subcategory?: string
+  translations: Array<{ locale: string, name?: string | null }>
+}
+
+/** Upsert des traductions de taxonomie (FR/EN/ES). Une traduction vide est supprimée. */
+export function setChestTaxonomyTranslations(entries: ChestTaxonomyTranslationInput[]): void {
+  const db = getReputationDb()
+  const upsert = db.prepare(`
+    INSERT INTO chest_taxonomy_translations (category, subcategory, locale, name)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(category, subcategory, locale) DO UPDATE SET name = excluded.name
+  `)
+  const del = db.prepare(`
+    DELETE FROM chest_taxonomy_translations WHERE category = ? AND subcategory = ? AND locale = ?
+  `)
+
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      const category = entry.category?.trim()
+      if (!category) continue
+      const subcategory = entry.subcategory?.trim() || ''
+      for (const t of entry.translations) {
+        if (!t.locale || !['fr', 'en', 'es'].includes(t.locale)) continue
+        const name = t.name?.trim() || null
+        if (!name) {
+          del.run(category, subcategory, t.locale)
+        } else {
+          upsert.run(category, subcategory, t.locale, name)
+        }
+      }
+    }
+  })
+  run()
 }
 
 export function getCampaignsByFaction(factionId: number): CampaignInfo[] {

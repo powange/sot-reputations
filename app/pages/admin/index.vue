@@ -81,6 +81,27 @@ watchEffect(() => {
         </UCard>
       </NuxtLink>
 
+      <!-- Catégories du coffre - Admin et Moderateurs -->
+      <NuxtLink
+        to="/admin/chest-taxonomy"
+        class="block"
+      >
+        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+          <div class="flex items-center gap-4">
+            <div class="p-3 rounded-lg bg-primary/10">
+              <UIcon
+                name="i-lucide-tags"
+                class="w-6 h-6 text-primary"
+              />
+            </div>
+            <div>
+              <h3 class="font-semibold">Catégories du coffre</h3>
+              <p class="text-sm text-muted">Traduire les catégories et sous-catégories d'objets</p>
+            </div>
+          </div>
+        </UCard>
+      </NuxtLink>
+
       <!-- Édition des factions - Admin et Moderateurs -->
       <NuxtLink
         to="/admin/factions-edition"

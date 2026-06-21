@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { isAuthenticated, saveRedirectUrl } = useAuth()
 
 useSeoMeta({
@@ -23,23 +23,33 @@ interface ChestItem {
   owned: boolean
 }
 
+interface TaxonomyMap {
+  categories: Record<string, Record<string, string | null>>
+  subcategories: Record<string, Record<string, Record<string, string | null>>>
+}
+
 const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest')
+const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
 const items = computed(() => data.value || [])
 const isLoading = computed(() => status.value === 'pending')
 // Nombre d'items que l'utilisateur possède réellement (le reste du catalogue
 // vient des imports d'autres utilisateurs).
 const ownedCount = computed(() => items.value.reduce((n, i) => n + (i.owned ? 1 : 0), 0))
 
-// "ShipDecoration" -> "Ship Decoration", "FlintlockDoubleBarrel" -> "Flintlock Double Barrel"
-function humanizeKey(key: string | null): string {
-  if (!key) return ''
-  return key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').trim()
+// Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
+// (humanizeKey est auto-importé depuis app/utils)
+function catLabel(category: string): string {
+  return taxonomy.value?.categories?.[category]?.[locale.value] || humanizeKey(category)
+}
+function subLabel(category: string, sub: string | null): string {
+  if (!sub) return ''
+  return taxonomy.value?.subcategories?.[category]?.[sub]?.[locale.value] || humanizeKey(sub)
 }
 
 // --- Filtres ---
 const searchQuery = ref('')
-const selectedCategory = ref<string | null>(null)
-const selectedSubcategory = ref<string | null>(null)
+const selectedCategories = ref<string[]>([])
+const selectedSubcategories = ref<string[]>([])
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>('owned')
 
 const ownershipOptions = computed(() => [
@@ -48,6 +58,8 @@ const ownershipOptions = computed(() => [
   { label: t('yourChest.allOwnership'), value: 'all' }
 ])
 
+const allCategoriesSelected = computed(() => selectedCategories.value.length === 0)
+
 // Catégories présentes (dans l'ordre renvoyé par le serveur = ordre du jeu)
 const categories = computed(() => {
   const seen = new Set<string>()
@@ -55,30 +67,51 @@ const categories = computed(() => {
   return [...seen]
 })
 
-// Sous-catégories de la catégorie sélectionnée (ou toutes)
-const subcategories = computed(() => {
-  const seen = new Set<string>()
-  for (const it of items.value) {
-    if (selectedCategory.value && it.category !== selectedCategory.value) continue
-    if (it.subcategory) seen.add(it.subcategory)
+// Sous-catégories des catégories sélectionnées, groupées par catégorie
+// (affichées seulement quand au moins une catégorie est choisie).
+const subcategoryGroups = computed(() => {
+  if (allCategoriesSelected.value) return []
+  const groups: Array<{ category: string, subcategories: string[] }> = []
+  for (const cat of selectedCategories.value) {
+    const seen = new Set<string>()
+    for (const it of items.value) {
+      if (it.category === cat && it.subcategory) seen.add(it.subcategory)
+    }
+    if (seen.size > 0) {
+      groups.push({ category: cat, subcategories: [...seen].sort((a, b) => a.localeCompare(b)) })
+    }
   }
-  return [...seen]
+  return groups
 })
 
-const categoryOptions = computed(() => [
-  { label: t('yourChest.allCategories'), value: null },
-  ...categories.value.map(c => ({ label: humanizeKey(c), value: c }))
-])
+// Les sous-catégories sont identifiées par une clé composite catégorie::sous-cat
+// (une même clé de sous-catégorie peut exister dans plusieurs catégories).
+function subKey(category: string, sub: string): string {
+  return `${category}::${sub}`
+}
 
-const subcategoryOptions = computed(() => [
-  { label: t('yourChest.allSubcategories'), value: null },
-  ...subcategories.value.map(s => ({ label: humanizeKey(s), value: s }))
-])
+function clearCategories() {
+  selectedCategories.value = []
+  selectedSubcategories.value = []
+}
 
-// Réinitialiser la sous-catégorie quand la catégorie change
-watch(selectedCategory, () => {
-  selectedSubcategory.value = null
-})
+function toggleCategory(cat: string) {
+  const i = selectedCategories.value.indexOf(cat)
+  if (i === -1) {
+    // Ajout : on conserve les sous-catégories déjà sélectionnées des autres catégories.
+    selectedCategories.value.push(cat)
+  } else {
+    // Retrait : on ne purge que les sous-catégories de cette catégorie.
+    selectedCategories.value.splice(i, 1)
+    selectedSubcategories.value = selectedSubcategories.value.filter(k => !k.startsWith(`${cat}::`))
+  }
+}
+
+function toggleSubcategory(key: string) {
+  const i = selectedSubcategories.value.indexOf(key)
+  if (i === -1) selectedSubcategories.value.push(key)
+  else selectedSubcategories.value.splice(i, 1)
+}
 
 const filteredItems = computed(() => {
   let list = items.value
@@ -87,11 +120,11 @@ const filteredItems = computed(() => {
   } else if (ownershipFilter.value === 'notowned') {
     list = list.filter(i => !i.owned)
   }
-  if (selectedCategory.value) {
-    list = list.filter(i => i.category === selectedCategory.value)
+  if (selectedCategories.value.length) {
+    list = list.filter(i => selectedCategories.value.includes(i.category))
   }
-  if (selectedSubcategory.value) {
-    list = list.filter(i => i.subcategory === selectedSubcategory.value)
+  if (selectedSubcategories.value.length) {
+    list = list.filter(i => !!i.subcategory && selectedSubcategories.value.includes(subKey(i.category, i.subcategory)))
   }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
@@ -112,9 +145,12 @@ const paginatedItems = computed(() => {
   return filteredItems.value.slice(start, start + pageSize)
 })
 
-watch([searchQuery, selectedCategory, selectedSubcategory, ownershipFilter], () => {
-  currentPage.value = 1
-})
+watch(
+  [searchQuery, ownershipFilter, () => selectedCategories.value.join(','), () => selectedSubcategories.value.join(',')],
+  () => {
+    currentPage.value = 1
+  }
+)
 watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal && newTotal > 0) currentPage.value = newTotal
 })
@@ -195,26 +231,13 @@ watch(totalPages, (newTotal) => {
       </div>
 
       <template v-else>
-        <!-- Filtres -->
-        <div class="flex flex-wrap items-center gap-3 mb-6">
+        <!-- Recherche + possession + compteur -->
+        <div class="flex flex-wrap items-center gap-3 mb-4">
           <UInput
             v-model="searchQuery"
             icon="i-lucide-search"
             :placeholder="$t('yourChest.searchPlaceholder')"
             class="w-full sm:w-72"
-          />
-          <USelectMenu
-            v-model="selectedCategory"
-            :items="categoryOptions"
-            value-key="value"
-            class="w-full sm:w-56"
-          />
-          <USelectMenu
-            v-model="selectedSubcategory"
-            :items="subcategoryOptions"
-            value-key="value"
-            :disabled="subcategories.length === 0"
-            class="w-full sm:w-56"
           />
           <USelectMenu
             v-model="ownershipFilter"
@@ -227,17 +250,59 @@ watch(totalPages, (newTotal) => {
           </span>
         </div>
 
+        <!-- Filtre catégories (multi-sélection) -->
+        <div class="flex flex-wrap gap-2 mb-3">
+          <UButton
+            :color="allCategoriesSelected ? 'primary' : 'neutral'"
+            :variant="allCategoriesSelected ? 'solid' : 'outline'"
+            size="sm"
+            @click="clearCategories"
+          >
+            {{ $t('yourChest.allCategories') }}
+          </UButton>
+          <UButton
+            v-for="cat in categories"
+            :key="cat"
+            :color="selectedCategories.includes(cat) ? 'primary' : 'neutral'"
+            :variant="selectedCategories.includes(cat) ? 'solid' : 'outline'"
+            size="sm"
+            @click="toggleCategory(cat)"
+          >
+            {{ catLabel(cat) }}
+          </UButton>
+        </div>
+
+        <!-- Filtre sous-catégories (des catégories sélectionnées) -->
+        <template v-if="subcategoryGroups.length > 0">
+          <div
+            v-for="group in subcategoryGroups"
+            :key="group.category"
+            class="flex items-center gap-2 flex-wrap mb-2"
+          >
+            <span class="text-sm font-medium text-muted">{{ catLabel(group.category) }} :</span>
+            <UButton
+              v-for="sub in group.subcategories"
+              :key="sub"
+              :color="selectedSubcategories.includes(subKey(group.category, sub)) ? 'info' : 'neutral'"
+              :variant="selectedSubcategories.includes(subKey(group.category, sub)) ? 'solid' : 'outline'"
+              size="sm"
+              @click="toggleSubcategory(subKey(group.category, sub))"
+            >
+              {{ subLabel(group.category, sub) }}
+            </UButton>
+          </div>
+        </template>
+
         <!-- Grille -->
         <div
           v-if="filteredItems.length > 0"
-          class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"
+          class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-4"
         >
           <UCard
             v-for="item in paginatedItems"
             :key="item.id"
             :ui="{ body: 'p-0 sm:p-0' }"
             class="overflow-hidden"
-            :class="{ 'opacity-60': !item.owned }"
           >
             <div class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden">
               <img
@@ -246,7 +311,6 @@ watch(totalPages, (newTotal) => {
                 :alt="item.name"
                 loading="lazy"
                 class="w-full h-full object-cover"
-                :class="{ grayscale: !item.owned }"
               >
               <UIcon
                 v-else
@@ -255,7 +319,7 @@ watch(totalPages, (newTotal) => {
               />
               <UBadge
                 v-if="!item.owned"
-                color="neutral"
+                color="error"
                 variant="solid"
                 size="xs"
                 class="absolute top-1 right-1"
@@ -274,7 +338,7 @@ watch(totalPages, (newTotal) => {
                 v-if="item.subcategory"
                 class="text-xs text-muted mt-1"
               >
-                {{ humanizeKey(item.subcategory) }}
+                {{ subLabel(item.category, item.subcategory) }}
               </p>
             </div>
           </UCard>
