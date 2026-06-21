@@ -219,7 +219,11 @@
     "noData": "Cofre vacío",
     "noDataDescription": "Importa tus datos desde el sitio de Sea of Thieves para ver el contenido de tu cofre.",
     "noResults": "Ningún objeto encontrado",
-    "loadError": "No se pudo cargar tu cofre. Inténtalo de nuevo más tarde."
+    "loadError": "No se pudo cargar tu cofre. Inténtalo de nuevo más tarde.",
+    "owned": "Poseídos",
+    "notOwned": "No poseídos",
+    "allOwnership": "Todos",
+    "notOwnedBadge": "Faltante"
   },
   "groupPage": {
     "import": "Importar",

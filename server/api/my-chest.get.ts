@@ -1,4 +1,4 @@
-import { getUserChestItems } from '../utils/reputation-db'
+import { getChestCatalogForUser } from '../utils/reputation-db'
 
 export default defineEventHandler(async (event) => {
   const session = await getUserSession(event)
@@ -11,5 +11,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return getUserChestItems(userId)
+  return getChestCatalogForUser(userId)
 })

@@ -219,7 +219,11 @@
     "noData": "Empty chest",
     "noDataDescription": "Import your data from the Sea of Thieves website to see your chest contents.",
     "noResults": "No item found",
-    "loadError": "Could not load your chest. Please try again later."
+    "loadError": "Could not load your chest. Please try again later.",
+    "owned": "Owned",
+    "notOwned": "Not owned",
+    "allOwnership": "All",
+    "notOwnedBadge": "Missing"
   },
   "groupPage": {
     "import": "Import",

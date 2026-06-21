@@ -876,6 +876,25 @@ const CHEST_CATEGORY_ORDER = [
   'Ship', 'Vanity', 'Equipment', 'Armory', 'Clothing', 'ShipDecoration', 'Pets', 'ShipTrinket', 'Bones'
 ]
 
+// Tri partagé des items du coffre : catégorie (ordre du jeu) puis ordre d'import,
+// avec un départage stable sur l'uid (les sort_order peuvent coïncider après
+// intercalation). Utilisé par le catalogue utilisateur et le catalogue agent.
+function compareChestRows(
+  a: { category: string, sortOrder: number, uid: string },
+  b: { category: string, sortOrder: number, uid: string }
+): number {
+  const rank = (cat: string) => {
+    const i = CHEST_CATEGORY_ORDER.indexOf(cat)
+    return i === -1 ? CHEST_CATEGORY_ORDER.length : i
+  }
+  const ra = rank(a.category)
+  const rb = rank(b.category)
+  if (ra !== rb) return ra - rb
+  if (a.category !== b.category) return a.category.localeCompare(b.category)
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+  return a.uid.localeCompare(b.uid)
+}
+
 export interface ChestItem {
   id: number
   uid: string
@@ -884,6 +903,7 @@ export interface ChestItem {
   name: string
   description: string | null
   image: string | null
+  owned: boolean
 }
 
 interface ParsedChestItem {
@@ -1034,30 +1054,76 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
 }
 
 /** Items du coffre possédés par un utilisateur, triés par catégorie puis ordre d'import. */
-export function getUserChestItems(userId: number): ChestItem[] {
+/**
+ * Catalogue complet des items du coffre (tous ceux connus, importés par n'importe
+ * quel utilisateur), avec un indicateur `owned` pour l'utilisateur donné.
+ * Trié par catégorie (ordre du jeu) puis ordre d'import.
+ */
+export function getChestCatalogForUser(userId: number): ChestItem[] {
   const db = getReputationDb()
   const rows = db.prepare(`
-    SELECT ci.id, ci.uid, ci.category, ci.subcategory, ci.name, ci.description, ci.image, ci.sort_order as sortOrder
-    FROM user_chest_items uci
-    JOIN chest_items ci ON ci.id = uci.item_id
-    WHERE uci.user_id = ?
-  `).all(userId) as Array<ChestItem & { sortOrder: number }>
+    SELECT
+      ci.id, ci.uid, ci.category, ci.subcategory, ci.name, ci.description, ci.image,
+      ci.sort_order as sortOrder,
+      CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
+    FROM chest_items ci
+    LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
+  `).all(userId) as Array<{
+    id: number
+    uid: string
+    category: string
+    subcategory: string | null
+    name: string
+    description: string | null
+    image: string | null
+    sortOrder: number
+    owned: number
+  }>
 
-  const catRank = (cat: string) => {
-    const i = CHEST_CATEGORY_ORDER.indexOf(cat)
-    return i === -1 ? CHEST_CATEGORY_ORDER.length : i
-  }
+  rows.sort(compareChestRows)
 
-  rows.sort((a, b) => {
-    const ra = catRank(a.category)
-    const rb = catRank(b.category)
-    if (ra !== rb) return ra - rb
-    if (a.category !== b.category) return a.category.localeCompare(b.category)
-    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
-    return a.id - b.id
-  })
+  return rows.map(r => ({
+    id: r.id,
+    uid: r.uid,
+    category: r.category,
+    subcategory: r.subcategory,
+    name: r.name,
+    description: r.description,
+    image: r.image,
+    owned: r.owned === 1
+  }))
+}
 
-  return rows.map(({ sortOrder: _sortOrder, ...item }) => item)
+export interface ChestCatalogItem {
+  uid: string
+  category: string
+  subcategory: string | null
+  name: string
+  description: string | null
+  image: string | null
+}
+
+/**
+ * Catalogue complet des items du coffre (non lié à un utilisateur), trié par
+ * catégorie (ordre du jeu) puis ordre d'import. Pour les endpoints agent.
+ */
+export function getChestCatalog(): ChestCatalogItem[] {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT uid, category, subcategory, name, description, image, sort_order as sortOrder
+    FROM chest_items
+  `).all() as Array<ChestCatalogItem & { sortOrder: number }>
+
+  rows.sort(compareChestRows)
+
+  return rows.map(r => ({
+    uid: r.uid,
+    category: r.category,
+    subcategory: r.subcategory,
+    name: r.name,
+    description: r.description,
+    image: r.image
+  }))
 }
 
 export function getCampaignsByFaction(factionId: number): CampaignInfo[] {

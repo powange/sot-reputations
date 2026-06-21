@@ -20,11 +20,15 @@ interface ChestItem {
   name: string
   description: string | null
   image: string | null
+  owned: boolean
 }
 
 const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest')
 const items = computed(() => data.value || [])
 const isLoading = computed(() => status.value === 'pending')
+// Nombre d'items que l'utilisateur possède réellement (le reste du catalogue
+// vient des imports d'autres utilisateurs).
+const ownedCount = computed(() => items.value.reduce((n, i) => n + (i.owned ? 1 : 0), 0))
 
 // "ShipDecoration" -> "Ship Decoration", "FlintlockDoubleBarrel" -> "Flintlock Double Barrel"
 function humanizeKey(key: string | null): string {
@@ -36,6 +40,13 @@ function humanizeKey(key: string | null): string {
 const searchQuery = ref('')
 const selectedCategory = ref<string | null>(null)
 const selectedSubcategory = ref<string | null>(null)
+const ownershipFilter = ref<'owned' | 'notowned' | 'all'>('owned')
+
+const ownershipOptions = computed(() => [
+  { label: t('yourChest.owned'), value: 'owned' },
+  { label: t('yourChest.notOwned'), value: 'notowned' },
+  { label: t('yourChest.allOwnership'), value: 'all' }
+])
 
 // Catégories présentes (dans l'ordre renvoyé par le serveur = ordre du jeu)
 const categories = computed(() => {
@@ -71,6 +82,11 @@ watch(selectedCategory, () => {
 
 const filteredItems = computed(() => {
   let list = items.value
+  if (ownershipFilter.value === 'owned') {
+    list = list.filter(i => i.owned)
+  } else if (ownershipFilter.value === 'notowned') {
+    list = list.filter(i => !i.owned)
+  }
   if (selectedCategory.value) {
     list = list.filter(i => i.category === selectedCategory.value)
   }
@@ -96,7 +112,7 @@ const paginatedItems = computed(() => {
   return filteredItems.value.slice(start, start + pageSize)
 })
 
-watch([searchQuery, selectedCategory, selectedSubcategory], () => {
+watch([searchQuery, selectedCategory, selectedSubcategory, ownershipFilter], () => {
   currentPage.value = 1
 })
 watch(totalPages, (newTotal) => {
@@ -156,9 +172,9 @@ watch(totalPages, (newTotal) => {
         </p>
       </div>
 
-      <!-- Aucun item importé -->
+      <!-- Aucun item importé (l'utilisateur ne possède rien) -->
       <div
-        v-else-if="items.length === 0"
+        v-else-if="ownedCount === 0"
         class="text-center py-16"
       >
         <UIcon
@@ -200,6 +216,12 @@ watch(totalPages, (newTotal) => {
             :disabled="subcategories.length === 0"
             class="w-full sm:w-56"
           />
+          <USelectMenu
+            v-model="ownershipFilter"
+            :items="ownershipOptions"
+            value-key="value"
+            class="w-full sm:w-48"
+          />
           <span class="text-sm text-muted ml-auto">
             {{ $t('yourChest.itemsCount', { count: filteredItems.length }) }}
           </span>
@@ -215,20 +237,31 @@ watch(totalPages, (newTotal) => {
             :key="item.id"
             :ui="{ body: 'p-0 sm:p-0' }"
             class="overflow-hidden"
+            :class="{ 'opacity-60': !item.owned }"
           >
-            <div class="aspect-square bg-muted/20 flex items-center justify-center overflow-hidden">
+            <div class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden">
               <img
                 v-if="item.image"
                 :src="item.image"
                 :alt="item.name"
                 loading="lazy"
                 class="w-full h-full object-cover"
+                :class="{ grayscale: !item.owned }"
               >
               <UIcon
                 v-else
                 name="i-lucide-image-off"
                 class="w-8 h-8 text-muted"
               />
+              <UBadge
+                v-if="!item.owned"
+                color="neutral"
+                variant="solid"
+                size="xs"
+                class="absolute top-1 right-1"
+              >
+                {{ $t('yourChest.notOwnedBadge') }}
+              </UBadge>
             </div>
             <div class="p-2">
               <p

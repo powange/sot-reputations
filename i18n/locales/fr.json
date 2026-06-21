@@ -219,7 +219,11 @@
     "noData": "Coffre vide",
     "noDataDescription": "Importez vos données depuis le site Sea of Thieves pour voir le contenu de votre coffre.",
     "noResults": "Aucun objet trouvé",
-    "loadError": "Impossible de charger votre coffre. Réessayez plus tard."
+    "loadError": "Impossible de charger votre coffre. Réessayez plus tard.",
+    "owned": "Possédés",
+    "notOwned": "Non possédés",
+    "allOwnership": "Tous",
+    "notOwnedBadge": "Manquant"
   },
   "groupPage": {
     "import": "Importer",

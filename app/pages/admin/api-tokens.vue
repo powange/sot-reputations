@@ -333,6 +333,12 @@ const origin = computed(() => useRequestURL().origin)
         </div>
         <div>
           <p class="font-medium mb-1">
+            Catalogue du coffre
+          </p>
+          <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/chest-items</code>
+        </div>
+        <div>
+          <p class="font-medium mb-1">
             Exemple (en-tête)
           </p>
           <code class="block px-3 py-2 rounded bg-elevated break-all whitespace-pre-wrap">curl -H "Authorization: Bearer &lt;jeton&gt;" {{ origin }}/api/agent/recommendations</code>
