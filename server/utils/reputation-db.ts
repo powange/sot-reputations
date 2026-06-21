@@ -186,9 +186,13 @@ export function getReputationDb(): Database.Database {
 
     -- Catalogue partagé des items du coffre (cosmétiques/équipements du jeu).
     -- sort_order conserve l'ordre d'import (intercalation des nouveaux items).
+    -- uid = #Name du jeu (par exemplaire/joueur, conservé à titre informatif).
+    -- item_key = identité stable de l'item, partagée entre joueurs (nom de
+    -- fichier de l'image) ; c'est la clé d'unicité du catalogue.
     CREATE TABLE IF NOT EXISTS chest_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       uid TEXT UNIQUE NOT NULL,
+      item_key TEXT,
       category TEXT NOT NULL,
       subcategory TEXT,
       name TEXT NOT NULL DEFAULT '',
@@ -299,6 +303,29 @@ export function getReputationDb(): Database.Database {
   if (hasAdminRole) {
     db.exec(`UPDATE group_members SET role = 'chef' WHERE role = 'admin'`)
   }
+
+  // Migration: item_key (identité stable d'item du coffre) + dédoublonnage.
+  // Avant, l'unicité reposait sur uid (#Name = par joueur) → doublons entre
+  // utilisateurs. On ré-indexe sur item_key (GUID du fichier image).
+  const chestItemCols = db.prepare('PRAGMA table_info(chest_items)').all() as Array<{ name: string }>
+  if (!chestItemCols.some(col => col.name === 'item_key')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN item_key TEXT')
+  }
+  // Backfill des clés manquantes + dédoublonnage dans UNE transaction, de façon
+  // idempotente : le dédoublonnage tourne à chaque démarrage (no-op s'il n'y a
+  // aucun doublon) pour garantir que l'index unique ci-dessous ne puisse jamais
+  // échouer, même après un crash entre backfill et dédoublonnage.
+  const cdb = db // non-null ici ; évite que la closure ré-élargisse `db` à `| null`
+  const setChestKey = cdb.prepare('UPDATE chest_items SET item_key = ? WHERE id = ?')
+  const migrateChestKeys = cdb.transaction(() => {
+    const toBackfill = cdb.prepare(
+      `SELECT id, uid, image FROM chest_items WHERE item_key IS NULL OR item_key = ''`
+    ).all() as Array<{ id: number, uid: string, image: string | null }>
+    for (const r of toBackfill) setChestKey.run(chestItemKey(r.image, r.uid), r.id)
+    dedupeChestItemsByKey(cdb)
+  })
+  migrateChestKeys()
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chest_items_item_key ON chest_items(item_key)')
 
   return db
 }
@@ -922,10 +949,52 @@ export interface ChestItem {
 
 interface ParsedChestItem {
   uid: string
+  itemKey: string
   subcategory: string | null
   name: string
   description: string | null
   image: string | null
+}
+
+// Identité stable d'un item, partagée entre joueurs : le nom de fichier de
+// l'image (GUID de l'asset), insensible au préfixe de version de l'URL.
+// Repli sur l'uid (#Name) si l'item n'a pas d'image.
+function chestItemKey(image: string | null, uid: string): string {
+  if (image) {
+    const base = image.split('/').pop()
+    if (base) return base
+  }
+  return uid
+}
+
+// Fusionne les lignes de chest_items partageant le même item_key (doublons
+// hérités de l'ancienne clé uid) : on garde la plus ancienne, on réaiguille la
+// possession dessus (en évitant les conflits de PK), et on supprime les doublons.
+function dedupeChestItemsByKey(db: Database.Database): void {
+  const groups = db.prepare(`
+    SELECT item_key as key, MIN(id) as keepId
+    FROM chest_items
+    WHERE item_key IS NOT NULL
+    GROUP BY item_key
+    HAVING COUNT(*) > 1
+  `).all() as Array<{ key: string, keepId: number }>
+  if (groups.length === 0) return
+
+  const getDups = db.prepare('SELECT id FROM chest_items WHERE item_key = ? AND id != ?')
+  const remapOwnership = db.prepare('UPDATE OR IGNORE user_chest_items SET item_id = ? WHERE item_id = ?')
+  const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE item_id = ?')
+  const deleteItem = db.prepare('DELETE FROM chest_items WHERE id = ?')
+
+  const tx = db.transaction(() => {
+    for (const g of groups) {
+      for (const dup of getDups.all(g.key, g.keepId) as Array<{ id: number }>) {
+        remapOwnership.run(g.keepId, dup.id)
+        deleteOwnership.run(dup.id)
+        deleteItem.run(dup.id)
+      }
+    }
+  })
+  tx()
 }
 
 function parseChestItem(raw: unknown): ParsedChestItem | null {
@@ -935,21 +1004,23 @@ function parseChestItem(raw: unknown): ParsedChestItem | null {
   if (!uid) return null
   const tags = (o.Taxonomy as { Tags?: Array<{ '#Value'?: unknown }> } | undefined)?.Tags
   const subRaw = tags?.[0]?.['#Value']
+  const image = typeof o.image === 'string' ? o.image : null
   return {
     uid,
+    itemKey: chestItemKey(image, uid),
     subcategory: typeof subRaw === 'string' ? subRaw : null,
     name: typeof o.title === 'string' ? o.title : '',
     description: typeof o.subtitle === 'string' ? o.subtitle : null,
-    image: typeof o.image === 'string' ? o.image : null
+    image
   }
 }
 
 /**
- * Calcule un sort_order pour chaque uid d'un import (ordre de la catégorie).
+ * Calcule un sort_order pour chaque clé d'item d'un import (ordre de la catégorie).
  * Les items connus gardent leur sort_order ; les nouveaux items sont intercalés
  * (point médian) entre leurs voisins déjà connus.
  */
-function computeChestSortOrders(uids: string[], existing: Map<string, number>): Map<string, number> {
+function computeChestSortOrders(keys: string[], existing: Map<string, number>): Map<string, number> {
   const result = new Map<string, number>()
   let lower: number | null = null
   let pending: string[] = []
@@ -958,31 +1029,31 @@ function computeChestSortOrders(uids: string[], existing: Map<string, number>): 
     if (pending.length === 0) return
     if (lower === null && upper === null) {
       // catalogue vide : numérotation séquentielle
-      pending.forEach((uid, i) => result.set(uid, i))
+      pending.forEach((key, i) => result.set(key, i))
     } else if (lower === null && upper !== null) {
       // nouveaux items avant le premier connu : placés en dessous
-      pending.forEach((uid, i) => result.set(uid, upper - (pending.length - i)))
+      pending.forEach((key, i) => result.set(key, upper - (pending.length - i)))
     } else if (lower !== null && upper === null) {
       // nouveaux items après le dernier connu : ajoutés à la suite
       const base = lower
-      pending.forEach((uid, i) => result.set(uid, base + (i + 1)))
+      pending.forEach((key, i) => result.set(key, base + (i + 1)))
     } else if (lower !== null && upper !== null) {
       // intercalation régulière entre deux connus
       const base = lower
       const gap = (upper - base) / (pending.length + 1)
-      pending.forEach((uid, i) => result.set(uid, base + gap * (i + 1)))
+      pending.forEach((key, i) => result.set(key, base + gap * (i + 1)))
     }
     pending = []
   }
 
-  for (const uid of uids) {
-    const known = existing.get(uid)
+  for (const key of keys) {
+    const known = existing.get(key)
     if (known !== undefined) {
       flush(known)
-      result.set(uid, known)
+      result.set(key, known)
       lower = known
     } else {
-      pending.push(uid)
+      pending.push(key)
     }
   }
   flush(null)
@@ -1024,21 +1095,27 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
 
   const db = getReputationDb()
 
-  // Catalogue partagé : ne pas écraser un nom/desc/image existant avec une valeur
-  // vide (un champ manquant chez un utilisateur ne doit pas vider l'item pour tous).
-  // RETURNING id évite un SELECT supplémentaire par item.
-  const upsertItem = db.prepare(`
-    INSERT INTO chest_items (uid, category, subcategory, name, description, image, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(uid) DO UPDATE SET
-      category = excluded.category,
-      subcategory = excluded.subcategory,
-      name = COALESCE(NULLIF(excluded.name, ''), chest_items.name),
-      description = COALESCE(NULLIF(excluded.description, ''), chest_items.description),
-      image = COALESCE(NULLIF(excluded.image, ''), chest_items.image)
-    RETURNING id
+  // Unicité du catalogue sur item_key (identité d'item partagée entre joueurs).
+  // uid (#Name) n'est posé qu'à la création, jamais mis à jour (par exemplaire).
+  const getByItemKey = db.prepare('SELECT id FROM chest_items WHERE item_key = ?')
+  const insertItem = db.prepare(`
+    INSERT INTO chest_items (uid, item_key, category, subcategory, name, description, image, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  const getExistingByCategory = db.prepare('SELECT uid, sort_order as sortOrder FROM chest_items WHERE category = ?')
+  // Refresh des champs (le site fait foi) sans écraser avec une valeur vide.
+  // sort_order est repassé : valeur inchangée pour un item stable (même catégorie),
+  // recalculé si l'item a changé de catégorie entre deux exports.
+  const updateItem = db.prepare(`
+    UPDATE chest_items SET
+      category = ?,
+      subcategory = ?,
+      name = COALESCE(NULLIF(?, ''), name),
+      description = COALESCE(NULLIF(?, ''), description),
+      image = COALESCE(NULLIF(?, ''), image),
+      sort_order = ?
+    WHERE id = ?
+  `)
+  const getExistingByCategory = db.prepare('SELECT item_key as key, sort_order as sortOrder FROM chest_items WHERE category = ?')
   const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
   const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
 
@@ -1048,17 +1125,29 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
 
     for (const { category, items } of parsed) {
       const existing = new Map<string, number>()
-      for (const row of getExistingByCategory.all(category) as Array<{ uid: string, sortOrder: number }>) {
-        existing.set(row.uid, row.sortOrder)
+      for (const row of getExistingByCategory.all(category) as Array<{ key: string, sortOrder: number }>) {
+        existing.set(row.key, row.sortOrder)
       }
 
-      const orders = computeChestSortOrders(items.map(i => i.uid), existing)
+      const orders = computeChestSortOrders(items.map(i => i.itemKey), existing)
 
       for (const item of items) {
-        const idRow = upsertItem.get(
-          item.uid, category, item.subcategory, item.name, item.description, item.image, orders.get(item.uid) ?? 0
-        ) as { id: number }
-        insertOwnership.run(userId, idRow.id)
+        const row = getByItemKey.get(item.itemKey) as { id: number } | undefined
+        let id: number
+        if (row) {
+          updateItem.run(
+            category, item.subcategory, item.name, item.description, item.image,
+            orders.get(item.itemKey) ?? 0, row.id
+          )
+          id = row.id
+        } else {
+          const res = insertItem.run(
+            item.uid, item.itemKey, category, item.subcategory, item.name, item.description, item.image,
+            orders.get(item.itemKey) ?? 0
+          )
+          id = Number(res.lastInsertRowid)
+        }
+        insertOwnership.run(userId, id)
       }
     }
   })
