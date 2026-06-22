@@ -21,6 +21,7 @@ interface ChestItem {
   description: string | null
   image: string | null
   owned: boolean
+  groupOwners: Array<{ group: string, members: string[] }>
 }
 
 interface TaxonomyMap {
@@ -44,6 +45,22 @@ function catLabel(category: string): string {
 function subLabel(category: string, sub: string | null): string {
   if (!sub) return ''
   return taxonomy.value?.subcategories?.[category]?.[sub]?.[locale.value] || humanizeKey(sub)
+}
+
+// Infobulle au survol : co-membres possédant aussi l'item, regroupés par groupe.
+function groupOwnersText(item: ChestItem): string {
+  if (!item.groupOwners.length) return ''
+  const lines = item.groupOwners.map(g => `${g.group} : ${g.members.join(', ')}`)
+  return `${t('yourChest.alsoOwnedBy')} :\n${lines.join('\n')}`
+}
+
+// Nombre de co-membres distincts possédant l'item (pour l'indicateur).
+function groupOwnersCount(item: ChestItem): number {
+  const set = new Set<string>()
+  for (const g of item.groupOwners) {
+    for (const m of g.members) set.add(m)
+  }
+  return set.size
 }
 
 // --- Filtres ---
@@ -304,7 +321,10 @@ watch(totalPages, (newTotal) => {
             :ui="{ body: 'p-0 sm:p-0' }"
             class="overflow-hidden"
           >
-            <div class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden">
+            <div
+              class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden"
+              :title="groupOwnersText(item)"
+            >
               <img
                 v-if="item.image"
                 :src="item.image"
@@ -325,6 +345,19 @@ watch(totalPages, (newTotal) => {
                 class="absolute top-1 right-1"
               >
                 {{ $t('yourChest.notOwnedBadge') }}
+              </UBadge>
+              <UBadge
+                v-if="item.groupOwners.length"
+                color="primary"
+                variant="solid"
+                size="xs"
+                class="absolute bottom-1 left-1 flex items-center gap-0.5"
+              >
+                <UIcon
+                  name="i-lucide-users"
+                  class="w-3 h-3"
+                />
+                {{ groupOwnersCount(item) }}
               </UBadge>
             </div>
             <div class="p-2">

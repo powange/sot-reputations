@@ -223,7 +223,8 @@
     "owned": "Poseídos",
     "notOwned": "No poseídos",
     "allOwnership": "Todos",
-    "notOwnedBadge": "Faltante"
+    "notOwnedBadge": "Faltante",
+    "alsoOwnedBy": "También lo tienen"
   },
   "groupPage": {
     "import": "Importar",

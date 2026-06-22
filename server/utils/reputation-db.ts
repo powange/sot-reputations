@@ -945,6 +945,8 @@ export interface ChestItem {
   description: string | null
   image: string | null
   owned: boolean
+  // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
+  groupOwners: Array<{ group: string, members: string[] }>
 }
 
 interface ParsedChestItem {
@@ -1185,6 +1187,9 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
 
   rows.sort(compareChestRows)
 
+  // Co-membres (de tous les groupes de l'utilisateur) possédant chaque item.
+  const groupOwners = getChestGroupOwners(db, userId)
+
   return rows.map(r => ({
     id: r.id,
     uid: r.uid,
@@ -1193,8 +1198,49 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
     name: r.name,
     description: r.description,
     image: r.image,
-    owned: r.owned === 1
+    owned: r.owned === 1,
+    groupOwners: groupOwners.get(r.id) || []
   }))
+}
+
+/**
+ * Pour chaque item du coffre, les co-membres qui le possèdent, regroupés par
+ * groupe partagé avec `userId` (l'utilisateur lui-même exclu). Un membre présent
+ * dans plusieurs groupes partagés apparaît sous chacun.
+ */
+function getChestGroupOwners(db: Database.Database, userId: number): Map<number, Array<{ group: string, members: string[] }>> {
+  const rows = db.prepare(`
+    SELECT g.id as groupId, g.name as groupName, uci.item_id as itemId, u.username
+    FROM group_members gmSelf
+    JOIN groups g ON g.id = gmSelf.group_id
+    JOIN group_members gm ON gm.group_id = g.id AND gm.user_id != gmSelf.user_id
+    JOIN user_chest_items uci ON uci.user_id = gm.user_id
+    JOIN users u ON u.id = gm.user_id
+    WHERE gmSelf.user_id = ?
+    ORDER BY g.name, u.username
+  `).all(userId) as Array<{ groupId: number, groupName: string, itemId: number, username: string }>
+
+  // itemId -> groupId -> { group, members } (Map interne pour préserver l'ordre par nom de groupe)
+  const byItem = new Map<number, Map<number, { group: string, members: string[] }>>()
+  for (const r of rows) {
+    let groups = byItem.get(r.itemId)
+    if (!groups) {
+      groups = new Map()
+      byItem.set(r.itemId, groups)
+    }
+    let entry = groups.get(r.groupId)
+    if (!entry) {
+      entry = { group: r.groupName, members: [] }
+      groups.set(r.groupId, entry)
+    }
+    entry.members.push(r.username)
+  }
+
+  const result = new Map<number, Array<{ group: string, members: string[] }>>()
+  for (const [itemId, groups] of byItem) {
+    result.set(itemId, [...groups.values()])
+  }
+  return result
 }
 
 export interface ChestCatalogItem {
