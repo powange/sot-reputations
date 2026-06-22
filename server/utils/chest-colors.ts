@@ -38,7 +38,11 @@ const S_MIN = 0.25 // sous cette saturation : neutre (noir/gris/blanc selon la c
 const WHITE_V = 0.78
 const GRAY_V = 0.30
 const BROWN_V_MAX = 0.6 // un orange assez sombre est nommé « marron »
-const PINK_DARK_V = 0.45 // un rouge-magenta plus sombre que ça est un rouge (lie-de-vin), pas un rose
+// Rose vs rouge dans l'arc rouge-magenta : un rouge CLAIR et peu saturé (rosé, saumon
+// pâle) est un rose ; un rouge saturé ou sombre reste rouge.
+const PINK_V_MIN = 0.6 // un rose est clair…
+const PINK_S_MAX = 0.5 // …et peu saturé (au-delà = rouge/corail franc)
+const PINK_DARK_V = 0.45 // côté magenta, plus sombre que ça = rouge (lie-de-vin), pas rose
 
 // Angle de teinte (degrés) façon HSV. `delta` = max - min des canaux.
 function hueDeg(r: number, g: number, b: number, max: number, delta: number): number {
@@ -51,22 +55,24 @@ function hueDeg(r: number, g: number, b: number, max: number, delta: number): nu
   return h < 0 ? h + 360 : h
 }
 
-// Nom de teinte à partir de l'angle (bornes choisies pour coller à la palette).
+// Nom de teinte pour les teintes NON rouge-magenta (appelé seulement pour h ∈ [14, 296)).
+// L'arc rouge-magenta (h ≥ 296 ou < 14) est traité à part dans classifyColor, car y
+// distinguer rouge/rose/marron dépend aussi de la clarté et de la saturation.
 function hueName(h: number): string {
-  if (h < 14 || h >= 345) return 'red'
   if (h < 40) return 'orange'
   if (h < 66) return 'yellow'
   if (h < 158) return 'green'
   if (h < 200) return 'cyan'
   if (h < 254) return 'blue'
-  if (h < 296) return 'purple'
-  return 'pink' // [296, 345) : magenta / rose
+  return 'purple' // [254, 296)
 }
 
 /**
  * Couleur nommée d'un RGB (modèle HSV). Une couleur assez saturée est nommée par sa
  * teinte même sombre (bleu nuit → « bleu ») ; les tons neutres/pâles tombent sur
- * noir/gris/blanc selon la clarté. Un orange sombre/terreux est nommé « marron ».
+ * noir/gris/blanc selon la clarté. Dans l'arc rouge-magenta, rouge/rose se départagent
+ * surtout par la clarté et la saturation (un rouge clair et doux = rosé/saumon = rose),
+ * et un orange sombre/terreux devient « marron ».
  */
 export function classifyColor(r: number, g: number, b: number): string {
   const max = Math.max(r, g, b)
@@ -76,11 +82,14 @@ export function classifyColor(r: number, g: number, b: number): string {
   if (v < V_MIN) return 'black'
   if (s < S_MIN) return v > WHITE_V ? 'white' : v > GRAY_V ? 'gray' : 'black'
   const h = hueDeg(r, g, b, max, max - min)
+  // Arc rouge-magenta (rosé, saumon, rouge, fuchsia) : départage par clarté/saturation.
+  if (h >= 296 || h < 14) {
+    if (v >= PINK_V_MIN && s <= PINK_S_MAX) return 'pink' // rouge clair & doux : rosé / saumon pâle
+    if (h >= 296 && h < 345 && v >= PINK_DARK_V) return 'pink' // magenta / fuchsia franc
+    return 'red'
+  }
   const name = hueName(h)
-  if (name === 'orange' && v < BROWN_V_MAX) return 'brown'
-  // Côté magenta (≥ 330°), un ton foncé est un rouge (lie-de-vin), pas un rose.
-  if (name === 'pink' && h >= 330 && v < PINK_DARK_V) return 'red'
-  return name
+  return name === 'orange' && v < BROWN_V_MAX ? 'brown' : name
 }
 
 /** Couleurs nommées (uniques, dans l'ordre de dominance) à partir des RGB dominants. */
