@@ -29,37 +29,53 @@ function hexToRgb(hex: string): [number, number, number] {
   ]
 }
 
-function srgbToLinear(c: number): number {
-  const v = c / 255
-  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+// Seuils de classification (modèle HSV). Choisis pour que :
+//  - une couleur sombre mais teintée (bleu nuit) garde sa teinte (≠ « noir ») ;
+//  - une couleur pâle peu saturée (crème) reste « blanc » (≠ forcée vers une teinte) ;
+//  - les tons très sombres tombent sur « noir », les désaturés sur gris/blanc.
+const V_MIN = 0.16 // sous cette clarté : noir quoi qu'il arrive
+const S_MIN = 0.25 // sous cette saturation : neutre (noir/gris/blanc selon la clarté)
+const WHITE_V = 0.78
+const GRAY_V = 0.30
+const BROWN_V_MAX = 0.6 // un orange assez sombre est nommé « marron »
+
+// Angle de teinte (degrés) façon HSV. `delta` = max - min des canaux.
+function hueDeg(r: number, g: number, b: number, max: number, delta: number): number {
+  let h: number
+  if (delta === 0) h = 0
+  else if (max === r) h = ((g - b) / delta) % 6
+  else if (max === g) h = (b - r) / delta + 2
+  else h = (r - g) / delta + 4
+  h *= 60
+  return h < 0 ? h + 360 : h
 }
 
-// sRGB -> CIE Lab (D65), pour une distance perceptuelle correcte.
-function rgbToLab(r: number, g: number, b: number): [number, number, number] {
-  const R = srgbToLinear(r), G = srgbToLinear(g), B = srgbToLinear(b)
-  const x = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047
-  const y = R * 0.2126 + G * 0.7152 + B * 0.0722
-  const z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883
-  const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116)
-  const fx = f(x), fy = f(y), fz = f(z)
-  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
+// Nom de teinte à partir de l'angle (bornes choisies pour coller à la palette).
+function hueName(h: number): string {
+  if (h < 14 || h >= 330) return 'red'
+  if (h < 40) return 'orange'
+  if (h < 66) return 'yellow'
+  if (h < 158) return 'green'
+  if (h < 200) return 'cyan'
+  if (h < 254) return 'blue'
+  if (h < 296) return 'purple'
+  return 'pink'
 }
 
-const PALETTE_LAB = CHEST_COLOR_PALETTE.map(c => ({ name: c.name, lab: rgbToLab(...hexToRgb(c.hex)) }))
-
-/** Couleur nommée la plus proche (distance Lab) d'un RGB. */
+/**
+ * Couleur nommée d'un RGB (modèle HSV). Une couleur assez saturée est nommée par sa
+ * teinte même sombre (bleu nuit → « bleu ») ; les tons neutres/pâles tombent sur
+ * noir/gris/blanc selon la clarté. Un orange sombre/terreux est nommé « marron ».
+ */
 export function classifyColor(r: number, g: number, b: number): string {
-  const lab = rgbToLab(r, g, b)
-  let bestName = PALETTE_LAB[0]!.name
-  let bestDist = Infinity
-  for (const p of PALETTE_LAB) {
-    const d = (lab[0] - p.lab[0]) ** 2 + (lab[1] - p.lab[1]) ** 2 + (lab[2] - p.lab[2]) ** 2
-    if (d < bestDist) {
-      bestDist = d
-      bestName = p.name
-    }
-  }
-  return bestName
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const v = max / 255
+  const s = max === 0 ? 0 : (max - min) / max
+  if (v < V_MIN) return 'black'
+  if (s < S_MIN) return v > WHITE_V ? 'white' : v > GRAY_V ? 'gray' : 'black'
+  const name = hueName(hueDeg(r, g, b, max, max - min))
+  return name === 'orange' && v < BROWN_V_MAX ? 'brown' : name
 }
 
 /** Couleurs nommées (uniques, dans l'ordre de dominance) à partir des RGB dominants. */

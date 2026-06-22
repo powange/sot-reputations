@@ -12,7 +12,7 @@ const DISTINCT_RGB_DIST = 48 // évite de retenir plusieurs nuances quasi identi
 const BLACK_CUTOFF = 12
 // Une couleur doit couvrir au moins cette fraction des pixels opaques pour compter
 // (écarte le bruit, sans exiger 33 % qui éliminerait les accents vifs minoritaires).
-const MIN_AREA_FRACTION = 0.05
+const MIN_AREA_FRACTION = 0.04
 // Les couleurs vives (saturées ET claires) « pèsent » plus que leur seule surface,
 // pour qu'un accent saillant (ex. cristaux cyan) remonte face à de grandes plages
 // neutres (métal gris, ombres).
@@ -26,7 +26,7 @@ const SATURATION_BOOST = 5
  * que des couleurs assez distinctes et couvrant une surface minimale.
  * (Isolé dans son module pour ne charger sharp/libvips que sur la route d'analyse.)
  */
-export async function extractDominantColors(buffer: Buffer, count = 3): Promise<string[]> {
+export async function extractDominantColors(buffer: Buffer, count = 4): Promise<string[]> {
   const { data, info } = await sharp(buffer)
     .resize(96, 96, { fit: 'inside' }) // échantillon plus fin : les petits accents survivent au sous-échantillonnage
     .ensureAlpha()
