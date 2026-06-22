@@ -32,19 +32,42 @@ const progressPct = computed(() =>
   status.value.total > 0 ? Math.round((status.value.analyzed / status.value.total) * 100) : 0
 )
 
+// Boucle de lots jusqu'à épuisement (l'UI rappelle l'endpoint jusqu'à remaining === 0).
+async function runAnalyzeLoop() {
+  while (!stopRequested.value) {
+    const res = await $fetch<AnalyzeResult>('/api/admin/chest-colors/analyze', { method: 'POST' })
+    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining }
+    // Fin si plus rien à traiter, ou si un lot n'a rien avancé (évite une boucle infinie).
+    if (res.remaining <= 0 || (res.processed === 0 && res.failed === 0)) break
+  }
+}
+
 async function analyzeAll() {
   analyzing.value = true
   stopRequested.value = false
   try {
-    while (!stopRequested.value) {
-      const res = await $fetch<AnalyzeResult>('/api/admin/chest-colors/analyze', { method: 'POST' })
-      status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining }
-      // Fin si plus rien à traiter, ou si un lot n'a rien avancé (évite une boucle infinie).
-      if (res.remaining <= 0 || (res.processed === 0 && res.failed === 0)) break
-    }
+    await runAnalyzeLoop()
     toast.add({ title: 'Analyse des couleurs terminée', color: 'success' })
   } catch {
     toast.add({ title: 'Erreur pendant l\'analyse', color: 'error' })
+  } finally {
+    analyzing.value = false
+  }
+}
+
+// Ré-extraction complète : remet toutes les couleurs à zéro puis relance l'analyse.
+// À utiliser après un changement de l'algorithme d'extraction (re-télécharge tout).
+async function reanalyzeAll() {
+  if (!confirm('Ré-analyser TOUS les items ? Toutes les images seront re-téléchargées et ré-analysées.')) return
+  analyzing.value = true
+  stopRequested.value = false
+  try {
+    const res = await $fetch<AnalyzeResult & { reset: number }>('/api/admin/chest-colors/reset', { method: 'POST' })
+    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining }
+    await runAnalyzeLoop()
+    toast.add({ title: 'Ré-analyse des couleurs terminée', color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur pendant la ré-analyse', color: 'error' })
   } finally {
     analyzing.value = false
   }
@@ -129,6 +152,15 @@ async function reclassify() {
             :loading="reclassifying"
             :disabled="analyzing"
             @click="reclassify"
+          />
+          <UButton
+            v-if="!analyzing"
+            icon="i-lucide-rotate-ccw"
+            label="Tout ré-analyser (après modif algo)"
+            color="warning"
+            variant="outline"
+            :disabled="reclassifying"
+            @click="reanalyzeAll"
           />
         </div>
         <p

@@ -1260,6 +1260,20 @@ export function getChestColorStatus(): { analyzed: number, total: number } {
 }
 
 /**
+ * Réinitialise les couleurs de tous les items (RGB dominants + noms) pour forcer une
+ * ré-extraction complète. À utiliser quand l'algorithme d'extraction change (les RGB
+ * stockés deviennent obsolètes : un simple re-classement ne suffit pas, il faut
+ * re-télécharger les images). Renvoie le nombre d'items remis à analyser.
+ */
+export function resetChestItemColors(): number {
+  const db = getReputationDb()
+  const res = db.prepare(
+    `UPDATE chest_items SET dominant_colors = NULL, colors = NULL WHERE image IS NOT NULL AND image != ''`
+  ).run()
+  return res.changes
+}
+
+/**
  * Re-classe les couleurs nommées de tous les items à partir des RGB dominants déjà
  * stockés (sans re-télécharger les images). `classify` mappe des RGB hex -> noms.
  */
