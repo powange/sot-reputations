@@ -65,12 +65,28 @@ function groupOwnersCount(item: ChestItem): number {
   return set.size
 }
 
-// --- Filtres ---
-const searchQuery = ref('')
-const selectedCategories = ref<string[]>([])
-const selectedSubcategories = ref<string[]>([])
-const selectedColors = ref<string[]>([])
-const ownershipFilter = ref<'owned' | 'notowned' | 'all'>('owned')
+// --- Filtres (synchronisés avec l'URL : liens partageables + retour arrière fidèle) ---
+const route = useRoute()
+const router = useRouter()
+
+// Une valeur de query peut être string | string[] | undefined selon l'URL.
+function queryToString(v: unknown): string {
+  if (Array.isArray(v)) return v[0] != null ? String(v[0]) : ''
+  return typeof v === 'string' ? v : ''
+}
+function queryToArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.flatMap(x => String(x).split(',')).filter(Boolean)
+  return typeof v === 'string' ? v.split(',').filter(Boolean) : []
+}
+
+const ownershipFromUrl = queryToString(route.query.own)
+const searchQuery = ref(queryToString(route.query.q))
+const selectedCategories = ref<string[]>(queryToArray(route.query.cat))
+const selectedSubcategories = ref<string[]>(queryToArray(route.query.sub))
+const selectedColors = ref<string[]>(queryToArray(route.query.color))
+const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
+  ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
+)
 
 function colorLabel(name: string): string {
   return t(`chestColors.${name}`)
@@ -175,7 +191,7 @@ const filteredItems = computed(() => {
 
 // --- Pagination ---
 const pageSize = 60
-const currentPage = ref(1)
+const currentPage = ref(Math.max(1, Number.parseInt(queryToString(route.query.page), 10) || 1))
 const totalPages = computed(() => Math.ceil(filteredItems.value.length / pageSize))
 const paginatedItems = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -196,7 +212,33 @@ watch(
 )
 watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal && newTotal > 0) currentPage.value = newTotal
-})
+}, { immediate: true })
+
+// Reflète filtres + page dans l'URL. `replace` : pas d'entrée d'historique à chaque
+// frappe. Les valeurs par défaut (possession « owned », page 1, filtres vides) sont
+// omises pour garder l'URL propre.
+function syncUrl() {
+  const query: Record<string, string> = {}
+  if (searchQuery.value.trim()) query.q = searchQuery.value
+  if (ownershipFilter.value !== 'owned') query.own = ownershipFilter.value
+  if (selectedCategories.value.length) query.cat = selectedCategories.value.join(',')
+  if (selectedSubcategories.value.length) query.sub = selectedSubcategories.value.join(',')
+  if (selectedColors.value.length) query.color = selectedColors.value.join(',')
+  if (currentPage.value > 1) query.page = String(currentPage.value)
+  router.replace({ query })
+}
+
+watch(
+  [
+    searchQuery,
+    ownershipFilter,
+    currentPage,
+    () => selectedCategories.value.join(','),
+    () => selectedSubcategories.value.join(','),
+    () => selectedColors.value.join(',')
+  ],
+  () => syncUrl()
+)
 </script>
 
 <template>
