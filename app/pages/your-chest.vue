@@ -76,6 +76,10 @@ function colorLabel(name: string): string {
   return t(`chestColors.${name}`)
 }
 
+function colorHex(name: string): string {
+  return (palette.value || []).find(c => c.name === name)?.hex || '#888888'
+}
+
 function toggleColor(name: string) {
   const i = selectedColors.value.indexOf(name)
   if (i === -1) selectedColors.value.push(name)
@@ -416,6 +420,18 @@ watch(totalPages, (newTotal) => {
               >
                 {{ subLabel(item.category, item.subcategory) }}
               </p>
+              <div
+                v-if="item.colors.length"
+                class="flex items-center gap-1 mt-1.5"
+              >
+                <span
+                  v-for="col in item.colors"
+                  :key="col"
+                  class="inline-block w-3 h-3 rounded-full border border-muted/40"
+                  :style="{ backgroundColor: colorHex(col) }"
+                  :title="colorLabel(col)"
+                />
+              </div>
             </div>
           </UCard>
         </div>
