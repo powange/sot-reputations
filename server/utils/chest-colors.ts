@@ -38,6 +38,7 @@ const S_MIN = 0.25 // sous cette saturation : neutre (noir/gris/blanc selon la c
 const WHITE_V = 0.78
 const GRAY_V = 0.30
 const BROWN_V_MAX = 0.6 // un orange assez sombre est nommé « marron »
+const PINK_DARK_V = 0.45 // un rouge-magenta plus sombre que ça est un rouge (lie-de-vin), pas un rose
 
 // Angle de teinte (degrés) façon HSV. `delta` = max - min des canaux.
 function hueDeg(r: number, g: number, b: number, max: number, delta: number): number {
@@ -52,14 +53,14 @@ function hueDeg(r: number, g: number, b: number, max: number, delta: number): nu
 
 // Nom de teinte à partir de l'angle (bornes choisies pour coller à la palette).
 function hueName(h: number): string {
-  if (h < 14 || h >= 330) return 'red'
+  if (h < 14 || h >= 345) return 'red'
   if (h < 40) return 'orange'
   if (h < 66) return 'yellow'
   if (h < 158) return 'green'
   if (h < 200) return 'cyan'
   if (h < 254) return 'blue'
   if (h < 296) return 'purple'
-  return 'pink'
+  return 'pink' // [296, 345) : magenta / rose
 }
 
 /**
@@ -74,8 +75,12 @@ export function classifyColor(r: number, g: number, b: number): string {
   const s = max === 0 ? 0 : (max - min) / max
   if (v < V_MIN) return 'black'
   if (s < S_MIN) return v > WHITE_V ? 'white' : v > GRAY_V ? 'gray' : 'black'
-  const name = hueName(hueDeg(r, g, b, max, max - min))
-  return name === 'orange' && v < BROWN_V_MAX ? 'brown' : name
+  const h = hueDeg(r, g, b, max, max - min)
+  const name = hueName(h)
+  if (name === 'orange' && v < BROWN_V_MAX) return 'brown'
+  // Côté magenta (≥ 330°), un ton foncé est un rouge (lie-de-vin), pas un rose.
+  if (name === 'pink' && h >= 330 && v < PINK_DARK_V) return 'red'
+  return name
 }
 
 /** Couleurs nommées (uniques, dans l'ordre de dominance) à partir des RGB dominants. */
