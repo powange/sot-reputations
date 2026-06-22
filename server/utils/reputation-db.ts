@@ -1240,6 +1240,28 @@ export function getChestItemsForColorAnalysis(limit: number): Array<{ id: number
   `).all(limit) as Array<{ id: number, image: string }>
 }
 
+/** Recherche d'items du coffre par nom (avec leurs couleurs nommées actuelles). */
+export function searchChestItemsByName(query: string, limit: number): Array<{ id: number, name: string, image: string | null, colors: string[] }> {
+  const db = getReputationDb()
+  // `%`/`_` du terme sont échappés pour rester littéraux (ESCAPE '\').
+  const term = `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`
+  const rows = db.prepare(`
+    SELECT id, name, image, colors FROM chest_items
+    WHERE name LIKE ? ESCAPE '\\' AND image IS NOT NULL AND image != ''
+    ORDER BY name
+    LIMIT ?
+  `).all(term, limit) as Array<{ id: number, name: string, image: string | null, colors: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors) }))
+}
+
+/** Image d'un item du coffre par id (pour ré-analyser un item précis). */
+export function getChestItemImageById(id: number): { id: number, image: string } | undefined {
+  const db = getReputationDb()
+  return db.prepare(
+    `SELECT id, image FROM chest_items WHERE id = ? AND image IS NOT NULL AND image != ''`
+  ).get(id) as { id: number, image: string } | undefined
+}
+
 /** Enregistre les RGB dominants bruts + les couleurs nommées d'un item. */
 export function saveChestItemColors(id: number, dominant: string[], named: string[]): void {
   const db = getReputationDb()

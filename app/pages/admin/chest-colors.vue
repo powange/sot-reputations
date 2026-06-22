@@ -88,6 +88,58 @@ async function reclassify() {
     reclassifying.value = false
   }
 }
+
+// --- Ré-analyse ciblée (recherche par nom) ---
+interface SearchItem { id: number, name: string, image: string | null, colors: string[] }
+
+const search = ref('')
+const searchResults = ref<SearchItem[]>([])
+const searching = ref(false)
+const reanalyzingId = ref<number | null>(null)
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+
+// Pastille d'affichage d'une couleur nommée (repli si absente de la palette).
+function colorHex(name: string): string {
+  return (palette.value || []).find(c => c.name === name)?.hex || '#888888'
+}
+
+// Recherche débattue (300 ms) pour ne pas marteler l'endpoint à chaque frappe.
+watch(search, (q) => {
+  clearTimeout(searchTimer)
+  const query = q.trim()
+  if (query.length < 2) {
+    searchResults.value = []
+    searching.value = false
+    return
+  }
+  searching.value = true
+  searchTimer = setTimeout(async () => {
+    try {
+      const res = await $fetch<{ items: SearchItem[] }>('/api/admin/chest-colors/search', { query: { q: query } })
+      searchResults.value = res.items
+    } catch {
+      searchResults.value = []
+    } finally {
+      searching.value = false
+    }
+  }, 300)
+})
+
+async function reanalyzeItem(item: SearchItem) {
+  reanalyzingId.value = item.id
+  try {
+    const res = await $fetch<{ id: number, colors: string[] }>('/api/admin/chest-colors/analyze-item', {
+      method: 'POST',
+      body: { id: item.id }
+    })
+    item.colors = res.colors // reflète les nouvelles couleurs dans la liste
+    toast.add({ title: `« ${item.name} » ré-analysé`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur lors de la ré-analyse', color: 'error' })
+  } finally {
+    reanalyzingId.value = null
+  }
+}
 </script>
 
 <template>
@@ -173,6 +225,84 @@ async function reclassify() {
           />
           Analyse en cours… ({{ status.analyzed }} / {{ status.total }})
         </p>
+      </div>
+    </UCard>
+
+    <UCard class="mb-6">
+      <template #header>
+        <h2 class="font-semibold">
+          Ré-analyser un item
+        </h2>
+      </template>
+
+      <div class="space-y-3">
+        <UInput
+          v-model="search"
+          icon="i-lucide-search"
+          placeholder="Rechercher un item par nom…"
+          :loading="searching"
+          class="w-full"
+        />
+        <p
+          v-if="search.trim().length >= 2 && !searching && searchResults.length === 0"
+          class="text-sm text-muted"
+        >
+          Aucun item trouvé.
+        </p>
+        <ul
+          v-if="searchResults.length"
+          class="divide-y divide-muted/20"
+        >
+          <li
+            v-for="item in searchResults"
+            :key="item.id"
+            class="flex items-center gap-3 py-2"
+          >
+            <img
+              v-if="item.image"
+              :src="item.image"
+              :alt="item.name"
+              loading="lazy"
+              class="w-10 h-10 object-cover rounded bg-muted/20 shrink-0"
+            >
+            <div class="min-w-0 flex-1">
+              <p
+                class="text-sm font-medium truncate"
+                :title="item.name"
+              >
+                {{ item.name }}
+              </p>
+              <div
+                v-if="item.colors.length"
+                class="flex items-center gap-1 mt-1"
+              >
+                <span
+                  v-for="col in item.colors"
+                  :key="col"
+                  class="inline-block w-3 h-3 rounded-full border border-muted/40"
+                  :style="{ backgroundColor: colorHex(col) }"
+                  :title="col"
+                />
+              </div>
+              <p
+                v-else
+                class="text-xs text-muted mt-1"
+              >
+                Pas encore de couleurs
+              </p>
+            </div>
+            <UButton
+              size="xs"
+              icon="i-lucide-rotate-ccw"
+              label="Réanalyser"
+              color="primary"
+              variant="outline"
+              :loading="reanalyzingId === item.id"
+              :disabled="reanalyzingId !== null"
+              @click="reanalyzeItem(item)"
+            />
+          </li>
+        </ul>
       </div>
     </UCard>
 
