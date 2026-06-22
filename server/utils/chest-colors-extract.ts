@@ -11,7 +11,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 const BLACK_CUTOFF = 12
 // Une couleur doit couvrir au moins cette fraction des pixels opaques pour compter
 // (écarte le bruit, sans exiger 33 % qui éliminerait les accents vifs minoritaires).
-const MIN_AREA_FRACTION = 0.04
+const MIN_AREA_FRACTION = 0.06
 // Les couleurs vives (saturées ET claires) « pèsent » plus que leur seule surface,
 // pour qu'un accent saillant (ex. étoile verte) remonte face à de grandes plages
 // neutres (tissu noir, ombres).
