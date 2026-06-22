@@ -1198,7 +1198,9 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
 }
 
 export interface ChestCatalogItem {
-  uid: string
+  // Identité stable de l'item, partagée entre joueurs (GUID du fichier image).
+  // Pas le #Name (qui est par exemplaire/joueur).
+  key: string
   category: string
   subcategory: string | null
   name: string
@@ -1213,14 +1215,23 @@ export interface ChestCatalogItem {
 export function getChestCatalog(): ChestCatalogItem[] {
   const db = getReputationDb()
   const rows = db.prepare(`
-    SELECT uid, category, subcategory, name, description, image, sort_order as sortOrder
+    SELECT uid, item_key, category, subcategory, name, description, image, sort_order as sortOrder
     FROM chest_items
-  `).all() as Array<ChestCatalogItem & { sortOrder: number }>
+  `).all() as Array<{
+    uid: string
+    item_key: string | null
+    category: string
+    subcategory: string | null
+    name: string
+    description: string | null
+    image: string | null
+    sortOrder: number
+  }>
 
   rows.sort(compareChestRows)
 
   return rows.map(r => ({
-    uid: r.uid,
+    key: r.item_key || r.uid,
     category: r.category,
     subcategory: r.subcategory,
     name: r.name,
