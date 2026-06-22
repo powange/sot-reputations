@@ -82,11 +82,15 @@ export function classifyColor(r: number, g: number, b: number): string {
   if (v < V_MIN) return 'black'
   if (s < S_MIN) return v > WHITE_V ? 'white' : v > GRAY_V ? 'gray' : 'black'
   const h = hueDeg(r, g, b, max, max - min)
-  // Arc rouge-magenta (rosé, saumon, rouge, fuchsia) : départage par clarté/saturation.
+  // Arc rouge-magenta (rosé, saumon, fuchsia, rouge, plum) : départage par clarté/saturation.
   if (h >= 296 || h < 14) {
     if (v >= PINK_V_MIN && s <= PINK_S_MAX) return 'pink' // rouge clair & doux : rosé / saumon pâle
-    if (h >= 296 && h < 345 && v >= PINK_DARK_V) return 'pink' // magenta / fuchsia franc
-    return 'red'
+    if (h >= 296 && h < 345) {
+      if (v >= PINK_DARK_V) return 'pink' // magenta / fuchsia franc
+      // Sombre : côté pourpre (296–335°) c'est un plum → violet ; côté rouge (335–345°) un lie-de-vin → rouge.
+      return h < 335 ? 'purple' : 'red'
+    }
+    return 'red' // côté chaud (≥ 345° ou < 14°), saturé ou sombre
   }
   const name = hueName(h)
   return name === 'orange' && v < BROWN_V_MAX ? 'brown' : name
