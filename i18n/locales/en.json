@@ -226,6 +226,20 @@
     "notOwnedBadge": "Missing",
     "alsoOwnedBy": "Also owned by"
   },
+  "chestColors": {
+    "red": "Red",
+    "orange": "Orange",
+    "yellow": "Yellow",
+    "green": "Green",
+    "cyan": "Cyan",
+    "blue": "Blue",
+    "purple": "Purple",
+    "pink": "Pink",
+    "brown": "Brown",
+    "black": "Black",
+    "white": "White",
+    "gray": "Gray"
+  },
   "groupPage": {
     "import": "Import",
     "members": "Members",

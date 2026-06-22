@@ -197,6 +197,27 @@ watchEffect(() => {
               </div>
             </UCard>
           </NuxtLink>
+
+          <!-- Couleurs du coffre -->
+          <NuxtLink
+            to="/admin/chest-colors"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-palette"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Couleurs du coffre</h3>
+                  <p class="text-sm text-muted">Extraire les couleurs principales des objets</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
         </div>
       </section>
 

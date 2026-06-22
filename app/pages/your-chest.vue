@@ -21,6 +21,7 @@ interface ChestItem {
   description: string | null
   image: string | null
   owned: boolean
+  colors: string[]
   groupOwners: Array<{ group: string, members: string[] }>
 }
 
@@ -31,6 +32,7 @@ interface TaxonomyMap {
 
 const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest')
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
+const { data: palette } = await useFetch<Array<{ name: string, hex: string }>>('/api/chest-colors')
 const items = computed(() => data.value || [])
 const isLoading = computed(() => status.value === 'pending')
 // Nombre d'items que l'utilisateur possède réellement (le reste du catalogue
@@ -67,7 +69,18 @@ function groupOwnersCount(item: ChestItem): number {
 const searchQuery = ref('')
 const selectedCategories = ref<string[]>([])
 const selectedSubcategories = ref<string[]>([])
+const selectedColors = ref<string[]>([])
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>('owned')
+
+function colorLabel(name: string): string {
+  return t(`chestColors.${name}`)
+}
+
+function toggleColor(name: string) {
+  const i = selectedColors.value.indexOf(name)
+  if (i === -1) selectedColors.value.push(name)
+  else selectedColors.value.splice(i, 1)
+}
 
 const ownershipOptions = computed(() => [
   { label: t('yourChest.owned'), value: 'owned' },
@@ -143,6 +156,9 @@ const filteredItems = computed(() => {
   if (selectedSubcategories.value.length) {
     list = list.filter(i => !!i.subcategory && selectedSubcategories.value.includes(subKey(i.category, i.subcategory)))
   }
+  if (selectedColors.value.length) {
+    list = list.filter(i => i.colors.some(c => selectedColors.value.includes(c)))
+  }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(i =>
@@ -163,7 +179,13 @@ const paginatedItems = computed(() => {
 })
 
 watch(
-  [searchQuery, ownershipFilter, () => selectedCategories.value.join(','), () => selectedSubcategories.value.join(',')],
+  [
+    searchQuery,
+    ownershipFilter,
+    () => selectedCategories.value.join(','),
+    () => selectedSubcategories.value.join(','),
+    () => selectedColors.value.join(',')
+  ],
   () => {
     currentPage.value = 1
   }
@@ -309,6 +331,27 @@ watch(totalPages, (newTotal) => {
             </UButton>
           </div>
         </template>
+
+        <!-- Filtre couleur (multi-sélection) -->
+        <div
+          v-if="(palette || []).length"
+          class="flex flex-wrap gap-2 mb-3"
+        >
+          <UButton
+            v-for="c in (palette || [])"
+            :key="c.name"
+            :color="selectedColors.includes(c.name) ? 'primary' : 'neutral'"
+            :variant="selectedColors.includes(c.name) ? 'solid' : 'outline'"
+            size="sm"
+            @click="toggleColor(c.name)"
+          >
+            <span
+              class="inline-block w-3 h-3 rounded-full border border-muted/40"
+              :style="{ backgroundColor: c.hex }"
+            />
+            {{ colorLabel(c.name) }}
+          </UButton>
+        </div>
 
         <!-- Grille -->
         <div

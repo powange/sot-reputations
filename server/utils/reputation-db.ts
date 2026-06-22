@@ -198,7 +198,9 @@ export function getReputationDb(): Database.Database {
       name TEXT NOT NULL DEFAULT '',
       description TEXT,
       image TEXT,
-      sort_order REAL NOT NULL DEFAULT 0
+      sort_order REAL NOT NULL DEFAULT 0,
+      dominant_colors TEXT,
+      colors TEXT
     );
 
     -- Possession des items du coffre par utilisateur
@@ -326,6 +328,15 @@ export function getReputationDb(): Database.Database {
   })
   migrateChestKeys()
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chest_items_item_key ON chest_items(item_key)')
+
+  // Migration: couleurs des items du coffre (RGB dominants bruts + couleurs nommées)
+  const chestColorCols = db.prepare('PRAGMA table_info(chest_items)').all() as Array<{ name: string }>
+  if (!chestColorCols.some(col => col.name === 'dominant_colors')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN dominant_colors TEXT')
+  }
+  if (!chestColorCols.some(col => col.name === 'colors')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN colors TEXT')
+  }
 
   return db
 }
@@ -945,6 +956,8 @@ export interface ChestItem {
   description: string | null
   image: string | null
   owned: boolean
+  // Couleurs principales nommées (palette), pour le filtre couleur.
+  colors: string[]
   // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
   groupOwners: Array<{ group: string, members: string[] }>
 }
@@ -1169,7 +1182,7 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
   const rows = db.prepare(`
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory, ci.name, ci.description, ci.image,
-      ci.sort_order as sortOrder,
+      ci.sort_order as sortOrder, ci.colors,
       CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
     FROM chest_items ci
     LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
@@ -1182,6 +1195,7 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
     description: string | null
     image: string | null
     sortOrder: number
+    colors: string | null
     owned: number
   }>
 
@@ -1199,8 +1213,69 @@ export function getChestCatalogForUser(userId: number): ChestItem[] {
     description: r.description,
     image: r.image,
     owned: r.owned === 1,
+    colors: parseColors(r.colors),
     groupOwners: groupOwners.get(r.id) || []
   }))
+}
+
+function parseColors(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+// ---- Analyse des couleurs des items du coffre ----
+
+/** Items du coffre à analyser (image présente, couleurs pas encore extraites). */
+export function getChestItemsForColorAnalysis(limit: number): Array<{ id: number, image: string }> {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT id, image FROM chest_items
+    WHERE dominant_colors IS NULL AND image IS NOT NULL AND image != ''
+    LIMIT ?
+  `).all(limit) as Array<{ id: number, image: string }>
+}
+
+/** Enregistre les RGB dominants bruts + les couleurs nommées d'un item. */
+export function saveChestItemColors(id: number, dominant: string[], named: string[]): void {
+  const db = getReputationDb()
+  db.prepare('UPDATE chest_items SET dominant_colors = ?, colors = ? WHERE id = ?')
+    .run(JSON.stringify(dominant), JSON.stringify(named), id)
+}
+
+/** Compteurs d'avancement de l'analyse des couleurs. */
+export function getChestColorStatus(): { analyzed: number, total: number } {
+  const db = getReputationDb()
+  const total = (db.prepare(
+    `SELECT COUNT(*) as c FROM chest_items WHERE image IS NOT NULL AND image != ''`
+  ).get() as { c: number }).c
+  const analyzed = (db.prepare(
+    `SELECT COUNT(*) as c FROM chest_items WHERE dominant_colors IS NOT NULL AND image IS NOT NULL AND image != ''`
+  ).get() as { c: number }).c
+  return { analyzed, total }
+}
+
+/**
+ * Re-classe les couleurs nommées de tous les items à partir des RGB dominants déjà
+ * stockés (sans re-télécharger les images). `classify` mappe des RGB hex -> noms.
+ */
+export function reclassifyChestColors(classify: (dominant: string[]) => string[]): number {
+  const db = getReputationDb()
+  const rows = db.prepare(
+    `SELECT id, dominant_colors FROM chest_items WHERE dominant_colors IS NOT NULL`
+  ).all() as Array<{ id: number, dominant_colors: string }>
+  const upd = db.prepare('UPDATE chest_items SET colors = ? WHERE id = ?')
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      upd.run(JSON.stringify(classify(parseColors(r.dominant_colors))), r.id)
+    }
+  })
+  tx()
+  return rows.length
 }
 
 /**
