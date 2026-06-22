@@ -37,177 +37,234 @@ watchEffect(() => {
       </p>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2">
-      <!-- Utilisateurs - Admin seulement -->
-      <NuxtLink
-        v-if="isAdmin"
-        to="/admin/utilisateurs"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-users"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">{{ $t('admin.users.title') }}</h3>
-              <p class="text-sm text-muted">{{ $t('admin.users.description') }}</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+    <div class="space-y-10">
+      <!-- Connexion - Admin seulement -->
+      <section v-if="isAdmin">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-log-in"
+            class="w-4 h-4"
+          />
+          Connexion
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Utilisateurs -->
+          <NuxtLink
+            to="/admin/utilisateurs"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-users"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">{{ $t('admin.users.title') }}</h3>
+                  <p class="text-sm text-muted">{{ $t('admin.users.description') }}</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
 
-      <!-- Factions - Admin et Moderateurs -->
-      <NuxtLink
-        to="/admin/factions"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-flag"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">{{ $t('admin.factions.title') }}</h3>
-              <p class="text-sm text-muted">{{ $t('admin.factions.description') }}</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+          <!-- Jetons d'API -->
+          <NuxtLink
+            to="/admin/api-tokens"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-key-round"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Jetons d'API</h3>
+                  <p class="text-sm text-muted">Gérer les accès des agents externes (IA)</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
 
-      <!-- Catégories du coffre - Admin et Moderateurs -->
-      <NuxtLink
-        to="/admin/chest-taxonomy"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-tags"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">Catégories du coffre</h3>
-              <p class="text-sm text-muted">Traduire les catégories et sous-catégories d'objets</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+      <!-- Factions et accomplissements - Admin et Moderateurs -->
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-flag"
+            class="w-4 h-4"
+          />
+          Factions et accomplissements
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Factions -->
+          <NuxtLink
+            to="/admin/factions"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-flag"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">{{ $t('admin.factions.title') }}</h3>
+                  <p class="text-sm text-muted">{{ $t('admin.factions.description') }}</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
 
-      <!-- Édition des factions - Admin et Moderateurs -->
-      <NuxtLink
-        to="/admin/factions-edition"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-pencil"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">Éditer les factions</h3>
-              <p class="text-sm text-muted">Nom, devise et traductions (EN/ES) des factions</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+          <!-- Édition des factions -->
+          <NuxtLink
+            to="/admin/factions-edition"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-pencil"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Éditer les factions</h3>
+                  <p class="text-sm text-muted">Nom, devise et traductions (EN/ES) des factions</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
 
-      <!-- Traductions - Admin et Moderateurs -->
-      <NuxtLink
-        to="/admin/traductions"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-languages"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">Traductions</h3>
-              <p class="text-sm text-muted">Traduire les accomplissements</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+          <!-- Traductions -->
+          <NuxtLink
+            to="/admin/traductions"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-languages"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Traductions</h3>
+                  <p class="text-sm text-muted">Traduire les accomplissements</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
+
+      <!-- Coffres - Admin et Moderateurs -->
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-box"
+            class="w-4 h-4"
+          />
+          Coffres
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Catégories du coffre -->
+          <NuxtLink
+            to="/admin/chest-taxonomy"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-tags"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Catégories du coffre</h3>
+                  <p class="text-sm text-muted">Traduire les catégories et sous-catégories d'objets</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
 
       <!-- Notes de version - Admin et Moderateurs -->
-      <NuxtLink
-        to="/admin/release-notes"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-scroll-text"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">Notes de version</h3>
-              <p class="text-sm text-muted">Importer les notes de mise à jour depuis le site SoT</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-scroll-text"
+            class="w-4 h-4"
+          />
+          Notes de version
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Notes de version -->
+          <NuxtLink
+            to="/admin/release-notes"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-scroll-text"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Notes de version</h3>
+                  <p class="text-sm text-muted">Importer les notes de mise à jour depuis le site SoT</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
 
-      <!-- Jetons d'API - Admin seulement -->
-      <NuxtLink
-        v-if="isAdmin"
-        to="/admin/api-tokens"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-primary/10">
-              <UIcon
-                name="i-lucide-key-round"
-                class="w-6 h-6 text-primary"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">Jetons d'API</h3>
-              <p class="text-sm text-muted">Gérer les accès des agents externes (IA)</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
-
-      <!-- Base de donnees - Admin seulement -->
-      <NuxtLink
-        v-if="isAdmin"
-        to="/admin/database"
-        class="block"
-      >
-        <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
-          <div class="flex items-center gap-4">
-            <div class="p-3 rounded-lg bg-warning/10">
-              <UIcon
-                name="i-lucide-database"
-                class="w-6 h-6 text-warning"
-              />
-            </div>
-            <div>
-              <h3 class="font-semibold">{{ $t('admin.database.title') }}</h3>
-              <p class="text-sm text-muted">{{ $t('admin.database.description') }}</p>
-            </div>
-          </div>
-        </UCard>
-      </NuxtLink>
+      <!-- Système - Admin seulement -->
+      <section v-if="isAdmin">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-settings"
+            class="w-4 h-4"
+          />
+          Système
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Base de donnees -->
+          <NuxtLink
+            to="/admin/database"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-warning/10">
+                  <UIcon
+                    name="i-lucide-database"
+                    class="w-6 h-6 text-warning"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">{{ $t('admin.database.title') }}</h3>
+                  <p class="text-sm text-muted">{{ $t('admin.database.description') }}</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
     </div>
   </UContainer>
 </template>
