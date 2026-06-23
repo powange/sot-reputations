@@ -177,6 +177,63 @@ async function apply() {
     applying.value = false
   }
 }
+
+// --- Traitement en masse : récupère + applique pour toutes les sous-catégories filtrées ---
+const bulkRunning = ref(false)
+const bulkProgress = ref({ done: 0, total: 0, current: '' })
+
+async function runBulk() {
+  const targets = scopes.value.filter(scopeMatchesFilter)
+  if (!targets.length) {
+    toast.add({ title: 'Aucune sous-catégorie dans le filtre courant', color: 'warning' })
+    return
+  }
+  if (!confirm(`Récupérer puis appliquer les coûts du wiki pour ${targets.length} sous-catégorie(s) filtrée(s) ? Les coûts en base seront mis à jour.`)) return
+
+  bulkRunning.value = true
+  result.value = null
+  let applied = 0
+  let failed = 0
+  let skipped = 0
+  let done = 0
+  bulkProgress.value = { done: 0, total: targets.length, current: '' }
+  try {
+    for (const s of targets) {
+      bulkProgress.value = { done, total: targets.length, current: `${s.category} / ${s.subcategory ?? '—'}` }
+      const wikiCat = (s.wikiCategory ?? s.subcategory ?? '').trim()
+      if (!wikiCat) {
+        skipped++
+        done++
+        continue
+      }
+      try {
+        const res = await $fetch<FetchResult>('/api/admin/chest-costs/fetch', {
+          method: 'POST',
+          body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCat }
+        })
+        const toApply = res.matched.filter(m => !sameCost(m.cost, m.currentCost))
+        if (toApply.length) {
+          const ap = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
+            method: 'POST',
+            body: { items: toApply.map(m => ({ id: m.id, cost: m.cost })) }
+          })
+          applied += ap.updated
+        }
+      } catch {
+        failed++
+      }
+      done++
+      bulkProgress.value = { done, total: targets.length, current: '' }
+    }
+    toast.add({
+      title: `Terminé : ${applied} coût(s) appliqué(s) sur ${targets.length} sous-catégorie(s) (${failed} échec(s), ${skipped} ignorée(s))`,
+      color: failed ? 'warning' : 'success'
+    })
+    await refreshScopes()
+  } finally {
+    bulkRunning.value = false
+  }
+}
 </script>
 
 <template>
@@ -241,7 +298,7 @@ async function apply() {
             icon="i-lucide-download"
             label="Récupérer"
             :loading="fetching"
-            :disabled="!selectedScope || !wikiCategory.trim()"
+            :disabled="!selectedScope || !wikiCategory.trim() || bulkRunning"
             @click="fetchCosts"
           />
           <UButton
@@ -250,7 +307,7 @@ async function apply() {
             color="neutral"
             variant="outline"
             :loading="savingMap"
-            :disabled="!selectedScope"
+            :disabled="!selectedScope || bulkRunning"
             @click="saveWikiMap"
           />
         </div>
@@ -259,6 +316,33 @@ async function apply() {
           Modifie-la si le nom du wiki diffère de la sous-catégorie ; « Mémoriser » la
           conserve pour ce scope (vide = retour au nom de la sous-catégorie).
         </p>
+
+        <div class="pt-3 border-t border-muted/20 space-y-2">
+          <div class="flex flex-wrap items-center gap-3">
+            <UButton
+              icon="i-lucide-zap"
+              :label="`Tout récupérer + appliquer (${scopeOptions.length} filtrée${scopeOptions.length > 1 ? 's' : ''})`"
+              color="primary"
+              :loading="bulkRunning"
+              :disabled="bulkRunning || fetching || applying || scopeOptions.length === 0"
+              @click="runBulk"
+            />
+            <p
+              v-if="bulkRunning"
+              class="text-sm text-muted flex items-center gap-2"
+            >
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-4 h-4 animate-spin"
+              />
+              Traitement {{ bulkProgress.done }}/{{ bulkProgress.total }}<span v-if="bulkProgress.current"> : {{ bulkProgress.current }}</span>
+            </p>
+          </div>
+          <p class="text-xs text-muted">
+            Récupère et applique automatiquement les coûts du wiki pour toutes les
+            sous-catégories du filtre courant (utilise la catégorie wiki mémorisée si elle existe).
+          </p>
+        </div>
       </div>
     </UCard>
 
