@@ -219,6 +219,27 @@ watchEffect(() => {
             </UCard>
           </NuxtLink>
 
+          <!-- Coûts du coffre -->
+          <NuxtLink
+            to="/admin/chest-costs"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-coins"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Coûts du coffre</h3>
+                  <p class="text-sm text-muted">Récupérer le coût des objets depuis le wiki Sea of Thieves</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+
           <!-- Traductions des objets -->
           <NuxtLink
             to="/admin/chest-item-translations"

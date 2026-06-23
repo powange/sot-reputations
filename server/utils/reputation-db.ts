@@ -373,6 +373,13 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE chest_items ADD COLUMN colors_manual INTEGER DEFAULT 0')
   }
 
+  // Migration: coût d'achat de l'item (récupéré depuis le wiki Sea of Thieves).
+  // JSON { gold?, doubloons?, ancientCoins? } ; NULL si l'item n'est pas achetable
+  // (item par défaut, événement, récompense…).
+  if (!chestColorCols.some(col => col.name === 'cost')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN cost TEXT')
+  }
+
   return db
 }
 
@@ -1406,6 +1413,61 @@ export function getChestScopes(): Array<{ category: string, subcategory: string 
       binCount: sig ? sig.bins.length : null
     }
   })
+}
+
+// --- Coûts des items du coffre (récupérés du wiki Sea of Thieves) ---
+
+export interface ChestItemCost { gold?: number, doubloons?: number, ancientCoins?: number }
+
+function parseChestItemCost(raw: string | null): ChestItemCost | null {
+  if (!raw) return null
+  try {
+    const o = JSON.parse(raw) as unknown
+    return o && typeof o === 'object' ? o as ChestItemCost : null
+  } catch {
+    return null
+  }
+}
+
+/** Scopes (catégorie/sous-catégorie) avec le total d'items et combien ont déjà un coût. */
+export function getChestCostScopes(): Array<{ category: string, subcategory: string | null, count: number, withCost: number }> {
+  const db = getReputationDb()
+  return db.prepare(`
+    SELECT category, subcategory,
+           COUNT(*) as count,
+           SUM(CASE WHEN cost IS NOT NULL AND cost != '' THEN 1 ELSE 0 END) as withCost
+    FROM chest_items
+    GROUP BY category, subcategory
+    ORDER BY category, subcategory
+  `).all() as Array<{ category: string, subcategory: string | null, count: number, withCost: number }>
+}
+
+/**
+ * Items d'un scope avec leur nom EN (chest_item_translations, repli sur le nom FR) et
+ * leur coût actuel — pour rapprocher du wiki par nom anglais.
+ */
+export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, cost: ChestItemCost | null }> {
+  const db = getReputationDb()
+  const sql = `
+    SELECT ci.id, ci.name, t.name as enName, ci.cost
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.category = ? AND ${subcategory === null ? 'ci.subcategory IS NULL' : 'ci.subcategory = ?'}
+    ORDER BY ci.sort_order
+  `
+  const rows = (subcategory === null
+    ? db.prepare(sql).all(category)
+    : db.prepare(sql).all(category, subcategory)
+  ) as Array<{ id: number, name: string, enName: string | null, cost: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, cost: parseChestItemCost(r.cost) }))
+}
+
+/** Écrit le coût d'un item (null/vide = efface). Renvoie true si l'item existe. */
+export function setChestItemCost(id: number, cost: ChestItemCost | null): boolean {
+  const db = getReputationDb()
+  const value = cost && Object.keys(cost).length > 0 ? JSON.stringify(cost) : null
+  const res = db.prepare('UPDATE chest_items SET cost = ? WHERE id = ?').run(value, id)
+  return res.changes > 0
 }
 
 /** Recherche d'items du coffre par nom (avec leurs couleurs nommées actuelles). */
