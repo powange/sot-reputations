@@ -30,6 +30,15 @@ RUN apk add --no-cache wget libstdc++ su-exec \
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./.output
 COPY --chmod=755 entrypoint.sh ./entrypoint.sh
 
+# sharp/libvips : Nitro range le binaire sharp et sa lib libvips dans des dossiers
+# versionnés (.nitro/@img/sharp-libvips-*@X.Y.Z) que le rpath du .node ne retrouve
+# pas -> "Could not load sharp / libvips-cpp.so: No such file". On rassemble tous
+# les libvips*.so dans un dossier placé sur LD_LIBRARY_PATH pour que le linker les
+# trouve (couvre les deux versions de sharp présentes : racine + celle d'ipx).
+RUN mkdir -p /app/vips-libs \
+    && find /app/.output -name 'libvips*.so*' -exec ln -sf {} /app/vips-libs/ \;
+ENV LD_LIBRARY_PATH=/app/vips-libs
+
 EXPOSE 3000
 
 ENV HOST=0.0.0.0
