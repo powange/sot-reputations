@@ -17,7 +17,7 @@ watchEffect(() => {
   }
 })
 
-interface Scope { category: string, subcategory: string | null, count: number, withCost: number }
+interface Scope { category: string, subcategory: string | null, count: number, withCost: number, wikiCategory: string | null }
 interface Cost { gold?: number, doubloons?: number, ancientCoins?: number }
 interface Matched { id: number, name: string, enName: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null }
 interface NoCost { id: number, name: string, enName: string | null, wikiTitle: string }
@@ -40,6 +40,7 @@ const selectedScopeIdx = ref<number | undefined>()
 const wikiCategory = ref('')
 const fetching = ref(false)
 const applying = ref(false)
+const savingMap = ref(false)
 const result = ref<FetchResult | null>(null)
 // Items matchés cochés (à appliquer). Clé = id.
 const selectedIds = ref<Set<number>>(new Set())
@@ -50,11 +51,30 @@ const scopeOptions = computed(() => scopes.value.map((s, i) => ({
 })))
 const selectedScope = computed(() => (selectedScopeIdx.value != null ? scopes.value[selectedScopeIdx.value] || null : null))
 
-// Pré-remplit le nom de catégorie wiki avec la sous-catégorie choisie.
+// Pré-remplit le nom de catégorie wiki : override mémorisé sinon la sous-catégorie.
 watch(selectedScope, (s) => {
-  wikiCategory.value = s?.subcategory ?? ''
+  wikiCategory.value = s?.wikiCategory ?? s?.subcategory ?? ''
   result.value = null
 })
+
+// Mémorise le nom de catégorie wiki pour ce scope (persisté en base).
+async function saveWikiMap() {
+  const s = selectedScope.value
+  if (!s) return
+  savingMap.value = true
+  try {
+    await $fetch('/api/admin/chest-costs/wiki-map', {
+      method: 'POST',
+      body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCategory.value.trim() }
+    })
+    toast.add({ title: 'Catégorie wiki mémorisée', color: 'success' })
+    await refreshScopes()
+  } catch {
+    toast.add({ title: 'Erreur lors de l\'enregistrement', color: 'error' })
+  } finally {
+    savingMap.value = false
+  }
+}
 
 function formatCost(cost: Cost | null): string {
   if (!cost) return '—'
@@ -184,10 +204,20 @@ async function apply() {
             :disabled="!selectedScope || !wikiCategory.trim()"
             @click="fetchCosts"
           />
+          <UButton
+            icon="i-lucide-save"
+            label="Mémoriser"
+            color="neutral"
+            variant="outline"
+            :loading="savingMap"
+            :disabled="!selectedScope"
+            @click="saveWikiMap"
+          />
         </div>
         <p class="text-xs text-muted">
           La catégorie wiki interrogée est <code>Category:{{ wikiCategory || '…' }}</code>.
-          Modifie-la si le nom du wiki diffère de la sous-catégorie.
+          Modifie-la si le nom du wiki diffère de la sous-catégorie ; « Mémoriser » la
+          conserve pour ce scope (vide = retour au nom de la sous-catégorie).
         </p>
       </div>
     </UCard>

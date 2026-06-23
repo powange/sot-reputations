@@ -22,6 +22,7 @@ interface ChestItem {
   image: string | null
   owned: boolean
   colors: string[]
+  cost: { gold?: number, doubloons?: number, ancientCoins?: number } | null
   groupOwners: Array<{ group: string, members: string[] }>
 }
 
@@ -50,6 +51,20 @@ function openItem(item: ChestItem) {
   if (!item.image) return
   selectedItem.value = item
   isImageModalOpen.value = true
+}
+
+// --- Coût de l'item (icône de devise + montant) ---
+const CURRENCY_META: Record<string, { icon: string, label: string }> = {
+  gold: { icon: '/img/currencies/gold.png', label: 'Or' },
+  doubloons: { icon: '/img/currencies/doubloons.png', label: 'Doublons' },
+  ancientCoins: { icon: '/img/currencies/ancient-coins.png', label: 'Pièces anciennes' }
+}
+function costEntries(item: ChestItem): Array<{ key: string, icon: string, label: string, value: number }> {
+  const cost = item.cost
+  if (!cost) return []
+  return (['gold', 'doubloons', 'ancientCoins'] as const)
+    .filter(k => cost[k] != null)
+    .map(k => ({ key: k, icon: CURRENCY_META[k]!.icon, label: CURRENCY_META[k]!.label, value: cost[k]! }))
 }
 
 // Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
@@ -518,6 +533,25 @@ watch(
                 />
                 {{ groupOwnersCount(item) }}
               </UBadge>
+              <!-- Coût (bas-droite) : montant + icône de devise, si renseigné -->
+              <div
+                v-if="costEntries(item).length"
+                class="absolute bottom-1 right-1 flex flex-col items-end gap-0.5"
+              >
+                <span
+                  v-for="c in costEntries(item)"
+                  :key="c.key"
+                  class="inline-flex items-center gap-0.5 rounded bg-black/65 text-white px-1 py-0.5 text-xs font-medium leading-none"
+                  :title="c.label"
+                >
+                  {{ c.value.toLocaleString('fr-FR') }}
+                  <img
+                    :src="c.icon"
+                    :alt="c.label"
+                    class="w-3.5 h-3.5"
+                  >
+                </span>
+              </div>
             </div>
             <div class="p-2">
               <p
@@ -615,6 +649,24 @@ watch(
               :style="{ backgroundColor: colorHex(col) }"
               :title="colorLabel(col)"
             />
+          </div>
+          <div
+            v-if="selectedItem && costEntries(selectedItem).length"
+            class="flex items-center gap-3 mt-3"
+          >
+            <span
+              v-for="c in costEntries(selectedItem)"
+              :key="c.key"
+              class="inline-flex items-center gap-1 text-sm font-medium"
+              :title="c.label"
+            >
+              {{ c.value.toLocaleString('fr-FR') }}
+              <img
+                :src="c.icon"
+                :alt="c.label"
+                class="w-4 h-4"
+              >
+            </span>
           </div>
         </div>
       </template>

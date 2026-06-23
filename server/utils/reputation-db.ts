@@ -246,6 +246,16 @@ export function getReputationDb(): Database.Database {
       built_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Surcharge du nom de Category: du wiki pour une sous-categorie, quand il differe
+    -- de la sous-categorie elle-meme (memorise par l'admin sur la page des couts).
+    -- subcategory = '' pour une categorie sans sous-categorie.
+    CREATE TABLE IF NOT EXISTS chest_cost_wiki_map (
+      category TEXT NOT NULL,
+      subcategory TEXT NOT NULL DEFAULT '',
+      wiki_category TEXT NOT NULL,
+      PRIMARY KEY (category, subcategory)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -1000,6 +1010,8 @@ export interface ChestItem {
   owned: boolean
   // Couleurs principales nommées (palette), pour le filtre couleur.
   colors: string[]
+  // Coût d'achat (récupéré du wiki) ; null si non achetable / non renseigné.
+  cost: ChestItemCost | null
   // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
   groupOwners: Array<{ group: string, members: string[] }>
 }
@@ -1278,7 +1290,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
       COALESCE(NULLIF(t.name, ''), ci.name) as name,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image,
-      ci.sort_order as sortOrder, ci.colors,
+      ci.sort_order as sortOrder, ci.colors, ci.cost,
       CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
     FROM chest_items ci
     LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
@@ -1293,6 +1305,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     image: string | null
     sortOrder: number
     colors: string | null
+    cost: string | null
     owned: number
   }>
 
@@ -1311,6 +1324,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     image: r.image,
     owned: r.owned === 1,
     colors: parseColors(r.colors),
+    cost: parseChestItemCost(r.cost),
     groupOwners: groupOwners.get(r.id) || []
   }))
 }
@@ -1429,17 +1443,39 @@ function parseChestItemCost(raw: string | null): ChestItemCost | null {
   }
 }
 
-/** Scopes (catégorie/sous-catégorie) avec le total d'items et combien ont déjà un coût. */
-export function getChestCostScopes(): Array<{ category: string, subcategory: string | null, count: number, withCost: number }> {
+/**
+ * Scopes (catégorie/sous-catégorie) avec le total d'items, combien ont déjà un coût,
+ * et l'éventuel nom de Category: du wiki mémorisé pour ce scope.
+ */
+export function getChestCostScopes(): Array<{ category: string, subcategory: string | null, count: number, withCost: number, wikiCategory: string | null }> {
   const db = getReputationDb()
   return db.prepare(`
-    SELECT category, subcategory,
+    SELECT ci.category as category, ci.subcategory as subcategory,
            COUNT(*) as count,
-           SUM(CASE WHEN cost IS NOT NULL AND cost != '' THEN 1 ELSE 0 END) as withCost
-    FROM chest_items
-    GROUP BY category, subcategory
-    ORDER BY category, subcategory
-  `).all() as Array<{ category: string, subcategory: string | null, count: number, withCost: number }>
+           SUM(CASE WHEN ci.cost IS NOT NULL AND ci.cost != '' THEN 1 ELSE 0 END) as withCost,
+           m.wiki_category as wikiCategory
+    FROM chest_items ci
+    LEFT JOIN chest_cost_wiki_map m
+      ON m.category = ci.category AND m.subcategory = COALESCE(ci.subcategory, '')
+    GROUP BY ci.category, ci.subcategory
+    ORDER BY ci.category, ci.subcategory
+  `).all() as Array<{ category: string, subcategory: string | null, count: number, withCost: number, wikiCategory: string | null }>
+}
+
+/** Mémorise (ou efface si vide) le nom de Category: du wiki pour un scope. */
+export function setChestCostWikiMap(category: string, subcategory: string | null, wikiCategory: string | null): void {
+  const db = getReputationDb()
+  const sub = subcategory ?? ''
+  const wc = wikiCategory?.trim() || ''
+  if (!wc) {
+    db.prepare('DELETE FROM chest_cost_wiki_map WHERE category = ? AND subcategory = ?').run(category, sub)
+    return
+  }
+  db.prepare(`
+    INSERT INTO chest_cost_wiki_map (category, subcategory, wiki_category)
+    VALUES (?, ?, ?)
+    ON CONFLICT(category, subcategory) DO UPDATE SET wiki_category = excluded.wiki_category
+  `).run(category, sub, wc)
 }
 
 /**
