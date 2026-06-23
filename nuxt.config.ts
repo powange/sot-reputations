@@ -3,6 +3,7 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
+    '@nuxt/image',
     '@nuxt/fonts',
     'nuxt-auth-utils',
     '@nuxtjs/i18n'
@@ -100,5 +101,12 @@ export default defineNuxtConfig({
       cookieKey: 'i18n_locale',
       fallbackLocale: 'fr'
     }
+  },
+
+  image: {
+    // Optimisation des images distantes du coffre (CDN officiel Sea of Thieves) :
+    // le domaine doit être explicitement autorisé pour passer par IPX.
+    domains: ['athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net'],
+    format: ['webp']
   }
 })

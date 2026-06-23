@@ -15,6 +15,7 @@
     "@iconify-json/lucide": "^1.2.74",
     "@iconify-json/simple-icons": "^1.2.59",
     "@nuxt/fonts": "^0.11.4",
+    "@nuxt/image": "^2.0.0",
     "@nuxt/ui": "^4.8.2",
     "@nuxtjs/i18n": "^10.2.1",
     "@tailwindcss/typography": "^0.5.19",

@@ -39,6 +39,15 @@ const isLoading = computed(() => status.value === 'pending')
 // vient des imports d'autres utilisateurs).
 const ownedCount = computed(() => items.value.reduce((n, i) => n + (i.owned ? 1 : 0), 0))
 
+// --- Modale de zoom : clic sur une vignette -> image en pleine résolution (1024px) ---
+const selectedItem = ref<ChestItem | null>(null)
+const isImageModalOpen = ref(false)
+function openItem(item: ChestItem) {
+  if (!item.image) return
+  selectedItem.value = item
+  isImageModalOpen.value = true
+}
+
 // Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
 // (humanizeKey est auto-importé depuis app/utils)
 function catLabel(category: string): string {
@@ -463,15 +472,21 @@ watch(
           >
             <div
               class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden"
+              :class="item.image ? 'cursor-pointer' : ''"
               :title="groupOwnersText(item)"
+              @click="openItem(item)"
             >
-              <img
+              <NuxtImg
                 v-if="item.image"
                 :src="item.image"
                 :alt="item.name"
+                width="200"
+                height="200"
+                densities="x1 x2"
+                format="webp"
                 loading="lazy"
-                class="w-full h-full object-cover"
-              >
+                class="w-full h-full object-cover transition-opacity hover:opacity-90"
+              />
               <UIcon
                 v-else
                 name="i-lucide-image-off"
@@ -551,5 +566,54 @@ watch(
         </div>
       </template>
     </template>
+
+    <!-- Modale de zoom : image en pleine résolution 1024px, optimisée WebP par IPX -->
+    <UModal
+      v-model:open="isImageModalOpen"
+      :title="selectedItem?.name"
+      :ui="{ content: 'sm:max-w-2xl' }"
+    >
+      <template #content>
+        <div class="p-4 flex flex-col items-center">
+          <NuxtImg
+            v-if="selectedItem?.image"
+            :src="selectedItem.image"
+            :alt="selectedItem.name"
+            width="1024"
+            height="1024"
+            format="webp"
+            :quality="90"
+            class="max-w-full max-h-[70vh] object-contain"
+          />
+          <p class="mt-4 text-lg font-medium text-center">
+            {{ selectedItem?.name }}
+          </p>
+          <p
+            v-if="selectedItem?.subcategory"
+            class="text-sm text-muted text-center"
+          >
+            {{ selectedItem ? subLabel(selectedItem.category, selectedItem.subcategory) : '' }}
+          </p>
+          <p
+            v-if="selectedItem?.description"
+            class="mt-2 text-sm text-muted text-center max-w-md"
+          >
+            {{ selectedItem.description }}
+          </p>
+          <div
+            v-if="selectedItem?.colors.length"
+            class="flex items-center gap-1.5 mt-3"
+          >
+            <span
+              v-for="col in selectedItem.colors"
+              :key="col"
+              class="inline-block w-4 h-4 rounded-full border border-muted/40"
+              :style="{ backgroundColor: colorHex(col) }"
+              :title="colorLabel(col)"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
   </UContainer>
 </template>
