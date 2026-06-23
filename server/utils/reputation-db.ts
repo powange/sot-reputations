@@ -337,6 +337,11 @@ export function getReputationDb(): Database.Database {
   if (!chestColorCols.some(col => col.name === 'colors')) {
     db.exec('ALTER TABLE chest_items ADD COLUMN colors TEXT')
   }
+  // Flag « couleurs éditées à la main » : ces items sont protégés des ré-analyses /
+  // re-classements en masse (pour ne pas écraser les corrections de l'admin).
+  if (!chestColorCols.some(col => col.name === 'colors_manual')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN colors_manual INTEGER DEFAULT 0')
+  }
 
   return db
 }
@@ -1241,17 +1246,17 @@ export function getChestItemsForColorAnalysis(limit: number): Array<{ id: number
 }
 
 /** Recherche d'items du coffre par nom (avec leurs couleurs nommées actuelles). */
-export function searchChestItemsByName(query: string, limit: number): Array<{ id: number, name: string, image: string | null, colors: string[] }> {
+export function searchChestItemsByName(query: string, limit: number): Array<{ id: number, name: string, image: string | null, colors: string[], manual: boolean }> {
   const db = getReputationDb()
   // `%`/`_` du terme sont échappés pour rester littéraux (ESCAPE '\').
   const term = `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`
   const rows = db.prepare(`
-    SELECT id, name, image, colors FROM chest_items
+    SELECT id, name, image, colors, colors_manual FROM chest_items
     WHERE name LIKE ? ESCAPE '\\' AND image IS NOT NULL AND image != ''
     ORDER BY name
     LIMIT ?
-  `).all(term, limit) as Array<{ id: number, name: string, image: string | null, colors: string | null }>
-  return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors) }))
+  `).all(term, limit) as Array<{ id: number, name: string, image: string | null, colors: string | null, colors_manual: number | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors), manual: r.colors_manual === 1 }))
 }
 
 /** Image d'un item du coffre par id (pour ré-analyser un item précis). */
@@ -1262,11 +1267,27 @@ export function getChestItemImageById(id: number): { id: number, image: string }
   ).get(id) as { id: number, image: string } | undefined
 }
 
-/** Enregistre les RGB dominants bruts + les couleurs nommées d'un item. */
+/**
+ * Enregistre les RGB dominants bruts + les couleurs nommées d'un item (extraction
+ * automatique). Lève le flag `colors_manual` : une ré-analyse écrase une éventuelle
+ * édition manuelle précédente.
+ */
 export function saveChestItemColors(id: number, dominant: string[], named: string[]): void {
   const db = getReputationDb()
-  db.prepare('UPDATE chest_items SET dominant_colors = ?, colors = ? WHERE id = ?')
+  db.prepare('UPDATE chest_items SET dominant_colors = ?, colors = ?, colors_manual = 0 WHERE id = ?')
     .run(JSON.stringify(dominant), JSON.stringify(named), id)
+}
+
+/**
+ * Fixe à la main les couleurs nommées d'un item et le marque `colors_manual` (il sera
+ * désormais ignoré par « Re-classer » / « Tout ré-analyser »). Les RGB dominants bruts
+ * sont laissés tels quels. Renvoie false si l'item n'existe pas.
+ */
+export function setChestItemColorsManual(id: number, colors: string[]): boolean {
+  const db = getReputationDb()
+  const res = db.prepare('UPDATE chest_items SET colors = ?, colors_manual = 1 WHERE id = ?')
+    .run(JSON.stringify(colors), id)
+  return res.changes > 0
 }
 
 /** Compteurs d'avancement de l'analyse des couleurs. */
@@ -1289,8 +1310,10 @@ export function getChestColorStatus(): { analyzed: number, total: number } {
  */
 export function resetChestItemColors(): number {
   const db = getReputationDb()
+  // On épargne les items aux couleurs éditées à la main (colors_manual = 1).
   const res = db.prepare(
-    `UPDATE chest_items SET dominant_colors = NULL, colors = NULL WHERE image IS NOT NULL AND image != ''`
+    `UPDATE chest_items SET dominant_colors = NULL, colors = NULL
+     WHERE image IS NOT NULL AND image != '' AND (colors_manual IS NULL OR colors_manual = 0)`
   ).run()
   return res.changes
 }
@@ -1301,8 +1324,10 @@ export function resetChestItemColors(): number {
  */
 export function reclassifyChestColors(classify: (dominant: string[]) => string[]): number {
   const db = getReputationDb()
+  // On épargne les items aux couleurs éditées à la main (colors_manual = 1).
   const rows = db.prepare(
-    `SELECT id, dominant_colors FROM chest_items WHERE dominant_colors IS NOT NULL`
+    `SELECT id, dominant_colors FROM chest_items
+     WHERE dominant_colors IS NOT NULL AND (colors_manual IS NULL OR colors_manual = 0)`
   ).all() as Array<{ id: number, dominant_colors: string }>
   const upd = db.prepare('UPDATE chest_items SET colors = ? WHERE id = ?')
   const tx = db.transaction(() => {

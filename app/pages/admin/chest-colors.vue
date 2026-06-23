@@ -90,7 +90,15 @@ async function reclassify() {
 }
 
 // --- Ré-analyse ciblée (recherche par nom) ---
-interface SearchItem { id: number, name: string, image: string | null, colors: string[] }
+interface SearchItem {
+  id: number
+  name: string
+  image: string | null
+  colors: string[]
+  manual: boolean
+  _dirty?: boolean // édition locale non encore enregistrée
+  _saving?: boolean
+}
 
 const search = ref('')
 const searchResults = ref<SearchItem[]>([])
@@ -101,6 +109,44 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 // Pastille d'affichage d'une couleur nommée (repli si absente de la palette).
 function colorHex(name: string): string {
   return (palette.value || []).find(c => c.name === name)?.hex || '#888888'
+}
+
+// Couleurs de la palette pas encore présentes sur l'item (pour le menu « ajouter »).
+function missingColors(item: SearchItem): Array<{ name: string, hex: string }> {
+  return (palette.value || []).filter(c => !item.colors.includes(c.name))
+}
+
+function removeColor(item: SearchItem, idx: number) {
+  item.colors.splice(idx, 1)
+  item._dirty = true
+}
+
+// Promeut une couleur en tête de liste (= couleur principale).
+function promoteColor(item: SearchItem, idx: number) {
+  if (idx === 0) return
+  const [c] = item.colors.splice(idx, 1)
+  item.colors.unshift(c!)
+  item._dirty = true
+}
+
+function addColor(item: SearchItem, name: string) {
+  if (item.colors.includes(name)) return
+  item.colors.push(name)
+  item._dirty = true
+}
+
+async function saveColors(item: SearchItem) {
+  item._saving = true
+  try {
+    await $fetch('/api/admin/chest-colors/set-colors', { method: 'POST', body: { id: item.id, colors: item.colors } })
+    item._dirty = false
+    item.manual = true
+    toast.add({ title: `Couleurs de « ${item.name} » enregistrées`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur lors de l\'enregistrement des couleurs', color: 'error' })
+  } finally {
+    item._saving = false
+  }
 }
 
 // Recherche débattue (300 ms) pour ne pas marteler l'endpoint à chaque frappe.
@@ -133,6 +179,8 @@ async function reanalyzeItem(item: SearchItem) {
       body: { id: item.id }
     })
     item.colors = res.colors // reflète les nouvelles couleurs dans la liste
+    item.manual = false // la ré-analyse auto écrase une éventuelle édition manuelle
+    item._dirty = false
     toast.add({ title: `« ${item.name} » ré-analysé`, color: 'success' })
   } catch {
     toast.add({ title: 'Erreur lors de la ré-analyse', color: 'error' })
@@ -256,51 +304,115 @@ async function reanalyzeItem(item: SearchItem) {
           <li
             v-for="item in searchResults"
             :key="item.id"
-            class="flex items-center gap-3 py-2"
+            class="flex items-start gap-3 py-3"
           >
             <img
               v-if="item.image"
               :src="item.image"
               :alt="item.name"
               loading="lazy"
-              class="w-10 h-10 object-cover rounded bg-muted/20 shrink-0"
+              class="w-10 h-10 object-cover rounded bg-muted/20 shrink-0 mt-0.5"
             >
             <div class="min-w-0 flex-1">
-              <p
-                class="text-sm font-medium truncate"
-                :title="item.name"
-              >
-                {{ item.name }}
-              </p>
-              <div
-                v-if="item.colors.length"
-                class="flex items-center gap-1 mt-1"
-              >
-                <span
-                  v-for="col in item.colors"
-                  :key="col"
-                  class="inline-block w-3 h-3 rounded-full border border-muted/40"
-                  :style="{ backgroundColor: colorHex(col) }"
-                  :title="col"
-                />
+              <div class="flex items-center gap-2">
+                <p
+                  class="text-sm font-medium truncate"
+                  :title="item.name"
+                >
+                  {{ item.name }}
+                </p>
+                <UBadge
+                  v-if="item.manual"
+                  color="info"
+                  variant="subtle"
+                  size="xs"
+                >
+                  manuel
+                </UBadge>
               </div>
-              <p
-                v-else
-                class="text-xs text-muted mt-1"
+
+              <!-- Couleurs éditables : clic = principale, ✕ = retirer -->
+              <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
+                <span
+                  v-if="!item.colors.length"
+                  class="text-xs text-muted"
+                >
+                  Pas encore de couleurs
+                </span>
+                <span
+                  v-for="(col, idx) in item.colors"
+                  :key="col"
+                  class="inline-flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-full border border-muted/40 text-xs"
+                >
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 cursor-pointer"
+                    :title="idx === 0 ? 'Couleur principale' : 'Définir comme principale'"
+                    @click="promoteColor(item, idx)"
+                  >
+                    <span
+                      class="inline-block w-3 h-3 rounded-full border border-muted/40"
+                      :style="{ backgroundColor: colorHex(col) }"
+                    />
+                    <span :class="idx === 0 ? 'font-semibold' : ''">{{ col }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="text-muted hover:text-error cursor-pointer"
+                    title="Retirer"
+                    @click="removeColor(item, idx)"
+                  >
+                    <UIcon
+                      name="i-lucide-x"
+                      class="w-3 h-3"
+                    />
+                  </button>
+                </span>
+              </div>
+
+              <!-- Ajouter une couleur de la palette -->
+              <div
+                v-if="missingColors(item).length"
+                class="flex items-center gap-1.5 flex-wrap mt-1.5"
               >
-                Pas encore de couleurs
-              </p>
+                <span class="text-xs text-muted">Ajouter :</span>
+                <button
+                  v-for="c in missingColors(item)"
+                  :key="c.name"
+                  type="button"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-dashed border-muted/40 text-xs text-muted hover:text-foreground cursor-pointer"
+                  @click="addColor(item, c.name)"
+                >
+                  <span
+                    class="inline-block w-3 h-3 rounded-full"
+                    :style="{ backgroundColor: c.hex }"
+                  />
+                  {{ c.name }}
+                </button>
+              </div>
             </div>
-            <UButton
-              size="xs"
-              icon="i-lucide-rotate-ccw"
-              label="Réanalyser"
-              color="primary"
-              variant="outline"
-              :loading="reanalyzingId === item.id"
-              :disabled="reanalyzingId !== null"
-              @click="reanalyzeItem(item)"
-            />
+
+            <div class="flex flex-col gap-1.5 shrink-0">
+              <UButton
+                v-if="item._dirty"
+                size="xs"
+                icon="i-lucide-check"
+                label="Enregistrer"
+                color="success"
+                :loading="item._saving"
+                @click="saveColors(item)"
+              />
+              <UButton
+                size="xs"
+                icon="i-lucide-rotate-ccw"
+                label="Réanalyser"
+                color="primary"
+                variant="outline"
+                :loading="reanalyzingId === item.id"
+                :disabled="reanalyzingId !== null"
+                @click="reanalyzeItem(item)"
+              />
+            </div>
           </li>
         </ul>
       </div>
