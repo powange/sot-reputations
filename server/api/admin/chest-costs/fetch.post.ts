@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestScopeItemsForCost, type ChestItemCost } from '../../../utils/reputation-db'
-import { fetchWikiItemCosts, normalizeName, type WikiCost, type WikiItem } from '../../../utils/sot-wiki'
+import { fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/fetch  { category, subcategory, wikiCategory? }
@@ -24,8 +24,10 @@ export default defineEventHandler(async (event) => {
     : String(body.subcategory)
   const wikiCategory = (typeof body?.wikiCategory === 'string' && body.wikiCategory.trim())
     ? body.wikiCategory.trim()
-    : subcategory
-  if (!wikiCategory) {
+    : (subcategory ?? '')
+  // Une sous-catégorie peut viser plusieurs Category: du wiki, séparées par « | ».
+  const wikiCategories = wikiCategory.split('|').map(c => c.trim()).filter(Boolean)
+  if (!wikiCategories.length) {
     throw createError({ statusCode: 400, statusMessage: 'wikiCategory requise (sous-catégorie absente)' })
   }
 
@@ -33,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   let wiki: WikiItem[]
   try {
-    wiki = await fetchWikiItemCosts(wikiCategory)
+    wiki = await fetchWikiItemCostsMulti(wikiCategories)
   } catch {
     throw createError({ statusCode: 502, statusMessage: `Échec de récupération du wiki pour « ${wikiCategory} »` })
   }

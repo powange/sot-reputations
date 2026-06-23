@@ -111,3 +111,21 @@ export async function fetchWikiItemCosts(wikiCategory: string): Promise<WikiItem
   }
   return out
 }
+
+/**
+ * Récupère et fusionne les items de PLUSIEURS catégories wiki (une sous-catégorie du
+ * catalogue peut correspondre à plusieurs Category: du wiki). Dédoublonnage par titre ;
+ * en cas de doublon, on conserve une entrée qui porte un coût si l'une l'a.
+ */
+export async function fetchWikiItemCostsMulti(categories: string[]): Promise<WikiItem[]> {
+  const byTitle = new Map<string, WikiItem>()
+  for (const cat of categories) {
+    const items = await fetchWikiItemCosts(cat)
+    for (const it of items) {
+      const key = normalizeName(it.title)
+      const existing = byTitle.get(key)
+      if (!existing || (!existing.cost && it.cost)) byTitle.set(key, it)
+    }
+  }
+  return [...byTitle.values()]
+}

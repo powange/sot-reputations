@@ -290,7 +290,7 @@ async function runBulk() {
             <label class="text-sm text-muted block mb-1">Catégorie wiki</label>
             <UInput
               v-model="wikiCategory"
-              placeholder="ex. Banjo"
+              placeholder="ex. Banjo ou Banjo|Drum"
               :disabled="!selectedScope"
             />
           </div>
@@ -312,9 +312,11 @@ async function runBulk() {
           />
         </div>
         <p class="text-xs text-muted">
-          La catégorie wiki interrogée est <code>Category:{{ wikiCategory || '…' }}</code>.
-          Modifie-la si le nom du wiki diffère de la sous-catégorie ; « Mémoriser » la
-          conserve pour ce scope (vide = retour au nom de la sous-catégorie).
+          Catégorie(s) wiki interrogée(s) : <code>Category:{{ wikiCategory || '…' }}</code>.
+          Modifie-la si le nom du wiki diffère de la sous-catégorie. Plusieurs catégories
+          possibles, séparées par <code>|</code> (ex. <code>Banjo|Drum</code>) — leurs items
+          sont fusionnés. « Mémoriser » conserve la valeur pour ce scope (vide = retour à la
+          sous-catégorie).
         </p>
 
         <div class="pt-3 border-t border-muted/20 space-y-2">
