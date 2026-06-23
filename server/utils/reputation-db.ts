@@ -1410,6 +1410,70 @@ export function searchChestItemsByName(query: string, limit: number): Array<{ id
   return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors), manual: r.colors_manual === 1 }))
 }
 
+export interface ChestItemTranslationRow {
+  id: number
+  itemKey: string
+  name: string
+  image: string | null
+  en: string | null
+  es: string | null
+}
+
+/**
+ * Recherche d'items du coffre par nom FR (nom de base) avec leurs traductions EN/ES
+ * actuelles, pour l'éditeur d'administration. Le nom FR sert de référence (lecture
+ * seule côté admin) ; seules EN/ES sont éditables.
+ */
+export function searchChestItemTranslations(query: string, limit: number): ChestItemTranslationRow[] {
+  const db = getReputationDb()
+  // `%`/`_` du terme sont échappés pour rester littéraux (ESCAPE '\').
+  const term = `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`
+  return db.prepare(`
+    SELECT
+      ci.id, ci.item_key as itemKey, ci.name, ci.image,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'en') as en,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'es') as es
+    FROM chest_items ci
+    WHERE ci.name LIKE ? ESCAPE '\\'
+    ORDER BY ci.name
+    LIMIT ?
+  `).all(term, limit) as ChestItemTranslationRow[]
+}
+
+export interface ChestItemTranslationInput {
+  itemKey: string
+  translations: Array<{ locale: string, name?: string | null }>
+}
+
+/** Upsert des traductions de noms d'items (EN/ES uniquement ; vide = suppression). */
+export function setChestItemTranslations(entries: ChestItemTranslationInput[]): void {
+  const db = getReputationDb()
+  const upsert = db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name)
+    VALUES (?, ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+  `)
+  const del = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ? AND locale = ?')
+
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      const itemKey = entry.itemKey?.trim()
+      if (!itemKey) continue
+      for (const t of entry.translations) {
+        // FR est le nom de base (chest_items.name) : non géré ici.
+        if (!t.locale || !['en', 'es'].includes(t.locale)) continue
+        const name = t.name?.trim() || null
+        if (!name) {
+          del.run(itemKey, t.locale)
+        } else {
+          upsert.run(itemKey, t.locale, name)
+        }
+      }
+    }
+  })
+  run()
+}
+
 /** Image + scope d'un item du coffre par id (pour ré-analyser un item précis). */
 export function getChestItemImageById(id: number): { id: number, image: string, category: string, subcategory: string | null } | undefined {
   const db = getReputationDb()

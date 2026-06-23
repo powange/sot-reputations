@@ -218,6 +218,27 @@ watchEffect(() => {
               </div>
             </UCard>
           </NuxtLink>
+
+          <!-- Traductions des objets -->
+          <NuxtLink
+            to="/admin/chest-item-translations"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-languages"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Traductions des objets</h3>
+                  <p class="text-sm text-muted">Corriger les noms EN / ES des objets du coffre</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
         </div>
       </section>
 
