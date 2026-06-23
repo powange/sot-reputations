@@ -1,5 +1,5 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { getChestItemsForColorAnalysis, saveChestItemColors, getChestColorStatus } from '../../../utils/reputation-db'
+import { getChestItemsForColorAnalysis, saveChestItemColors, getChestColorStatus, getAllChestColorSignatures, chestScopeKey } from '../../../utils/reputation-db'
 import { classifyDominantColors } from '../../../utils/chest-colors'
 import { extractDominantColors } from '../../../utils/chest-colors-extract'
 
@@ -17,6 +17,8 @@ export default defineEventHandler(async (event) => {
   await requireAdminOrModerator(event)
 
   const items = getChestItemsForColorAnalysis(BATCH_SIZE)
+  // Signatures « décor » par scope (coque de bateau, etc.) à exclure de l'extraction.
+  const signatures = getAllChestColorSignatures()
 
   // Téléchargements en parallèle : borne la durée du lot (~ l'image la plus lente)
   // au lieu de la somme, ce qui évite les timeouts de reverse proxy. Chaque item
@@ -27,7 +29,8 @@ export default defineEventHandler(async (event) => {
       const res = await fetch(item.image, { signal: AbortSignal.timeout(15000) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const buf = Buffer.from(await res.arrayBuffer())
-      const dominant = await extractDominantColors(buf)
+      const excludeBins = signatures.get(chestScopeKey(item.category, item.subcategory))
+      const dominant = await extractDominantColors(buf, 4, excludeBins)
       saveChestItemColors(item.id, dominant, classifyDominantColors(dominant))
       return 'ok'
     } catch (err) {

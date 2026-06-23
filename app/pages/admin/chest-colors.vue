@@ -28,6 +28,43 @@ const analyzing = ref(false)
 const stopRequested = ref(false)
 const reclassifying = ref(false)
 
+// --- Signature de couleurs « décor » par sous-catégorie ---
+interface Scope { category: string, subcategory: string | null, count: number, builtAt: string | null, sampleCount: number | null, binCount: number | null }
+const { data: scopesData, refresh: refreshScopes } = await useFetch<{ scopes: Scope[] }>('/api/admin/chest-colors/scopes')
+const scopes = computed(() => scopesData.value?.scopes || [])
+const selectedScopeIdx = ref<number | undefined>()
+const buildingSignature = ref(false)
+
+const scopeOptions = computed(() => scopes.value.map((s, i) => ({
+  label: `${s.category} / ${s.subcategory ?? '—'} (${s.count})${s.binCount != null ? ` · sig. ${s.binCount} bacs` : ''}`,
+  value: i
+})))
+const selectedScope = computed(() => (selectedScopeIdx.value != null ? scopes.value[selectedScopeIdx.value] || null : null))
+
+function formatBuiltAt(d: string | null): string {
+  if (!d) return ''
+  const dt = new Date(d.replace(' ', 'T') + 'Z')
+  return Number.isNaN(dt.getTime()) ? d : dt.toLocaleString('fr-FR')
+}
+
+async function buildSignature() {
+  const s = selectedScope.value
+  if (!s) return
+  buildingSignature.value = true
+  try {
+    const res = await $fetch<{ binCount: number, sampleCount: number, reanalyzed: number, manualSkipped: number }>(
+      '/api/admin/chest-colors/build-signature',
+      { method: 'POST', body: { category: s.category, subcategory: s.subcategory } }
+    )
+    toast.add({ title: `Signature : ${res.binCount} bacs (${res.sampleCount} images) — ${res.reanalyzed} ré-analysés, ${res.manualSkipped} manuels épargnés`, color: 'success' })
+    await refreshScopes()
+  } catch {
+    toast.add({ title: 'Erreur lors de la construction de la signature', color: 'error' })
+  } finally {
+    buildingSignature.value = false
+  }
+}
+
 const progressPct = computed(() =>
   status.value.total > 0 ? Math.round((status.value.analyzed / status.value.total) * 100) : 0
 )
@@ -415,6 +452,49 @@ async function reanalyzeItem(item: SearchItem) {
             </div>
           </li>
         </ul>
+      </div>
+    </UCard>
+
+    <UCard class="mb-6">
+      <template #header>
+        <h2 class="font-semibold">
+          Signature de couleurs (sous-catégorie)
+        </h2>
+      </template>
+
+      <div class="space-y-3">
+        <p class="text-sm text-muted">
+          Repère les couleurs communes à toutes les images d'une sous-catégorie (ex. la coque
+          sous les figures de proue) pour les exclure de l'analyse, puis ré-analyse les items
+          de cette sous-catégorie (les items édités à la main sont épargnés).
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <USelectMenu
+            v-model="selectedScopeIdx"
+            :items="scopeOptions"
+            value-key="value"
+            placeholder="Choisir une sous-catégorie…"
+            class="w-full sm:w-96"
+          />
+          <UButton
+            icon="i-lucide-scan-line"
+            label="Construire + ré-analyser"
+            :loading="buildingSignature"
+            :disabled="!selectedScope"
+            @click="buildSignature"
+          />
+        </div>
+        <p
+          v-if="selectedScope"
+          class="text-sm text-muted"
+        >
+          <template v-if="selectedScope.binCount != null">
+            Signature actuelle : {{ selectedScope.binCount }} bacs exclus, sur {{ selectedScope.sampleCount }} images — {{ formatBuiltAt(selectedScope.builtAt) }}
+          </template>
+          <template v-else>
+            Pas encore de signature pour cette sous-catégorie.
+          </template>
+        </p>
       </div>
     </UCard>
 

@@ -1,5 +1,5 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { getChestItemImageById, saveChestItemColors } from '../../../utils/reputation-db'
+import { getChestItemImageById, saveChestItemColors, getChestColorSignature, chestScopeKey } from '../../../utils/reputation-db'
 import { classifyDominantColors } from '../../../utils/chest-colors'
 import { extractDominantColors } from '../../../utils/chest-colors-extract'
 
@@ -27,7 +27,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, statusMessage: `Téléchargement image : HTTP ${res.status}` })
   }
   const buf = Buffer.from(await res.arrayBuffer())
-  const dominant = await extractDominantColors(buf)
+  const sig = getChestColorSignature(chestScopeKey(item.category, item.subcategory))
+  const dominant = await extractDominantColors(buf, 4, sig ? new Set(sig.bins) : undefined)
   const colors = classifyDominantColors(dominant)
   saveChestItemColors(id, dominant, colors)
 

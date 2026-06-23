@@ -223,6 +223,17 @@ export function getReputationDb(): Database.Database {
       UNIQUE(category, subcategory, locale)
     );
 
+    -- Signature de couleurs decor d'un scope (categorie::sous-categorie) : les bacs
+    -- couleur presents sur ~toutes les images du scope = elements communs (coque de
+    -- bateau pour les figures de proue) a exclure de l'extraction. bins = JSON de cles
+    -- de bacs quantifies (4 bits/canal).
+    CREATE TABLE IF NOT EXISTS chest_color_signatures (
+      scope TEXT PRIMARY KEY,
+      bins TEXT NOT NULL,
+      sample_count INTEGER NOT NULL DEFAULT 0,
+      built_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_groups_uid ON groups(uid);
     CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
@@ -1235,14 +1246,92 @@ function parseColors(json: string | null): string[] {
 
 // ---- Analyse des couleurs des items du coffre ----
 
+export interface ChestAnalysisItem { id: number, image: string, category: string, subcategory: string | null }
+
 /** Items du coffre à analyser (image présente, couleurs pas encore extraites). */
-export function getChestItemsForColorAnalysis(limit: number): Array<{ id: number, image: string }> {
+export function getChestItemsForColorAnalysis(limit: number): ChestAnalysisItem[] {
   const db = getReputationDb()
   return db.prepare(`
-    SELECT id, image FROM chest_items
+    SELECT id, image, category, subcategory FROM chest_items
     WHERE dominant_colors IS NULL AND image IS NOT NULL AND image != ''
     LIMIT ?
-  `).all(limit) as Array<{ id: number, image: string }>
+  `).all(limit) as ChestAnalysisItem[]
+}
+
+/** Clé de scope « catégorie::sous-catégorie » pour les signatures (sous-cat. vide = ''). */
+export function chestScopeKey(category: string, subcategory: string | null): string {
+  return `${category}::${subcategory ?? ''}`
+}
+
+/** Signature couleur (bacs à exclure) d'un scope, ou null si non construite. */
+export function getChestColorSignature(scope: string): { bins: number[], sampleCount: number, builtAt: string } | null {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT bins, sample_count, built_at FROM chest_color_signatures WHERE scope = ?')
+    .get(scope) as { bins: string, sample_count: number, built_at: string } | undefined
+  if (!row) return null
+  let bins: number[] = []
+  try {
+    const a = JSON.parse(row.bins)
+    if (Array.isArray(a)) bins = a.filter((n): n is number => typeof n === 'number')
+  } catch { /* corrompu */ }
+  return { bins, sampleCount: row.sample_count, builtAt: row.built_at }
+}
+
+/** Toutes les signatures, indexées par scope (pour la boucle d'analyse). */
+export function getAllChestColorSignatures(): Map<string, Set<number>> {
+  const db = getReputationDb()
+  const rows = db.prepare('SELECT scope, bins FROM chest_color_signatures').all() as Array<{ scope: string, bins: string }>
+  const map = new Map<string, Set<number>>()
+  for (const r of rows) {
+    try {
+      const a = JSON.parse(r.bins)
+      if (Array.isArray(a)) map.set(r.scope, new Set(a.filter((n): n is number => typeof n === 'number')))
+    } catch { /* ignore */ }
+  }
+  return map
+}
+
+/** Enregistre (remplace) la signature couleur d'un scope. */
+export function saveChestColorSignature(scope: string, bins: number[], sampleCount: number): void {
+  const db = getReputationDb()
+  db.prepare(`
+    INSERT INTO chest_color_signatures (scope, bins, sample_count, built_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(scope) DO UPDATE SET bins = excluded.bins, sample_count = excluded.sample_count, built_at = CURRENT_TIMESTAMP
+  `).run(scope, JSON.stringify(bins), sampleCount)
+}
+
+/** Items (avec image) d'un scope donné, pour construire/appliquer une signature. */
+export function getChestItemsForScope(category: string, subcategory: string | null): Array<{ id: number, image: string, manual: boolean }> {
+  const db = getReputationDb()
+  const rows = subcategory === null
+    ? db.prepare(`SELECT id, image, colors_manual FROM chest_items WHERE category = ? AND subcategory IS NULL AND image IS NOT NULL AND image != ''`).all(category)
+    : db.prepare(`SELECT id, image, colors_manual FROM chest_items WHERE category = ? AND subcategory = ? AND image IS NOT NULL AND image != ''`).all(category, subcategory)
+  return (rows as Array<{ id: number, image: string, colors_manual: number | null }>)
+    .map(r => ({ id: r.id, image: r.image, manual: r.colors_manual === 1 }))
+}
+
+/** Scopes (catégorie/sous-catégorie) présents, avec l'état de leur signature. */
+export function getChestScopes(): Array<{ category: string, subcategory: string | null, count: number, builtAt: string | null, sampleCount: number | null, binCount: number | null }> {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT category, subcategory, COUNT(*) as count
+    FROM chest_items
+    WHERE image IS NOT NULL AND image != ''
+    GROUP BY category, subcategory
+    ORDER BY category, subcategory
+  `).all() as Array<{ category: string, subcategory: string | null, count: number }>
+  return rows.map((r) => {
+    const sig = getChestColorSignature(chestScopeKey(r.category, r.subcategory))
+    return {
+      category: r.category,
+      subcategory: r.subcategory,
+      count: r.count,
+      builtAt: sig?.builtAt ?? null,
+      sampleCount: sig?.sampleCount ?? null,
+      binCount: sig ? sig.bins.length : null
+    }
+  })
 }
 
 /** Recherche d'items du coffre par nom (avec leurs couleurs nommées actuelles). */
@@ -1259,12 +1348,12 @@ export function searchChestItemsByName(query: string, limit: number): Array<{ id
   return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors), manual: r.colors_manual === 1 }))
 }
 
-/** Image d'un item du coffre par id (pour ré-analyser un item précis). */
-export function getChestItemImageById(id: number): { id: number, image: string } | undefined {
+/** Image + scope d'un item du coffre par id (pour ré-analyser un item précis). */
+export function getChestItemImageById(id: number): { id: number, image: string, category: string, subcategory: string | null } | undefined {
   const db = getReputationDb()
   return db.prepare(
-    `SELECT id, image FROM chest_items WHERE id = ? AND image IS NOT NULL AND image != ''`
-  ).get(id) as { id: number, image: string } | undefined
+    `SELECT id, image, category, subcategory FROM chest_items WHERE id = ? AND image IS NOT NULL AND image != ''`
+  ).get(id) as { id: number, image: string, category: string, subcategory: string | null } | undefined
 }
 
 /**
