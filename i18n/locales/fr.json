@@ -224,7 +224,9 @@
     "notOwned": "Non possédés",
     "allOwnership": "Tous",
     "notOwnedBadge": "Manquant",
-    "alsoOwnedBy": "Aussi possédé par"
+    "alsoOwnedBy": "Aussi possédé par",
+    "primaryColor": "Couleur principale",
+    "secondaryColors": "Couleurs secondaires"
   },
   "chestColors": {
     "red": "Rouge",

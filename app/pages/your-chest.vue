@@ -83,7 +83,9 @@ const ownershipFromUrl = queryToString(route.query.own)
 const searchQuery = ref(queryToString(route.query.q))
 const selectedCategories = ref<string[]>(queryToArray(route.query.cat))
 const selectedSubcategories = ref<string[]>(queryToArray(route.query.sub))
-const selectedColors = ref<string[]>(queryToArray(route.query.color))
+// Deux filtres couleur : couleur principale (colors[0]) et couleurs secondaires (le reste).
+const selectedPrimaryColors = ref<string[]>(queryToArray(route.query.pcolor))
+const selectedSecondaryColors = ref<string[]>(queryToArray(route.query.scolor))
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
   ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
 )
@@ -96,10 +98,11 @@ function colorHex(name: string): string {
   return (palette.value || []).find(c => c.name === name)?.hex || '#888888'
 }
 
-function toggleColor(name: string) {
-  const i = selectedColors.value.indexOf(name)
-  if (i === -1) selectedColors.value.push(name)
-  else selectedColors.value.splice(i, 1)
+function toggleColor(which: 'primary' | 'secondary', name: string) {
+  const list = which === 'primary' ? selectedPrimaryColors : selectedSecondaryColors
+  const i = list.value.indexOf(name)
+  if (i === -1) list.value.push(name)
+  else list.value.splice(i, 1)
 }
 
 const ownershipOptions = computed(() => [
@@ -176,8 +179,11 @@ const filteredItems = computed(() => {
   if (selectedSubcategories.value.length) {
     list = list.filter(i => !!i.subcategory && selectedSubcategories.value.includes(subKey(i.category, i.subcategory)))
   }
-  if (selectedColors.value.length) {
-    list = list.filter(i => i.colors.some(c => selectedColors.value.includes(c)))
+  if (selectedPrimaryColors.value.length) {
+    list = list.filter(i => i.colors.length > 0 && selectedPrimaryColors.value.includes(i.colors[0]!))
+  }
+  if (selectedSecondaryColors.value.length) {
+    list = list.filter(i => i.colors.slice(1).some(c => selectedSecondaryColors.value.includes(c)))
   }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
@@ -204,7 +210,8 @@ watch(
     ownershipFilter,
     () => selectedCategories.value.join(','),
     () => selectedSubcategories.value.join(','),
-    () => selectedColors.value.join(',')
+    () => selectedPrimaryColors.value.join(','),
+    () => selectedSecondaryColors.value.join(',')
   ],
   () => {
     currentPage.value = 1
@@ -223,7 +230,8 @@ function syncUrl() {
   if (ownershipFilter.value !== 'owned') query.own = ownershipFilter.value
   if (selectedCategories.value.length) query.cat = selectedCategories.value.join(',')
   if (selectedSubcategories.value.length) query.sub = selectedSubcategories.value.join(',')
-  if (selectedColors.value.length) query.color = selectedColors.value.join(',')
+  if (selectedPrimaryColors.value.length) query.pcolor = selectedPrimaryColors.value.join(',')
+  if (selectedSecondaryColors.value.length) query.scolor = selectedSecondaryColors.value.join(',')
   if (currentPage.value > 1) query.page = String(currentPage.value)
   router.replace({ query })
 }
@@ -235,7 +243,8 @@ watch(
     currentPage,
     () => selectedCategories.value.join(','),
     () => selectedSubcategories.value.join(','),
-    () => selectedColors.value.join(',')
+    () => selectedPrimaryColors.value.join(','),
+    () => selectedSecondaryColors.value.join(',')
   ],
   () => syncUrl()
 )
@@ -378,18 +387,41 @@ watch(
           </div>
         </template>
 
-        <!-- Filtre couleur (multi-sélection) -->
+        <!-- Filtre couleur principale (colors[0]) -->
         <div
           v-if="(palette || []).length"
-          class="flex flex-wrap gap-2 mb-3"
+          class="flex items-center gap-2 flex-wrap mb-2"
         >
+          <span class="text-sm font-medium text-muted">{{ $t('yourChest.primaryColor') }} :</span>
           <UButton
             v-for="c in (palette || [])"
             :key="c.name"
-            :color="selectedColors.includes(c.name) ? 'primary' : 'neutral'"
-            :variant="selectedColors.includes(c.name) ? 'solid' : 'outline'"
+            :color="selectedPrimaryColors.includes(c.name) ? 'primary' : 'neutral'"
+            :variant="selectedPrimaryColors.includes(c.name) ? 'solid' : 'outline'"
             size="sm"
-            @click="toggleColor(c.name)"
+            @click="toggleColor('primary', c.name)"
+          >
+            <span
+              class="inline-block w-3 h-3 rounded-full border border-muted/40"
+              :style="{ backgroundColor: c.hex }"
+            />
+            {{ colorLabel(c.name) }}
+          </UButton>
+        </div>
+
+        <!-- Filtre couleurs secondaires (colors[1..]) -->
+        <div
+          v-if="(palette || []).length"
+          class="flex items-center gap-2 flex-wrap mb-3"
+        >
+          <span class="text-sm font-medium text-muted">{{ $t('yourChest.secondaryColors') }} :</span>
+          <UButton
+            v-for="c in (palette || [])"
+            :key="c.name"
+            :color="selectedSecondaryColors.includes(c.name) ? 'info' : 'neutral'"
+            :variant="selectedSecondaryColors.includes(c.name) ? 'solid' : 'outline'"
+            size="sm"
+            @click="toggleColor('secondary', c.name)"
           >
             <span
               class="inline-block w-3 h-3 rounded-full border border-muted/40"
