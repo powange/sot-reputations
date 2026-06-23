@@ -117,6 +117,8 @@ const selectedSecondaryColors = ref<string[]>(queryToArray(route.query.scolor))
 // Mode de combinaison des couleurs secondaires : false = OU (au moins une, défaut),
 // true = ET (l'objet doit avoir toutes les couleurs sélectionnées).
 const secondaryColorsMatchAll = ref(queryToString(route.query.smatch) === 'all')
+// Filtre devises (coût) : or / pièces anciennes / doublons (multi-sélection, OU).
+const selectedCurrencies = ref<string[]>(queryToArray(route.query.cur))
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
   ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
 )
@@ -134,6 +136,15 @@ function toggleColor(which: 'primary' | 'secondary', name: string) {
   const i = list.value.indexOf(name)
   if (i === -1) list.value.push(name)
   else list.value.splice(i, 1)
+}
+
+// Options du filtre devises (icône + libellé via CURRENCY_META) et bascule.
+const CURRENCY_KEYS = ['gold', 'ancientCoins', 'doubloons'] as const
+const currencyOptions = CURRENCY_KEYS.map(k => ({ key: k as string, icon: CURRENCY_META[k]!.icon, label: CURRENCY_META[k]!.label }))
+function toggleCurrency(key: string) {
+  const i = selectedCurrencies.value.indexOf(key)
+  if (i === -1) selectedCurrencies.value.push(key)
+  else selectedCurrencies.value.splice(i, 1)
 }
 
 const ownershipOptions = computed(() => [
@@ -219,6 +230,10 @@ const filteredItems = computed(() => {
       ? list.filter(i => sel.every(c => i.colors.slice(1).includes(c))) // ET : toutes présentes
       : list.filter(i => i.colors.slice(1).some(c => sel.includes(c))) // OU : au moins une
   }
+  if (selectedCurrencies.value.length) {
+    // OU : l'item a un coût dans au moins une des devises sélectionnées.
+    list = list.filter(i => !!i.cost && selectedCurrencies.value.some(c => (i.cost as Record<string, number | undefined>)[c] != null))
+  }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(i =>
@@ -246,7 +261,8 @@ watch(
     () => selectedSubcategories.value.join(','),
     () => selectedPrimaryColors.value.join(','),
     () => selectedSecondaryColors.value.join(','),
-    secondaryColorsMatchAll
+    secondaryColorsMatchAll,
+    () => selectedCurrencies.value.join(',')
   ],
   () => {
     currentPage.value = 1
@@ -268,6 +284,7 @@ function syncUrl() {
   if (selectedPrimaryColors.value.length) query.pcolor = selectedPrimaryColors.value.join(',')
   if (selectedSecondaryColors.value.length) query.scolor = selectedSecondaryColors.value.join(',')
   if (secondaryColorsMatchAll.value) query.smatch = 'all'
+  if (selectedCurrencies.value.length) query.cur = selectedCurrencies.value.join(',')
   if (currentPage.value > 1) query.page = String(currentPage.value)
   router.replace({ query })
 }
@@ -281,7 +298,8 @@ watch(
     () => selectedSubcategories.value.join(','),
     () => selectedPrimaryColors.value.join(','),
     () => selectedSecondaryColors.value.join(','),
-    secondaryColorsMatchAll
+    secondaryColorsMatchAll,
+    () => selectedCurrencies.value.join(',')
   ],
   () => syncUrl()
 )
@@ -475,6 +493,26 @@ watch(
               :style="{ backgroundColor: c.hex }"
             />
             {{ colorLabel(c.name) }}
+          </UButton>
+        </div>
+
+        <!-- Filtre devises (coût) -->
+        <div class="flex items-center gap-2 flex-wrap mb-3">
+          <span class="text-sm font-medium text-muted">Devises :</span>
+          <UButton
+            v-for="cur in currencyOptions"
+            :key="cur.key"
+            :color="selectedCurrencies.includes(cur.key) ? 'primary' : 'neutral'"
+            :variant="selectedCurrencies.includes(cur.key) ? 'solid' : 'outline'"
+            size="sm"
+            @click="toggleCurrency(cur.key)"
+          >
+            <img
+              :src="cur.icon"
+              :alt="cur.label"
+              class="w-4 h-4"
+            >
+            {{ cur.label }}
           </UButton>
         </div>
 
