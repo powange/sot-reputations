@@ -1,7 +1,7 @@
-import { requireAdminOrModerator } from '../../../utils/admin'
+import { requireAdmin } from '../../../utils/admin'
 import { getReleaseNotes } from '../../../utils/release-notes-db'
 
 export default defineEventHandler(async (event) => {
-  await requireAdminOrModerator(event)
+  await requireAdmin(event)
   return getReleaseNotes()
 })

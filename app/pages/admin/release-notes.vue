@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import type { ReleaseNote } from '~/types/release-notes'
 
-const { isAdminOrModerator, isAdmin, isAuthenticated, saveRedirectUrl } = useAuth()
+const { isAdmin, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
 
 useSeoMeta({
   title: 'Notes de version - Administration'
 })
 
-// Redirection si non admin/moderateur
+// Redirection si non admin
 watchEffect(() => {
   if (import.meta.client) {
     if (!isAuthenticated.value) {
       saveRedirectUrl()
       navigateTo('/')
-    } else if (!isAdminOrModerator.value) {
+    } else if (!isAdmin.value) {
       navigateTo('/')
     }
   }

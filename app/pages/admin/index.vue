@@ -221,8 +221,8 @@ watchEffect(() => {
         </div>
       </section>
 
-      <!-- Notes de version - Admin et Moderateurs -->
-      <section>
+      <!-- Notes de version - Admin seulement -->
+      <section v-if="isAdmin">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
           <UIcon
             name="i-lucide-scroll-text"
