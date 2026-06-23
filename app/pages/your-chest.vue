@@ -30,7 +30,11 @@ interface TaxonomyMap {
   subcategories: Record<string, Record<string, Record<string, string | null>>>
 }
 
-const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest')
+// La locale est passée au serveur pour résoudre les noms d'items (FR/EN/ES) ;
+// useFetch refait l'appel automatiquement au changement de langue.
+const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest', {
+  query: { locale }
+})
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
 const { data: palette } = await useFetch<Array<{ name: string, hex: string }>>('/api/chest-colors')
 const items = computed(() => data.value || [])

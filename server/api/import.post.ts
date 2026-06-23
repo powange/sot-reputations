@@ -26,10 +26,13 @@ export default defineEventHandler(async (event) => {
 
   // Format combiné { reputation, chest } (bookmarklet v7+) vs réputation brute
   // (ancien bookmarklet / collage manuel) — rétro-compatible.
-  const wrapper = jsonData as { reputation?: unknown, chest?: unknown }
+  const wrapper = jsonData as { reputation?: unknown, chest?: unknown, chestEn?: unknown, chestEs?: unknown }
   const hasWrapper = typeof wrapper.reputation === 'object' && wrapper.reputation !== null
   const reputationData = hasWrapper ? wrapper.reputation : jsonData
   const chestData = hasWrapper && wrapper.chest && typeof wrapper.chest === 'object' ? wrapper.chest : null
+  // Coffres EN/ES (bookmarklet v8+) : alimentent les traductions de noms d'items.
+  const chestEn = hasWrapper && wrapper.chestEn && typeof wrapper.chestEn === 'object' ? wrapper.chestEn : null
+  const chestEs = hasWrapper && wrapper.chestEs && typeof wrapper.chestEs === 'object' ? wrapper.chestEs : null
 
   const db = getReputationDb()
   let userId: number
@@ -87,7 +90,7 @@ export default defineEventHandler(async (event) => {
   // de réputation déjà réussi en cas de données de coffre invalides).
   if (chestData) {
     try {
-      importChestData(userId, chestData)
+      importChestData(userId, chestData, { en: chestEn, es: chestEs })
     } catch (error) {
       // coffre optionnel : on n'échoue pas l'import de réputation, mais on trace.
       console.error('[import] Échec de l\'import du coffre:', error instanceof Error ? error.message : error)

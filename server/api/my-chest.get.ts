@@ -11,5 +11,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return getChestCatalogForUser(userId)
+  // Locale demandée par le client (FR par défaut) pour résoudre les noms d'items.
+  const localeRaw = String(getQuery(event).locale || 'fr')
+  const locale = ['fr', 'en', 'es'].includes(localeRaw) ? localeRaw : 'fr'
+
+  return getChestCatalogForUser(userId, locale)
 })

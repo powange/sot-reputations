@@ -223,6 +223,17 @@ export function getReputationDb(): Database.Database {
       UNIQUE(category, subcategory, locale)
     );
 
+    -- Traductions (EN/ES) des noms d'items du coffre, captées à l'import multi-langue.
+    -- Le nom FR reste la langue de base dans chest_items.name ; cette table ne porte
+    -- que EN/ES. Clé = item_key (identité stable partagée entre joueurs), donc une
+    -- traduction profite à tous les possesseurs de l'item.
+    CREATE TABLE IF NOT EXISTS chest_item_translations (
+      item_key TEXT NOT NULL,
+      locale TEXT NOT NULL,
+      name TEXT NOT NULL,
+      PRIMARY KEY (item_key, locale)
+    );
+
     -- Signature de couleurs decor d'un scope (categorie::sous-categorie) : les bacs
     -- couleur presents sur ~toutes les images du scope = elements communs (coque de
     -- bateau pour les figures de proue) a exclure de l'extraction. bins = JSON de cles
@@ -1047,6 +1058,25 @@ function parseChestItem(raw: unknown): ParsedChestItem | null {
 }
 
 /**
+ * Extrait les noms d'items (itemKey -> nom) d'un payload de coffre dans une langue
+ * donnée, pour alimenter chest_item_translations. L'itemKey est indépendant de la
+ * langue (nom de fichier image), donc il sert de pont entre les exports FR/EN/ES.
+ */
+function parseChestNames(chestData: unknown): Map<string, string> {
+  const names = new Map<string, string>()
+  if (!chestData || typeof chestData !== 'object') return names
+  for (const category of Object.keys(chestData as Record<string, unknown>)) {
+    const rawItems = (chestData as Record<string, unknown>)[category]
+    if (!Array.isArray(rawItems)) continue
+    for (const raw of rawItems) {
+      const item = parseChestItem(raw)
+      if (item && item.name) names.set(item.itemKey, item.name)
+    }
+  }
+  return names
+}
+
+/**
  * Calcule un sort_order pour chaque clé d'item d'un import (ordre de la catégorie).
  * Les items connus gardent leur sort_order ; les nouveaux items sont intercalés
  * (point médian) entre leurs voisins déjà connus.
@@ -1095,10 +1125,18 @@ function computeChestSortOrders(keys: string[], existing: Map<string, number>): 
  * Importe le coffre d'un utilisateur depuis /fr/api/profilev2/chest
  * (payload = { chestData: { <catégorie>: [items] }, categoryMap }).
  * Alimente le catalogue partagé (intercalation de l'ordre pour les nouveaux
- * items, refresh nom/desc/image — le site fait foi) puis remplace la possession
+ * items, refresh nom/desc/image FR — le site fait foi) puis remplace la possession
  * de l'utilisateur.
+ *
+ * `translations` (optionnel) porte les payloads de coffre EN/ES récupérés par le
+ * même import : leurs noms sont stockés dans chest_item_translations (par item_key),
+ * sans toucher au nom FR de base.
  */
-export function importChestData(userId: number, payload: { chestData?: Record<string, unknown> }): { items: number, categories: number } {
+export function importChestData(
+  userId: number,
+  payload: { chestData?: Record<string, unknown> },
+  translations?: { en?: unknown, es?: unknown }
+): { items: number, categories: number } {
   const chestData = payload?.chestData
   if (!chestData || typeof chestData !== 'object') {
     throw new Error('Données de coffre invalides')
@@ -1150,6 +1188,17 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
   const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
   const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
 
+  // Noms d'items dans les langues secondaires (EN/ES), indexés par item_key.
+  const translationNames: Array<{ locale: string, names: Map<string, string> }> = [
+    { locale: 'en', names: parseChestNames((translations?.en as { chestData?: unknown } | undefined)?.chestData) },
+    { locale: 'es', names: parseChestNames((translations?.es as { chestData?: unknown } | undefined)?.chestData) }
+  ]
+  const upsertTranslation = db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name)
+    VALUES (?, ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+  `)
+
   const run = db.transaction(() => {
     // Le coffre importé = possession courante : on remplace l'ensemble.
     deleteOwnership.run(userId)
@@ -1181,6 +1230,13 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
         insertOwnership.run(userId, id)
       }
     }
+
+    // Traductions EN/ES : upsert par item_key (profite à tous les possesseurs).
+    for (const { locale, names } of translationNames) {
+      for (const [itemKey, name] of names) {
+        if (name) upsertTranslation.run(itemKey, locale, name)
+      }
+    }
   })
   run()
 
@@ -1193,16 +1249,22 @@ export function importChestData(userId: number, payload: { chestData?: Record<st
  * quel utilisateur), avec un indicateur `owned` pour l'utilisateur donné.
  * Trié par catégorie (ordre du jeu) puis ordre d'import.
  */
-export function getChestCatalogForUser(userId: number): ChestItem[] {
+export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem[] {
   const db = getReputationDb()
+  // Nom résolu selon la locale : FR = nom de base (chest_items.name), EN/ES via
+  // chest_item_translations (repli sur le nom FR si pas de traduction). Pour 'fr'
+  // (ou locale inconnue) la jointure ne matche rien et on garde ci.name.
   const rows = db.prepare(`
     SELECT
-      ci.id, ci.uid, ci.category, ci.subcategory, ci.name, ci.description, ci.image,
+      ci.id, ci.uid, ci.category, ci.subcategory,
+      COALESCE(NULLIF(t.name, ''), ci.name) as name,
+      ci.description, ci.image,
       ci.sort_order as sortOrder, ci.colors,
       CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
     FROM chest_items ci
     LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
-  `).all(userId) as Array<{
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
+  `).all(userId, locale) as Array<{
     id: number
     uid: string
     category: string

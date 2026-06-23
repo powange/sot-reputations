@@ -1,5 +1,5 @@
 // Version du bookmarklet - utilisée par l'API /api/bookmarklet-version
-export const BOOKMARKLET_VERSION = 7
+export const BOOKMARKLET_VERSION = 8
 
 // Génère le code du bookmarklet (non minifié pour lisibilité)
 export function generateBookmarkletCode(siteUrl: string): string {
@@ -169,18 +169,17 @@ export function generateBookmarkletCode(siteUrl: string): string {
     modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
   }
 
-  // Afficher le message de mise à jour
+  // Afficher le message de mise à jour. L'import est bloqué tant que le bookmarklet
+  // n'est pas réinstallé : pas de « continuer quand meme » (le format des données a
+  // changé, un ancien bookmarklet enverrait des données incompletes).
   function showUpdateMessage() {
     modal.innerHTML = \`
       <h2>⚓ SoT Reputations</h2>
       <p>Une nouvelle version du bookmarklet est disponible !</p>
-      <p class="error">Vous devrez re-installer le bookmarklet depuis la page tutoriel.</p>
+      <p class="error">Import desactive tant que le bookmarklet n'est pas mis a jour. Re-installez-le depuis la page tutoriel.</p>
       <div class="buttons">
         <button class="btn-primary" id="sot-update-btn">
           🔄 Mettre a jour
-        </button>
-        <button class="btn-secondary" id="sot-continue-btn">
-          Continuer quand meme
         </button>
         <button class="btn-close" id="sot-close-btn">
           Fermer
@@ -191,7 +190,6 @@ export function generateBookmarkletCode(siteUrl: string): string {
       window.open(SITE_URL + '/tutoriel#bookmarklet', '_blank');
       closeModal();
     });
-    modal.querySelector('#sot-continue-btn').addEventListener('click', checkSiteAndRun);
     modal.querySelector('#sot-close-btn').addEventListener('click', closeModal);
   }
 
@@ -251,14 +249,19 @@ export function generateBookmarkletCode(siteUrl: string): string {
     return response.json();
   })
   .then(async (data) => {
-    // Récupérer aussi le coffre (best-effort : ne bloque pas l'import si échec)
-    let chestData = null;
-    try {
-      const chestResp = await fetch('https://www.seaofthieves.com/fr/api/profilev2/chest', { credentials: 'include' });
-      if (chestResp.ok) chestData = await chestResp.json();
-    } catch (e) { /* coffre optionnel */ }
+    // Récupérer le coffre en FR (base) + EN/ES (pour traduire les noms d'items).
+    // Best-effort : ne bloque pas l'import si un appel échoue.
+    async function fetchChest(prefix) {
+      try {
+        const resp = await fetch('https://www.seaofthieves.com' + prefix + '/api/profilev2/chest', { credentials: 'include' });
+        return resp.ok ? await resp.json() : null;
+      } catch (e) { return null; }
+    }
+    const chestData = await fetchChest('/fr');
+    const chestEn = await fetchChest('');
+    const chestEs = await fetchChest('/es');
 
-    const payload = { reputation: data, chest: chestData };
+    const payload = { reputation: data, chest: chestData, chestEn: chestEn, chestEs: chestEs };
     const chestCount = (chestData && chestData.chestData)
       ? Object.values(chestData.chestData).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0)
       : 0;
