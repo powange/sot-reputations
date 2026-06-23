@@ -22,17 +22,23 @@ interface ApiItem {
   id: number
   itemKey: string
   name: string
+  descFr: string | null
   image: string | null
   en: string | null
   es: string | null
+  enDesc: string | null
+  esDesc: string | null
 }
 interface ItemRow {
   id: number
   itemKey: string
   name: string
+  descFr: string
   image: string | null
   en: string
   es: string
+  enDesc: string
+  esDesc: string
 }
 
 const q = ref('')
@@ -57,9 +63,12 @@ async function runSearch() {
       id: i.id,
       itemKey: i.itemKey,
       name: i.name,
+      descFr: i.descFr || '',
       image: i.image,
       en: i.en || '',
-      es: i.es || ''
+      es: i.es || '',
+      enDesc: i.enDesc || '',
+      esDesc: i.esDesc || ''
     }))
     hasSearched.value = true
   } catch {
@@ -80,8 +89,8 @@ async function saveAll() {
   const entries = results.value.map(r => ({
     itemKey: r.itemKey,
     translations: [
-      { locale: 'en', name: r.en },
-      { locale: 'es', name: r.es }
+      { locale: 'en', name: r.en, description: r.enDesc },
+      { locale: 'es', name: r.es, description: r.esDesc }
     ]
   }))
   saving.value = true
@@ -110,8 +119,8 @@ async function saveAll() {
         Traductions des objets
       </h1>
       <p class="text-muted mt-2">
-        Corriger les traductions EN / ES des noms d'objets du coffre. Le nom FR (langue
-        de base, capté à l'import) sert de référence et n'est pas modifiable ici.
+        Corriger les traductions EN / ES (nom et description) des objets du coffre. Le FR
+        (langue de base, capté à l'import) sert de référence et n'est pas modifiable ici.
       </p>
     </div>
 
@@ -136,13 +145,13 @@ async function saveAll() {
     <!-- Résultats -->
     <div
       v-if="results.length > 0"
-      class="space-y-2"
+      class="space-y-3"
     >
       <UCard
         v-for="item in results"
         :key="item.itemKey"
       >
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-start gap-3">
           <img
             v-if="item.image"
             :src="item.image"
@@ -158,27 +167,62 @@ async function saveAll() {
               class="w-5 h-5 text-muted"
             />
           </div>
-          <div class="w-48 shrink-0">
-            <span class="text-sm font-medium">{{ item.name }}</span>
-            <UBadge
-              color="neutral"
-              variant="subtle"
-              size="xs"
-              class="ml-2"
-            >
-              FR
-            </UBadge>
+
+          <div class="flex-1 min-w-0 space-y-3">
+            <!-- Référence FR (lecture seule) -->
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium">{{ item.name }}</span>
+                <UBadge
+                  color="neutral"
+                  variant="subtle"
+                  size="xs"
+                >
+                  FR
+                </UBadge>
+              </div>
+              <p
+                v-if="item.descFr"
+                class="text-xs text-muted mt-0.5"
+              >
+                {{ item.descFr }}
+              </p>
+            </div>
+
+            <!-- Champs éditables EN / ES -->
+            <div class="grid gap-2 sm:grid-cols-2">
+              <UFormField label="EN — nom">
+                <UInput
+                  v-model="item.en"
+                  :placeholder="item.name"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="EN — description">
+                <UTextarea
+                  v-model="item.enDesc"
+                  :rows="2"
+                  :placeholder="item.descFr || '—'"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="ES — nom">
+                <UInput
+                  v-model="item.es"
+                  :placeholder="item.name"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="ES — description">
+                <UTextarea
+                  v-model="item.esDesc"
+                  :rows="2"
+                  :placeholder="item.descFr || '—'"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
           </div>
-          <UInput
-            v-model="item.en"
-            placeholder="EN"
-            class="flex-1 min-w-32"
-          />
-          <UInput
-            v-model="item.es"
-            placeholder="ES"
-            class="flex-1 min-w-32"
-          />
         </div>
       </UCard>
     </div>

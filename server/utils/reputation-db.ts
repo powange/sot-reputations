@@ -231,6 +231,7 @@ export function getReputationDb(): Database.Database {
       item_key TEXT NOT NULL,
       locale TEXT NOT NULL,
       name TEXT NOT NULL,
+      description TEXT,
       PRIMARY KEY (item_key, locale)
     );
 
@@ -289,6 +290,13 @@ export function getReputationDb(): Database.Database {
   const hasCampaignDesc = campaignColumnsForDesc.some(col => col.name === 'description')
   if (!hasCampaignDesc) {
     db.exec('ALTER TABLE campaigns ADD COLUMN description TEXT')
+  }
+
+  // Migration: ajouter description aux traductions d'items du coffre (EN/ES)
+  const chestTransCols = db.prepare('PRAGMA table_info(chest_item_translations)').all() as Array<{ name: string }>
+  const hasChestTransDesc = chestTransCols.some(col => col.name === 'description')
+  if (!hasChestTransDesc) {
+    db.exec('ALTER TABLE chest_item_translations ADD COLUMN description TEXT')
   }
 
   // Migration: ajouter microsoft_id aux utilisateurs pour OAuth Microsoft
@@ -1057,23 +1065,26 @@ function parseChestItem(raw: unknown): ParsedChestItem | null {
   }
 }
 
+interface ChestTranslationValue { name: string, description: string | null }
+
 /**
- * Extrait les noms d'items (itemKey -> nom) d'un payload de coffre dans une langue
- * donnée, pour alimenter chest_item_translations. L'itemKey est indépendant de la
- * langue (nom de fichier image), donc il sert de pont entre les exports FR/EN/ES.
+ * Extrait les traductions d'items (itemKey -> { name, description }) d'un payload de
+ * coffre dans une langue donnée, pour alimenter chest_item_translations. L'itemKey est
+ * indépendant de la langue (nom de fichier image), donc il sert de pont entre les
+ * exports FR/EN/ES.
  */
-function parseChestNames(chestData: unknown): Map<string, string> {
-  const names = new Map<string, string>()
-  if (!chestData || typeof chestData !== 'object') return names
+function parseChestTranslations(chestData: unknown): Map<string, ChestTranslationValue> {
+  const out = new Map<string, ChestTranslationValue>()
+  if (!chestData || typeof chestData !== 'object') return out
   for (const category of Object.keys(chestData as Record<string, unknown>)) {
     const rawItems = (chestData as Record<string, unknown>)[category]
     if (!Array.isArray(rawItems)) continue
     for (const raw of rawItems) {
       const item = parseChestItem(raw)
-      if (item && item.name) names.set(item.itemKey, item.name)
+      if (item && item.name) out.set(item.itemKey, { name: item.name, description: item.description })
     }
   }
-  return names
+  return out
 }
 
 /**
@@ -1188,15 +1199,15 @@ export function importChestData(
   const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
   const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
 
-  // Noms d'items dans les langues secondaires (EN/ES), indexés par item_key.
-  const translationNames: Array<{ locale: string, names: Map<string, string> }> = [
-    { locale: 'en', names: parseChestNames((translations?.en as { chestData?: unknown } | undefined)?.chestData) },
-    { locale: 'es', names: parseChestNames((translations?.es as { chestData?: unknown } | undefined)?.chestData) }
+  // Traductions (nom + description) dans les langues secondaires (EN/ES), par item_key.
+  const translationData: Array<{ locale: string, items: Map<string, ChestTranslationValue> }> = [
+    { locale: 'en', items: parseChestTranslations((translations?.en as { chestData?: unknown } | undefined)?.chestData) },
+    { locale: 'es', items: parseChestTranslations((translations?.es as { chestData?: unknown } | undefined)?.chestData) }
   ]
   const upsertTranslation = db.prepare(`
-    INSERT INTO chest_item_translations (item_key, locale, name)
-    VALUES (?, ?, ?)
-    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+    INSERT INTO chest_item_translations (item_key, locale, name, description)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
   `)
 
   const run = db.transaction(() => {
@@ -1231,10 +1242,10 @@ export function importChestData(
       }
     }
 
-    // Traductions EN/ES : upsert par item_key (profite à tous les possesseurs).
-    for (const { locale, names } of translationNames) {
-      for (const [itemKey, name] of names) {
-        if (name) upsertTranslation.run(itemKey, locale, name)
+    // Traductions EN/ES (nom + description) : upsert par item_key (profite à tous).
+    for (const { locale, items } of translationData) {
+      for (const [itemKey, value] of items) {
+        if (value.name) upsertTranslation.run(itemKey, locale, value.name, value.description)
       }
     }
   })
@@ -1258,7 +1269,8 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory,
       COALESCE(NULLIF(t.name, ''), ci.name) as name,
-      ci.description, ci.image,
+      COALESCE(NULLIF(t.description, ''), ci.description) as description,
+      ci.image,
       ci.sort_order as sortOrder, ci.colors,
       CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
     FROM chest_items ci
@@ -1414,15 +1426,18 @@ export interface ChestItemTranslationRow {
   id: number
   itemKey: string
   name: string
+  descFr: string | null
   image: string | null
   en: string | null
   es: string | null
+  enDesc: string | null
+  esDesc: string | null
 }
 
 /**
  * Recherche d'items du coffre par nom FR (nom de base) avec leurs traductions EN/ES
- * actuelles, pour l'éditeur d'administration. Le nom FR sert de référence (lecture
- * seule côté admin) ; seules EN/ES sont éditables.
+ * actuelles (nom + description), pour l'éditeur d'administration. Le FR sert de
+ * référence (lecture seule côté admin) ; seules EN/ES sont éditables.
  */
 export function searchChestItemTranslations(query: string, limit: number): ChestItemTranslationRow[] {
   const db = getReputationDb()
@@ -1430,10 +1445,12 @@ export function searchChestItemTranslations(query: string, limit: number): Chest
   const term = `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`
   return db.prepare(`
     SELECT
-      ci.id, ci.item_key as itemKey, ci.name, ci.image,
-      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'en') as en,
-      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'es') as es
+      ci.id, ci.item_key as itemKey, ci.name, ci.description as descFr, ci.image,
+      en_t.name as en, es_t.name as es,
+      en_t.description as enDesc, es_t.description as esDesc
     FROM chest_items ci
+    LEFT JOIN chest_item_translations en_t ON en_t.item_key = ci.item_key AND en_t.locale = 'en'
+    LEFT JOIN chest_item_translations es_t ON es_t.item_key = ci.item_key AND es_t.locale = 'es'
     WHERE ci.name LIKE ? ESCAPE '\\'
     ORDER BY ci.name
     LIMIT ?
@@ -1442,16 +1459,20 @@ export function searchChestItemTranslations(query: string, limit: number): Chest
 
 export interface ChestItemTranslationInput {
   itemKey: string
-  translations: Array<{ locale: string, name?: string | null }>
+  translations: Array<{ locale: string, name?: string | null, description?: string | null }>
 }
 
-/** Upsert des traductions de noms d'items (EN/ES uniquement ; vide = suppression). */
+/**
+ * Upsert des traductions d'items (EN/ES uniquement ; nom + description). Une ligne
+ * sans aucun override (ni nom ni description) est supprimée. Nom vide mais description
+ * présente : nom stocké vide → repli sur le nom FR à l'affichage.
+ */
 export function setChestItemTranslations(entries: ChestItemTranslationInput[]): void {
   const db = getReputationDb()
   const upsert = db.prepare(`
-    INSERT INTO chest_item_translations (item_key, locale, name)
-    VALUES (?, ?, ?)
-    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+    INSERT INTO chest_item_translations (item_key, locale, name, description)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
   `)
   const del = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ? AND locale = ?')
 
@@ -1460,13 +1481,14 @@ export function setChestItemTranslations(entries: ChestItemTranslationInput[]): 
       const itemKey = entry.itemKey?.trim()
       if (!itemKey) continue
       for (const t of entry.translations) {
-        // FR est le nom de base (chest_items.name) : non géré ici.
+        // FR est la langue de base (chest_items.name/description) : non gérée ici.
         if (!t.locale || !['en', 'es'].includes(t.locale)) continue
-        const name = t.name?.trim() || null
-        if (!name) {
+        const name = t.name?.trim() || ''
+        const description = t.description?.trim() || null
+        if (!name && !description) {
           del.run(itemKey, t.locale)
         } else {
-          upsert.run(itemKey, t.locale, name)
+          upsert.run(itemKey, t.locale, name, description)
         }
       }
     }
