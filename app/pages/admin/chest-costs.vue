@@ -45,11 +45,39 @@ const result = ref<FetchResult | null>(null)
 // Items matchés cochés (à appliquer). Clé = id.
 const selectedIds = ref<Set<number>>(new Set())
 
-const scopeOptions = computed(() => scopes.value.map((s, i) => ({
-  label: `${s.category} / ${s.subcategory ?? '—'} (${s.withCost}/${s.count} avec coût)`,
-  value: i
-})))
+// Filtre d'avancement des scopes : toutes / sans aucun coût / partiellement remplies.
+const scopeFilter = ref<'all' | 'empty' | 'incomplete'>('all')
+const emptyCount = computed(() => scopes.value.filter(s => s.withCost === 0).length)
+const incompleteCount = computed(() => scopes.value.filter(s => s.withCost > 0 && s.withCost < s.count).length)
+const scopeFilterOptions = computed(() => [
+  { label: `Toutes (${scopes.value.length})`, value: 'all' as const },
+  { label: `Sans coût (${emptyCount.value})`, value: 'empty' as const },
+  { label: `Incomplètes (${incompleteCount.value})`, value: 'incomplete' as const }
+])
+function scopeMatchesFilter(s: Scope): boolean {
+  if (scopeFilter.value === 'empty') return s.withCost === 0
+  if (scopeFilter.value === 'incomplete') return s.withCost > 0 && s.withCost < s.count
+  return true
+}
+
+// On filtre en conservant l'index d'origine dans scopes.value (= value du select).
+const scopeOptions = computed(() =>
+  scopes.value
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => scopeMatchesFilter(s))
+    .map(({ s, i }) => ({
+      label: `${s.category} / ${s.subcategory ?? '—'} (${s.withCost}/${s.count} avec coût)`,
+      value: i
+    }))
+)
 const selectedScope = computed(() => (selectedScopeIdx.value != null ? scopes.value[selectedScopeIdx.value] || null : null))
+
+// Si le scope sélectionné ne correspond plus au filtre choisi, on le désélectionne.
+watch(scopeFilter, () => {
+  if (selectedScope.value && !scopeMatchesFilter(selectedScope.value)) {
+    selectedScopeIdx.value = undefined
+  }
+})
 
 // Pré-remplit le nom de catégorie wiki : override mémorisé sinon la sous-catégorie.
 watch(selectedScope, (s) => {
@@ -178,6 +206,18 @@ async function apply() {
       </template>
 
       <div class="space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm text-muted">Filtre :</span>
+          <UButton
+            v-for="opt in scopeFilterOptions"
+            :key="opt.value"
+            :label="opt.label"
+            size="xs"
+            :color="scopeFilter === opt.value ? 'primary' : 'neutral'"
+            :variant="scopeFilter === opt.value ? 'solid' : 'outline'"
+            @click="scopeFilter = opt.value"
+          />
+        </div>
         <div class="flex flex-wrap items-end gap-3">
           <div class="w-full sm:w-96">
             <label class="text-sm text-muted block mb-1">Sous-catégorie</label>
