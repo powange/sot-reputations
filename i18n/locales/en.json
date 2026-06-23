@@ -226,7 +226,9 @@
     "notOwnedBadge": "Missing",
     "alsoOwnedBy": "Also owned by",
     "primaryColor": "Main color",
-    "secondaryColors": "Secondary colors"
+    "secondaryColors": "Secondary colors",
+    "secondaryColorsMatchAll": "All (AND)",
+    "secondaryColorsMatchAllTooltip": "On: the item must have every selected color (AND). Off: at least one (OR)."
   },
   "chestColors": {
     "red": "Red",

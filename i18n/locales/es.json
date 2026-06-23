@@ -226,7 +226,9 @@
     "notOwnedBadge": "Faltante",
     "alsoOwnedBy": "También lo tienen",
     "primaryColor": "Color principal",
-    "secondaryColors": "Colores secundarios"
+    "secondaryColors": "Colores secundarios",
+    "secondaryColorsMatchAll": "Todos (Y)",
+    "secondaryColorsMatchAllTooltip": "Activado: el objeto debe tener todos los colores seleccionados (Y). Desactivado: al menos uno (O)."
   },
   "chestColors": {
     "red": "Rojo",

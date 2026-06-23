@@ -86,6 +86,9 @@ const selectedSubcategories = ref<string[]>(queryToArray(route.query.sub))
 // Deux filtres couleur : couleur principale (colors[0]) et couleurs secondaires (le reste).
 const selectedPrimaryColors = ref<string[]>(queryToArray(route.query.pcolor))
 const selectedSecondaryColors = ref<string[]>(queryToArray(route.query.scolor))
+// Mode de combinaison des couleurs secondaires : false = OU (au moins une, défaut),
+// true = ET (l'objet doit avoir toutes les couleurs sélectionnées).
+const secondaryColorsMatchAll = ref(queryToString(route.query.smatch) === 'all')
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
   ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
 )
@@ -183,7 +186,10 @@ const filteredItems = computed(() => {
     list = list.filter(i => i.colors.length > 0 && selectedPrimaryColors.value.includes(i.colors[0]!))
   }
   if (selectedSecondaryColors.value.length) {
-    list = list.filter(i => i.colors.slice(1).some(c => selectedSecondaryColors.value.includes(c)))
+    const sel = selectedSecondaryColors.value
+    list = secondaryColorsMatchAll.value
+      ? list.filter(i => sel.every(c => i.colors.slice(1).includes(c))) // ET : toutes présentes
+      : list.filter(i => i.colors.slice(1).some(c => sel.includes(c))) // OU : au moins une
   }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
@@ -211,7 +217,8 @@ watch(
     () => selectedCategories.value.join(','),
     () => selectedSubcategories.value.join(','),
     () => selectedPrimaryColors.value.join(','),
-    () => selectedSecondaryColors.value.join(',')
+    () => selectedSecondaryColors.value.join(','),
+    secondaryColorsMatchAll
   ],
   () => {
     currentPage.value = 1
@@ -232,6 +239,7 @@ function syncUrl() {
   if (selectedSubcategories.value.length) query.sub = selectedSubcategories.value.join(',')
   if (selectedPrimaryColors.value.length) query.pcolor = selectedPrimaryColors.value.join(',')
   if (selectedSecondaryColors.value.length) query.scolor = selectedSecondaryColors.value.join(',')
+  if (secondaryColorsMatchAll.value) query.smatch = 'all'
   if (currentPage.value > 1) query.page = String(currentPage.value)
   router.replace({ query })
 }
@@ -244,7 +252,8 @@ watch(
     () => selectedCategories.value.join(','),
     () => selectedSubcategories.value.join(','),
     () => selectedPrimaryColors.value.join(','),
-    () => selectedSecondaryColors.value.join(',')
+    () => selectedSecondaryColors.value.join(','),
+    secondaryColorsMatchAll
   ],
   () => syncUrl()
 )
@@ -415,6 +424,16 @@ watch(
           class="flex items-center gap-2 flex-wrap mb-3"
         >
           <span class="text-sm font-medium text-muted">{{ $t('yourChest.secondaryColors') }} :</span>
+          <label
+            class="flex items-center gap-1.5 cursor-pointer"
+            :title="$t('yourChest.secondaryColorsMatchAllTooltip')"
+          >
+            <USwitch
+              v-model="secondaryColorsMatchAll"
+              size="sm"
+            />
+            <span class="text-sm text-muted">{{ $t('yourChest.secondaryColorsMatchAll') }}</span>
+          </label>
           <UButton
             v-for="c in (palette || [])"
             :key="c.name"
