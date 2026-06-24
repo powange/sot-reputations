@@ -23,6 +23,16 @@ interface ChestItem {
   owned: boolean
   colors: string[]
   cost: { gold?: number, doubloons?: number, ancientCoins?: number } | null
+  prerequisites: {
+    commendations?: Array<{ name: string, grade: number | null }>
+    factionLevels?: Record<string, number>
+    legendary?: boolean
+    requires?: string
+  } | null
+  eligibility: {
+    status: 'met' | 'locked' | 'unknown'
+    commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean }>
+  } | null
   groupOwners: Array<{ group: string, members: string[] }>
 }
 
@@ -65,6 +75,26 @@ function costEntries(item: ChestItem): Array<{ key: string, icon: string, label:
   return (['gold', 'doubloons', 'ancientCoins'] as const)
     .filter(k => cost[k] != null)
     .map(k => ({ key: k, icon: CURRENCY_META[k]!.icon, label: CURRENCY_META[k]!.label, value: cost[k]! }))
+}
+
+// --- Prérequis d'obtention (depuis le wiki) ---
+const FACTION_LABELS: Record<string, string> = {
+  hoarder: 'Gold Hoarders',
+  merchant: 'Merchant Alliance',
+  souls: 'Order of Souls',
+  hunter: 'Hunter\'s Call',
+  seadog: 'Sea Dogs',
+  reaper: 'Reaper\'s Bones',
+  athena: 'Athena\'s Fortune'
+}
+function factionLabel(key: string): string {
+  return FACTION_LABELS[key] || key
+}
+// Niveaux de faction d'un item, prêts à afficher.
+function factionLevelEntries(item: ChestItem): Array<{ key: string, label: string, level: number }> {
+  const fl = item.prerequisites?.factionLevels
+  if (!fl) return []
+  return Object.entries(fl).map(([key, level]) => ({ key, label: factionLabel(key), level }))
 }
 
 // Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
@@ -559,6 +589,19 @@ watch(
                 {{ $t('yourChest.notOwnedBadge') }}
               </UBadge>
               <UBadge
+                v-if="!item.owned && item.eligibility?.status === 'locked'"
+                color="warning"
+                variant="solid"
+                size="xs"
+                class="absolute top-1 left-1"
+                title="Prérequis non atteint"
+              >
+                <UIcon
+                  name="i-lucide-lock"
+                  class="w-3 h-3"
+                />
+              </UBadge>
+              <UBadge
                 v-if="item.groupOwners.length"
                 color="primary"
                 variant="solid"
@@ -705,6 +748,84 @@ watch(
                 class="w-4 h-4"
               >
             </span>
+          </div>
+
+          <!-- Prérequis d'obtention (depuis le wiki) -->
+          <div
+            v-if="selectedItem?.prerequisites"
+            class="mt-4 w-full max-w-md text-sm border-t border-muted/20 pt-3"
+          >
+            <div class="flex items-center gap-2 mb-1.5">
+              <UIcon
+                name="i-lucide-list-checks"
+                class="w-4 h-4 text-muted"
+              />
+              <span class="font-medium">Prérequis</span>
+              <UBadge
+                v-if="selectedItem.eligibility?.status === 'met'"
+                color="success"
+                variant="subtle"
+                size="xs"
+              >
+                Débloquable
+              </UBadge>
+              <UBadge
+                v-else-if="selectedItem.eligibility?.status === 'locked'"
+                color="warning"
+                variant="subtle"
+                size="xs"
+              >
+                Verrouillé
+              </UBadge>
+            </div>
+            <ul class="space-y-1">
+              <li
+                v-for="c in (selectedItem.eligibility?.commendations || [])"
+                :key="c.name"
+                class="flex items-start gap-2"
+              >
+                <UIcon
+                  :name="c.met ? 'i-lucide-circle-check' : (c.userGrade === null ? 'i-lucide-circle-help' : 'i-lucide-circle-x')"
+                  :class="c.met ? 'text-success' : (c.userGrade === null ? 'text-muted' : 'text-warning')"
+                  class="w-4 h-4 shrink-0 mt-0.5"
+                />
+                <span>
+                  Commendation <span class="font-medium">{{ c.name }}</span> — grade {{ c.requiredGrade }}
+                  <span class="text-muted">(toi : {{ c.userGrade === null ? '?' : c.userGrade }})</span>
+                </span>
+              </li>
+              <li
+                v-for="f in factionLevelEntries(selectedItem)"
+                :key="f.key"
+                class="flex items-start gap-2 text-muted"
+              >
+                <UIcon
+                  name="i-lucide-flag"
+                  class="w-4 h-4 shrink-0 mt-0.5"
+                />
+                <span>Réputation {{ f.label }} ≥ {{ f.level }}</span>
+              </li>
+              <li
+                v-if="selectedItem.prerequisites.legendary"
+                class="flex items-start gap-2 text-muted"
+              >
+                <UIcon
+                  name="i-lucide-crown"
+                  class="w-4 h-4 shrink-0 mt-0.5"
+                />
+                <span>Titre Pirate Legend requis</span>
+              </li>
+              <li
+                v-if="selectedItem.prerequisites.requires"
+                class="flex items-start gap-2 text-muted"
+              >
+                <UIcon
+                  name="i-lucide-info"
+                  class="w-4 h-4 shrink-0 mt-0.5"
+                />
+                <span>{{ selectedItem.prerequisites.requires }}</span>
+              </li>
+            </ul>
           </div>
         </div>
       </template>

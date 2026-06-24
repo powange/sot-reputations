@@ -1020,8 +1020,17 @@ export interface ChestItem {
   cost: ChestItemCost | null
   // Prérequis d'obtention (récupérés du wiki) ; null si aucun / non renseigné.
   prerequisites: ChestItemPrereqs | null
+  // Éligibilité calculée vs la progression commendations de l'utilisateur.
+  // null = aucun prérequis. status: 'met' (débloquable), 'locked' (commendation
+  // manquante connue), 'unknown' (prérequis non entièrement vérifiables).
+  eligibility: ChestItemEligibility | null
   // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
   groupOwners: Array<{ group: string, members: string[] }>
+}
+
+export interface ChestItemEligibility {
+  status: 'met' | 'locked' | 'unknown'
+  commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean }>
 }
 
 interface ParsedChestItem {
@@ -1281,6 +1290,59 @@ export function importChestData(
   return { items: totalItems, categories: parsed.length }
 }
 
+// Normalisation pour rapprocher un nom de commendation (wiki) d'un nom d'emblème.
+function normalizeMatch(s: string): string {
+  return s
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[‘’'`]/g, '\'')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+// Grade atteint par l'utilisateur pour chaque emblème, indexé par nom EN normalisé.
+function getUserCommendationGrades(userId: number): Map<string, number> {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT COALESCE(NULLIF(et.name, ''), e.name) as name, COALESCE(ue.grade, 0) as grade
+    FROM emblems e
+    LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = 'en'
+    LEFT JOIN user_emblems ue ON ue.emblem_id = e.id AND ue.user_id = ?
+  `).all(userId) as Array<{ name: string, grade: number }>
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    const key = normalizeMatch(r.name)
+    const prev = map.get(key)
+    if (prev == null || r.grade > prev) map.set(key, r.grade)
+  }
+  return map
+}
+
+// Statut d'éligibilité d'un item vs la progression commendations de l'utilisateur.
+function computeEligibility(prereqs: ChestItemPrereqs | null, commGrades: Map<string, number>): ChestItemEligibility | null {
+  if (!prereqs) return null
+  const commendations = (prereqs.commendations ?? []).map((c) => {
+    const requiredGrade = c.grade ?? 1
+    const userGrade = commGrades.get(normalizeMatch(c.name))
+    return {
+      name: c.name,
+      requiredGrade,
+      userGrade: userGrade ?? null,
+      met: userGrade !== undefined && userGrade >= requiredGrade
+    }
+  })
+  const hasOther = !!prereqs.factionLevels || !!prereqs.legendary || !!prereqs.requires
+  if (commendations.length === 0 && !hasOther) return null
+  // 'locked' : on SAIT qu'une commendation requise n'est pas atteinte.
+  const anyLocked = commendations.some(c => c.userGrade !== null && !c.met)
+  const allCommMet = commendations.length > 0 && commendations.every(c => c.met)
+  let status: ChestItemEligibility['status']
+  if (anyLocked) status = 'locked'
+  else if (allCommMet && !hasOther) status = 'met'
+  else status = 'unknown'
+  return { status, commendations }
+}
+
 /** Items du coffre possédés par un utilisateur, triés par catégorie puis ordre d'import. */
 /**
  * Catalogue complet des items du coffre (tous ceux connus, importés par n'importe
@@ -1322,21 +1384,27 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
 
   // Co-membres (de tous les groupes de l'utilisateur) possédant chaque item.
   const groupOwners = getChestGroupOwners(db, userId)
+  // Grades commendations de l'utilisateur (pour l'éligibilité des prérequis).
+  const commGrades = getUserCommendationGrades(userId)
 
-  return rows.map(r => ({
-    id: r.id,
-    uid: r.uid,
-    category: r.category,
-    subcategory: r.subcategory,
-    name: r.name,
-    description: r.description,
-    image: r.image,
-    owned: r.owned === 1,
-    colors: parseColors(r.colors),
-    cost: parseChestItemCost(r.cost),
-    prerequisites: parseChestItemPrereqs(r.prerequisites),
-    groupOwners: groupOwners.get(r.id) || []
-  }))
+  return rows.map((r) => {
+    const prerequisites = parseChestItemPrereqs(r.prerequisites)
+    return {
+      id: r.id,
+      uid: r.uid,
+      category: r.category,
+      subcategory: r.subcategory,
+      name: r.name,
+      description: r.description,
+      image: r.image,
+      owned: r.owned === 1,
+      colors: parseColors(r.colors),
+      cost: parseChestItemCost(r.cost),
+      prerequisites,
+      eligibility: computeEligibility(prerequisites, commGrades),
+      groupOwners: groupOwners.get(r.id) || []
+    }
+  })
 }
 
 function parseColors(json: string | null): string[] {
