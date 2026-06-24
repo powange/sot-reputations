@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestScopeItemsForCost, type ChestItemCost } from '../../../utils/reputation-db'
-import { fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem } from '../../../utils/sot-wiki'
+import { fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/fetch  { category, subcategory, wikiCategory? }
@@ -43,8 +43,8 @@ export default defineEventHandler(async (event) => {
   const wikiByName = new Map(wiki.map(w => [normalizeName(w.title), w]))
   const usedTitles = new Set<string>()
 
-  const matched: Array<{ id: number, name: string, enName: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null }> = []
-  const noCost: Array<{ id: number, name: string, enName: string | null, wikiTitle: string }> = []
+  const matched: Array<{ id: number, name: string, enName: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null }> = []
+  const noCost: Array<{ id: number, name: string, enName: string | null, wikiTitle: string, prereqs: WikiPrereqs | null }> = []
   const unmatched: Array<{ id: number, name: string, enName: string | null }> = []
 
   for (const it of items) {
@@ -55,10 +55,10 @@ export default defineEventHandler(async (event) => {
     }
     usedTitles.add(normalizeName(w.title))
     if (!w.cost) {
-      noCost.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title })
+      noCost.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title, prereqs: w.prereqs })
       continue
     }
-    matched.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title, cost: w.cost, currentCost: it.cost })
+    matched.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs })
   }
 
   const wikiOnly = wiki

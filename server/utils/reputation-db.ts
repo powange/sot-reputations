@@ -390,6 +390,12 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE chest_items ADD COLUMN cost TEXT')
   }
 
+  // Migration: prérequis d'obtention (récupérés du wiki). JSON
+  // { commendations?, factionLevels?, legendary?, requires? } ; NULL si aucun.
+  if (!chestColorCols.some(col => col.name === 'prerequisites')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN prerequisites TEXT')
+  }
+
   return db
 }
 
@@ -1012,6 +1018,8 @@ export interface ChestItem {
   colors: string[]
   // Coût d'achat (récupéré du wiki) ; null si non achetable / non renseigné.
   cost: ChestItemCost | null
+  // Prérequis d'obtention (récupérés du wiki) ; null si aucun / non renseigné.
+  prerequisites: ChestItemPrereqs | null
   // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
   groupOwners: Array<{ group: string, members: string[] }>
 }
@@ -1290,7 +1298,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
       COALESCE(NULLIF(t.name, ''), ci.name) as name,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image,
-      ci.sort_order as sortOrder, ci.colors, ci.cost,
+      ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites,
       CASE WHEN uci.user_id IS NOT NULL THEN 1 ELSE 0 END as owned
     FROM chest_items ci
     LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
@@ -1306,6 +1314,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     sortOrder: number
     colors: string | null
     cost: string | null
+    prerequisites: string | null
     owned: number
   }>
 
@@ -1325,6 +1334,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     owned: r.owned === 1,
     colors: parseColors(r.colors),
     cost: parseChestItemCost(r.cost),
+    prerequisites: parseChestItemPrereqs(r.prerequisites),
     groupOwners: groupOwners.get(r.id) || []
   }))
 }
@@ -1503,6 +1513,31 @@ export function setChestItemCost(id: number, cost: ChestItemCost | null): boolea
   const db = getReputationDb()
   const value = cost && Object.keys(cost).length > 0 ? JSON.stringify(cost) : null
   const res = db.prepare('UPDATE chest_items SET cost = ? WHERE id = ?').run(value, id)
+  return res.changes > 0
+}
+
+export interface ChestItemPrereqs {
+  commendations?: Array<{ name: string, grade: number | null }>
+  factionLevels?: Record<string, number>
+  legendary?: boolean
+  requires?: string
+}
+
+function parseChestItemPrereqs(raw: string | null): ChestItemPrereqs | null {
+  if (!raw) return null
+  try {
+    const o = JSON.parse(raw) as unknown
+    return o && typeof o === 'object' ? o as ChestItemPrereqs : null
+  } catch {
+    return null
+  }
+}
+
+/** Écrit les prérequis d'un item (null/vide = efface). Renvoie true si l'item existe. */
+export function setChestItemPrereqs(id: number, prereqs: ChestItemPrereqs | null): boolean {
+  const db = getReputationDb()
+  const value = prereqs && Object.keys(prereqs).length > 0 ? JSON.stringify(prereqs) : null
+  const res = db.prepare('UPDATE chest_items SET prerequisites = ? WHERE id = ?').run(value, id)
   return res.changes > 0
 }
 

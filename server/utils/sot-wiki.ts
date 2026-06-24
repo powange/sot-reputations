@@ -12,7 +12,32 @@ const WIKI_API = 'https://seaofthieves.wiki.gg/api.php'
 const USER_AGENT = 'sot-reputations (https://achievements-sot.powange.com)'
 
 export interface WikiCost { gold?: number, doubloons?: number, ancientCoins?: number }
-export interface WikiItem { title: string, cost: WikiCost | null }
+
+/**
+ * Prérequis d'obtention d'un item (déduits de l'infobox {{variant}}).
+ * - commendations : commendation(s) + grade requis (= emblèmes du site).
+ * - factionLevels : niveau de réputation requis par faction (clé courte).
+ * - legendary : nécessite le titre Pirate Legend.
+ * - requires : autre condition en texte libre (event, Twitch Drops…).
+ */
+export interface WikiPrereqs {
+  commendations?: Array<{ name: string, grade: number | null }>
+  factionLevels?: Record<string, number>
+  legendary?: boolean
+  requires?: string
+}
+export interface WikiItem { title: string, cost: WikiCost | null, prereqs: WikiPrereqs | null }
+
+// Champ wiki « *-level » -> clé de faction courte.
+const FACTION_LEVEL_FIELDS: Record<string, string> = {
+  'hoarder-level': 'hoarder',
+  'merchant-level': 'merchant',
+  'souls-level': 'souls',
+  'hunter-level': 'hunter',
+  'seadog-level': 'seadog',
+  'reaper-level': 'reaper',
+  'athena-level': 'athena'
+}
 
 interface CategoryMembersResponse {
   query?: { categorymembers?: Array<{ title: string }> }
@@ -69,6 +94,61 @@ function parseVariantCost(wikitext: string): WikiCost | null {
   return Object.keys(cost).length > 0 ? cost : null
 }
 
+/** Allège un fragment de wikitext (liens, gras, refs, templates) pour l'affichage. */
+function cleanWiki(s: string): string {
+  return s
+    .replace(/<ref[\s\S]*?<\/ref>/gi, '')
+    .replace(/\[\[[^\]|]*\|([^\]]+)\]\]/g, '$1') // [[A|B]] -> B
+    .replace(/\[\[([^\]]+)\]\]/g, '$1') // [[A]] -> A
+    .replace(/\[https?:\/\/\S+\s+([^\]]+)\]/g, '$1') // [url texte] -> texte
+    .replace(/\{\{[^{}]*\}\}/g, '') // templates simples
+    .replace(/'''?/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Extrait les prérequis d'obtention de l'infobox {{variant}} (null si aucun). */
+function parseVariantPrereqs(wikitext: string): WikiPrereqs | null {
+  const m = wikitext.match(/\{\{variant([\s\S]*?)\}\}/i)
+  if (!m) return null
+  const body = m[1] ?? ''
+  const str = (name: string): string | undefined => {
+    const fm = body.match(new RegExp(`\\|\\s*${name}\\s*=\\s*([^|}\\n]+)`, 'i'))
+    const v = fm?.[1]?.trim()
+    return v || undefined
+  }
+  const int = (name: string): number | undefined => {
+    const v = str(name)
+    if (v == null) return undefined
+    const n = Number.parseInt(v.replace(/[^0-9]/g, ''), 10)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  const out: WikiPrereqs = {}
+  // Commendations (jusqu'à 2)
+  const comms: Array<{ name: string, grade: number | null }> = []
+  const c1 = str('commendation')
+  if (c1) comms.push({ name: cleanWiki(c1), grade: int('comm-grade') ?? null })
+  const c2 = str('commendation2')
+  if (c2) comms.push({ name: cleanWiki(c2), grade: int('comm-grade2') ?? null })
+  if (comms.length) out.commendations = comms
+  // Niveaux de réputation de faction
+  const fl: Record<string, number> = {}
+  for (const [fieldName, key] of Object.entries(FACTION_LEVEL_FIELDS)) {
+    const v = int(fieldName)
+    if (v != null) fl[key] = v
+  }
+  if (Object.keys(fl).length) out.factionLevels = fl
+  // Pirate Legend
+  const leg = str('legendary')
+  if (leg && /^(yes|true|1)$/i.test(leg)) out.legendary = true
+  // Autre condition (texte libre)
+  const req = str('requires')
+  if (req) out.requires = cleanWiki(req)
+
+  return Object.keys(out).length > 0 ? out : null
+}
+
 /**
  * Récupère tous les items d'une catégorie wiki avec leur coût.
  * Écarte la page « racine » du type (ex. la page « Banjo » elle-même).
@@ -106,7 +186,7 @@ export async function fetchWikiItemCosts(wikiCategory: string): Promise<WikiItem
     })
     for (const p of Object.values(d.query?.pages ?? {})) {
       const wt = p.revisions?.[0]?.slots?.main?.['*'] ?? ''
-      out.push({ title: p.title, cost: parseVariantCost(wt) })
+      out.push({ title: p.title, cost: parseVariantCost(wt), prereqs: parseVariantPrereqs(wt) })
     }
   }
   return out

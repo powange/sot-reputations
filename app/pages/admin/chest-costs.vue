@@ -19,8 +19,9 @@ watchEffect(() => {
 
 interface Scope { category: string, subcategory: string | null, count: number, withCost: number, wikiCategory: string | null }
 interface Cost { gold?: number, doubloons?: number, ancientCoins?: number }
-interface Matched { id: number, name: string, enName: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null }
-interface NoCost { id: number, name: string, enName: string | null, wikiTitle: string }
+interface Prereqs { commendations?: Array<{ name: string, grade: number | null }>, factionLevels?: Record<string, number>, legendary?: boolean, requires?: string }
+interface Matched { id: number, name: string, enName: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null, prereqs: Prereqs | null }
+interface NoCost { id: number, name: string, enName: string | null, wikiTitle: string, prereqs: Prereqs | null }
 interface Unmatched { id: number, name: string, enName: string | null }
 interface WikiOnly { title: string, cost: Cost | null }
 interface FetchResult {
@@ -149,6 +150,10 @@ function toggle(id: number) {
 const allSelected = computed(() =>
   !!result.value?.matched.length && result.value.matched.every(m => selectedIds.value.has(m.id))
 )
+// Nombre d'items (matchés + sans coût) pour lesquels le wiki donne des prérequis.
+const prereqCount = computed(() =>
+  result.value ? [...result.value.matched, ...result.value.noCost].filter(x => x.prereqs).length : 0
+)
 function toggleAll() {
   if (!result.value) return
   selectedIds.value = allSelected.value ? new Set() : new Set(result.value.matched.map(m => m.id))
@@ -165,7 +170,7 @@ async function apply() {
   try {
     const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
       method: 'POST',
-      body: { items: toApply.map(m => ({ id: m.id, cost: m.cost })) }
+      body: { items: toApply.map(m => ({ id: m.id, cost: m.cost, prereqs: m.prereqs })) }
     })
     toast.add({ title: `${res.updated} coût(s) appliqué(s)`, color: 'success' })
     result.value = null
@@ -211,11 +216,15 @@ async function runBulk() {
           method: 'POST',
           body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCat }
         })
-        const toApply = res.matched.filter(m => !sameCost(m.cost, m.currentCost))
-        if (toApply.length) {
+        // Écrit coût (matchés) + prérequis (matchés ET sans-coût) de tout le scope.
+        const items = [
+          ...res.matched.map(m => ({ id: m.id, cost: m.cost, prereqs: m.prereqs })),
+          ...res.noCost.map(n => ({ id: n.id, prereqs: n.prereqs }))
+        ]
+        if (items.length) {
           const ap = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
             method: 'POST',
-            body: { items: toApply.map(m => ({ id: m.id, cost: m.cost })) }
+            body: { items }
           })
           applied += ap.updated
         }
@@ -226,7 +235,7 @@ async function runBulk() {
       bulkProgress.value = { done, total: targets.length, current: '' }
     }
     toast.add({
-      title: `Terminé : ${applied} coût(s) appliqué(s) sur ${targets.length} sous-catégorie(s) (${failed} échec(s), ${skipped} ignorée(s))`,
+      title: `Terminé : ${applied} objet(s) mis à jour (coût + prérequis) sur ${targets.length} sous-catégorie(s) (${failed} échec(s), ${skipped} ignorée(s))`,
       color: failed ? 'warning' : 'success'
     })
     await refreshScopes()
@@ -374,6 +383,13 @@ async function runBulk() {
           variant="subtle"
         >
           {{ result.counts.wikiOnly }} pages wiki orphelines
+        </UBadge>
+        <UBadge
+          v-if="prereqCount"
+          color="primary"
+          variant="subtle"
+        >
+          {{ prereqCount }} avec prérequis
         </UBadge>
       </div>
 
