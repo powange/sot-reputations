@@ -233,8 +233,8 @@ watchEffect(() => {
                   />
                 </div>
                 <div>
-                  <h3 class="font-semibold">Coûts du coffre</h3>
-                  <p class="text-sm text-muted">Récupérer le coût des objets depuis le wiki Sea of Thieves</p>
+                  <h3 class="font-semibold">Coûts & prérequis du coffre</h3>
+                  <p class="text-sm text-muted">Récupérer coûts et prérequis des objets depuis le wiki Sea of Thieves</p>
                 </div>
               </div>
             </UCard>

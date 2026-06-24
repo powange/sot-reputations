@@ -3,7 +3,7 @@ const { isAdminOrModerator, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
 
 useSeoMeta({
-  title: 'Coûts du coffre - Administration'
+  title: 'Coûts & prérequis du coffre - Administration'
 })
 
 watchEffect(() => {
@@ -258,11 +258,12 @@ async function runBulk() {
         class="mb-4"
       />
       <h1 class="text-4xl font-pirate">
-        Coûts du coffre
+        Coûts & prérequis du coffre
       </h1>
       <p class="text-muted mt-2">
-        Récupère le coût d'achat des objets depuis le wiki Sea of Thieves (rapprochement
-        par nom anglais), puis applique après vérification.
+        Récupère depuis le wiki Sea of Thieves le <strong>coût d'achat</strong> et les
+        <strong>prérequis</strong> des objets (commendation/grade, niveau de réputation,
+        Pirate Legend…), par rapprochement de nom anglais, puis applique après vérification.
       </p>
     </div>
 
@@ -352,8 +353,9 @@ async function runBulk() {
             </p>
           </div>
           <p class="text-xs text-muted">
-            Récupère et applique automatiquement les coûts du wiki pour toutes les
-            sous-catégories du filtre courant (utilise la catégorie wiki mémorisée si elle existe).
+            Récupère et applique automatiquement les <strong>coûts et prérequis</strong> du
+            wiki pour toutes les sous-catégories du filtre courant (utilise la catégorie wiki
+            mémorisée si elle existe).
           </p>
         </div>
       </div>
