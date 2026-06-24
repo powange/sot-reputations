@@ -110,16 +110,53 @@ function cleanWiki(s: string): string {
 }
 
 /**
+ * Découpe le corps d'une infobox en paramètres « name -> value » en respectant
+ * l'imbrication : un `|` à l'intérieur d'un {{template|...}} ou d'un [[lien|...]] n'est
+ * PAS un séparateur de paramètre (sinon un champ comme `requires` contenant {{a|499}}
+ * serait tronqué). Noms en minuscules.
+ */
+function parseInfoboxFields(body: string): Map<string, string> {
+  const params: string[] = []
+  let depth = 0
+  let cur = ''
+  for (let i = 0; i < body.length; i++) {
+    const two = body.slice(i, i + 2)
+    if (two === '{{' || two === '[[') {
+      depth++
+      cur += two
+      i++
+    } else if (two === '}}' || two === ']]') {
+      if (depth > 0) depth--
+      cur += two
+      i++
+    } else if (body[i] === '|' && depth === 0) {
+      params.push(cur)
+      cur = ''
+    } else {
+      cur += body[i]
+    }
+  }
+  params.push(cur)
+  const fields = new Map<string, string>()
+  for (const p of params) {
+    const eq = p.indexOf('=')
+    if (eq === -1) continue
+    const name = p.slice(0, eq).trim().toLowerCase()
+    if (name) fields.set(name, p.slice(eq + 1).trim())
+  }
+  return fields
+}
+
+/**
  * Parse l'infobox {{variant}} d'un wikitext en une passe : coût + prérequis.
- * Lit un champ « | <name> = <valeur> » (s'arrête au prochain | / } / fin de ligne) ;
- * le `=` juste après le nom évite que `cost` capte `cost-d`/`cost-a`.
  */
 function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
   const body = extractVariantBody(wikitext)
   if (body == null) return { cost: null, prereqs: null }
+  const fields = parseInfoboxFields(body)
   const str = (name: string): string | undefined => {
-    const fm = body.match(new RegExp(`\\|\\s*${name}\\s*=\\s*([^|}\\n]+)`, 'i'))
-    return fm?.[1]?.trim() || undefined
+    const v = fields.get(name)
+    return v && v.length > 0 ? v : undefined
   }
   const int = (name: string): number | undefined => {
     const v = str(name)
