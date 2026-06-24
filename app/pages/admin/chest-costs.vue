@@ -187,13 +187,14 @@ async function apply() {
 const bulkRunning = ref(false)
 const bulkProgress = ref({ done: 0, total: 0, current: '' })
 
-async function runBulk() {
+async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
   const targets = scopes.value.filter(scopeMatchesFilter)
   if (!targets.length) {
     toast.add({ title: 'Aucune sous-catégorie dans le filtre courant', color: 'warning' })
     return
   }
-  if (!confirm(`Récupérer puis appliquer les coûts du wiki pour ${targets.length} sous-catégorie(s) filtrée(s) ? Les coûts en base seront mis à jour.`)) return
+  const what = mode === 'prereqsOnly' ? 'les prérequis' : 'les coûts et prérequis'
+  if (!confirm(`Récupérer puis appliquer ${what} du wiki pour ${targets.length} sous-catégorie(s) filtrée(s) ? Les données en base seront mises à jour.`)) return
 
   bulkRunning.value = true
   result.value = null
@@ -216,13 +217,16 @@ async function runBulk() {
           method: 'POST',
           body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCat }
         })
-        // Écrit coût (matchés) + prérequis (matchés ET sans-coût) de tout le scope.
-        // On n'envoie prereqs QUE s'il est non-null : un null effacerait les prérequis
-        // déjà importés (ex. faux négatif de parsing). Import = backfill/mise à jour.
-        const items = [
-          ...res.matched.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
-          ...res.noCost.filter(n => n.prereqs).map(n => ({ id: n.id, prereqs: n.prereqs }))
-        ]
+        // prereqsOnly : on n'écrit QUE les prérequis des items qui en ont (cost non
+        // envoyé -> coûts intacts). all : coût (matchés) + prérequis (matchés ET sans-coût).
+        // On n'envoie prereqs QUE s'il est non-null (un null effacerait les prérequis déjà
+        // importés). Import = backfill/mise à jour.
+        const items = mode === 'prereqsOnly'
+          ? [...res.matched, ...res.noCost].filter(x => x.prereqs).map(x => ({ id: x.id, prereqs: x.prereqs }))
+          : [
+              ...res.matched.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
+              ...res.noCost.filter(n => n.prereqs).map(n => ({ id: n.id, prereqs: n.prereqs }))
+            ]
         if (items.length) {
           const ap = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
             method: 'POST',
@@ -237,7 +241,7 @@ async function runBulk() {
       bulkProgress.value = { done, total: targets.length, current: '' }
     }
     toast.add({
-      title: `Terminé : ${applied} objet(s) mis à jour (coût + prérequis) sur ${targets.length} sous-catégorie(s) (${failed} échec(s), ${skipped} ignorée(s))`,
+      title: `Terminé : ${applied} objet(s) mis à jour (${mode === 'prereqsOnly' ? 'prérequis' : 'coût + prérequis'}) sur ${targets.length} sous-catégorie(s) (${failed} échec(s), ${skipped} ignorée(s))`,
       color: failed ? 'warning' : 'success'
     })
     await refreshScopes()
@@ -339,7 +343,16 @@ async function runBulk() {
               color="primary"
               :loading="bulkRunning"
               :disabled="bulkRunning || fetching || applying || scopeOptions.length === 0"
-              @click="runBulk"
+              @click="runBulk('all')"
+            />
+            <UButton
+              icon="i-lucide-list-checks"
+              :label="`Prérequis seulement (${scopeOptions.length})`"
+              color="neutral"
+              variant="outline"
+              :loading="bulkRunning"
+              :disabled="bulkRunning || fetching || applying || scopeOptions.length === 0"
+              @click="runBulk('prereqsOnly')"
             />
             <p
               v-if="bulkRunning"
@@ -353,9 +366,10 @@ async function runBulk() {
             </p>
           </div>
           <p class="text-xs text-muted">
-            Récupère et applique automatiquement les <strong>coûts et prérequis</strong> du
-            wiki pour toutes les sous-catégories du filtre courant (utilise la catégorie wiki
-            mémorisée si elle existe).
+            Pour toutes les sous-catégories du filtre courant (utilise la catégorie wiki
+            mémorisée si elle existe). <strong>Tout récupérer</strong> : coûts + prérequis.
+            <strong>Prérequis seulement</strong> : n'écrit que les prérequis (les coûts en base
+            restent intacts) — pratique pour rafraîchir les prérequis sans retoucher les coûts.
           </p>
         </div>
       </div>
