@@ -1,5 +1,6 @@
 import { join } from 'path'
 import Database from 'better-sqlite3'
+import { normalizeName, type WikiPrereqs } from './sot-wiki'
 
 let db: Database.Database | null = null
 
@@ -1290,16 +1291,6 @@ export function importChestData(
   return { items: totalItems, categories: parsed.length }
 }
 
-// Normalisation pour rapprocher un nom de commendation (wiki) d'un nom d'emblème.
-function normalizeMatch(s: string): string {
-  return s
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[‘’'`]/g, '\'')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
-}
-
 interface CommendationContext {
   // nom d'emblème normalisé (EN ET base) -> grade gagné par l'utilisateur
   grades: Map<string, number>
@@ -1327,7 +1318,7 @@ function getUserCommendationContext(userId: number): CommendationContext {
   const emblemNames = new Set<string>()
   let hasImported = false
   for (const r of rows) {
-    const keys = new Set([normalizeMatch(r.enName), normalizeMatch(r.baseName)])
+    const keys = new Set([normalizeName(r.enName), normalizeName(r.baseName)])
     for (const k of keys) emblemNames.add(k)
     if (r.grade !== null) {
       hasImported = true
@@ -1347,7 +1338,7 @@ function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: CommendationC
   const rawComms = Array.isArray(prereqs.commendations) ? prereqs.commendations : []
   const commendations = rawComms.map((c) => {
     const requiredGrade = typeof c.grade === 'number' ? c.grade : 1
-    const key = normalizeMatch(c.name)
+    const key = normalizeName(c.name)
     // grade connu / emblème existant mais sans progression (0 si importé, sinon ?) /
     // aucun emblème correspondant (?).
     let userGrade: number | null
@@ -1415,7 +1406,10 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   // Co-membres (de tous les groupes de l'utilisateur) possédant chaque item.
   const groupOwners = getChestGroupOwners(db, userId)
   // Contexte commendations de l'utilisateur (pour l'éligibilité des prérequis).
-  const commCtx = getUserCommendationContext(userId)
+  // Inutile de faire la jointure emblèmes si aucun item du catalogue n'a de prérequis.
+  const commCtx: CommendationContext = rows.some(r => r.prerequisites)
+    ? getUserCommendationContext(userId)
+    : { grades: new Map<string, number>(), emblemNames: new Set<string>(), hasImported: false }
 
   return rows.map((r) => {
     const prerequisites = parseChestItemPrereqs(r.prerequisites)
@@ -1614,12 +1608,8 @@ export function setChestItemCost(id: number, cost: ChestItemCost | null): boolea
   return res.changes > 0
 }
 
-export interface ChestItemPrereqs {
-  commendations?: Array<{ name: string, grade: number | null }>
-  factionLevels?: Record<string, number>
-  legendary?: boolean
-  requires?: string
-}
+// Forme partagée avec le wiki : une seule définition structurelle (cf. WikiPrereqs).
+export type ChestItemPrereqs = WikiPrereqs
 
 function parseChestItemPrereqs(raw: string | null): ChestItemPrereqs | null {
   if (!raw) return null

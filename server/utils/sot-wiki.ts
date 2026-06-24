@@ -71,27 +71,29 @@ export function normalizeName(s: string): string {
     .toLowerCase()
 }
 
-/** Extrait le coût de l'infobox {{variant}} d'un wikitext (null si non achetable). */
-function parseVariantCost(wikitext: string): WikiCost | null {
-  const m = wikitext.match(/\{\{variant([\s\S]*?)\}\}/i)
-  if (!m) return null
-  const body = m[1] ?? ''
-  // Lit un champ « | <name> = <int> » (s'arrête au prochain | / } / fin de ligne).
-  // Le `=` juste après le nom évite que `cost` capte `cost-d` / `cost-a`.
-  const field = (name: string): number | undefined => {
-    const fm = body.match(new RegExp(`\\|\\s*${name}\\s*=\\s*([^|}\\n]+)`, 'i'))
-    if (!fm || fm[1] == null) return undefined
-    const n = Number.parseInt(fm[1].replace(/[^0-9]/g, ''), 10)
-    return Number.isFinite(n) ? n : undefined
+/**
+ * Extrait le corps de l'infobox {{variant ... }} en équilibrant les accolades,
+ * pour ne PAS s'arrêter au premier `}}` d'un éventuel template imbriqué.
+ */
+function extractVariantBody(wikitext: string): string | null {
+  const m = wikitext.match(/\{\{\s*variant/i)
+  if (!m || m.index == null) return null
+  const start = m.index + m[0].length
+  let depth = 1
+  let i = start
+  while (i < wikitext.length && depth > 0) {
+    if (wikitext[i] === '{' && wikitext[i + 1] === '{') {
+      depth++
+      i += 2
+    } else if (wikitext[i] === '}' && wikitext[i + 1] === '}') {
+      depth--
+      i += 2
+    } else {
+      i++
+    }
   }
-  const cost: WikiCost = {}
-  const gold = field('cost')
-  const doubloons = field('cost-d')
-  const ancientCoins = field('cost-a')
-  if (gold != null) cost.gold = gold
-  if (doubloons != null) cost.doubloons = doubloons
-  if (ancientCoins != null) cost.ancientCoins = ancientCoins
-  return Object.keys(cost).length > 0 ? cost : null
+  // depth === 0 -> i pointe juste après le `}}` fermant : le corps est [start, i-2).
+  return depth === 0 ? wikitext.slice(start, i - 2) : wikitext.slice(start)
 }
 
 /** Allège un fragment de wikitext (liens, gras, refs, templates) pour l'affichage. */
@@ -107,15 +109,17 @@ function cleanWiki(s: string): string {
     .trim()
 }
 
-/** Extrait les prérequis d'obtention de l'infobox {{variant}} (null si aucun). */
-function parseVariantPrereqs(wikitext: string): WikiPrereqs | null {
-  const m = wikitext.match(/\{\{variant([\s\S]*?)\}\}/i)
-  if (!m) return null
-  const body = m[1] ?? ''
+/**
+ * Parse l'infobox {{variant}} d'un wikitext en une passe : coût + prérequis.
+ * Lit un champ « | <name> = <valeur> » (s'arrête au prochain | / } / fin de ligne) ;
+ * le `=` juste après le nom évite que `cost` capte `cost-d`/`cost-a`.
+ */
+function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
+  const body = extractVariantBody(wikitext)
+  if (body == null) return { cost: null, prereqs: null }
   const str = (name: string): string | undefined => {
     const fm = body.match(new RegExp(`\\|\\s*${name}\\s*=\\s*([^|}\\n]+)`, 'i'))
-    const v = fm?.[1]?.trim()
-    return v || undefined
+    return fm?.[1]?.trim() || undefined
   }
   const int = (name: string): number | undefined => {
     const v = str(name)
@@ -124,29 +128,38 @@ function parseVariantPrereqs(wikitext: string): WikiPrereqs | null {
     return Number.isFinite(n) ? n : undefined
   }
 
-  const out: WikiPrereqs = {}
-  // Commendations (jusqu'à 2)
+  // Coût
+  const cost: WikiCost = {}
+  const gold = int('cost')
+  const doubloons = int('cost-d')
+  const ancientCoins = int('cost-a')
+  if (gold != null) cost.gold = gold
+  if (doubloons != null) cost.doubloons = doubloons
+  if (ancientCoins != null) cost.ancientCoins = ancientCoins
+
+  // Prérequis
+  const prereqs: WikiPrereqs = {}
   const comms: Array<{ name: string, grade: number | null }> = []
   const c1 = str('commendation')
   if (c1) comms.push({ name: cleanWiki(c1), grade: int('comm-grade') ?? null })
   const c2 = str('commendation2')
   if (c2) comms.push({ name: cleanWiki(c2), grade: int('comm-grade2') ?? null })
-  if (comms.length) out.commendations = comms
-  // Niveaux de réputation de faction
+  if (comms.length) prereqs.commendations = comms
   const fl: Record<string, number> = {}
   for (const [fieldName, key] of Object.entries(FACTION_LEVEL_FIELDS)) {
     const v = int(fieldName)
     if (v != null) fl[key] = v
   }
-  if (Object.keys(fl).length) out.factionLevels = fl
-  // Pirate Legend
+  if (Object.keys(fl).length) prereqs.factionLevels = fl
   const leg = str('legendary')
-  if (leg && /^(yes|true|1)$/i.test(leg)) out.legendary = true
-  // Autre condition (texte libre)
+  if (leg && /^(yes|true|1)$/i.test(leg)) prereqs.legendary = true
   const req = str('requires')
-  if (req) out.requires = cleanWiki(req)
+  if (req) prereqs.requires = cleanWiki(req)
 
-  return Object.keys(out).length > 0 ? out : null
+  return {
+    cost: Object.keys(cost).length > 0 ? cost : null,
+    prereqs: Object.keys(prereqs).length > 0 ? prereqs : null
+  }
 }
 
 /**
@@ -186,7 +199,8 @@ export async function fetchWikiItemCosts(wikiCategory: string): Promise<WikiItem
     })
     for (const p of Object.values(d.query?.pages ?? {})) {
       const wt = p.revisions?.[0]?.slots?.main?.['*'] ?? ''
-      out.push({ title: p.title, cost: parseVariantCost(wt), prereqs: parseVariantPrereqs(wt) })
+      const { cost, prereqs } = parseVariant(wt)
+      out.push({ title: p.title, cost, prereqs })
     }
   }
   return out
