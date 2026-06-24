@@ -32,6 +32,7 @@ interface ChestItem {
   eligibility: {
     status: 'met' | 'locked' | 'unknown'
     commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean }>
+    factions: Array<{ key: string, requiredLevel: number, userLevel: number | null, met: boolean }>
   } | null
   groupOwners: Array<{ group: string, members: string[] }>
 }
@@ -90,12 +91,6 @@ const FACTION_LABELS: Record<string, string> = {
 function factionLabel(key: string): string {
   return FACTION_LABELS[key] || key
 }
-// Niveaux de faction d'un item, prêts à afficher.
-function factionLevelEntries(item: ChestItem): Array<{ key: string, label: string, level: number }> {
-  const fl = item.prerequisites?.factionLevels
-  if (!fl) return []
-  return Object.entries(fl).map(([key, level]) => ({ key, label: factionLabel(key), level }))
-}
 
 // Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
 // (humanizeKey est auto-importé depuis app/utils)
@@ -149,6 +144,18 @@ const selectedSecondaryColors = ref<string[]>(queryToArray(route.query.scolor))
 const secondaryColorsMatchAll = ref(queryToString(route.query.smatch) === 'all')
 // Filtre devises (coût) : or / pièces anciennes / doublons (multi-sélection, OU).
 const selectedCurrencies = ref<string[]>(queryToArray(route.query.cur))
+// Filtre prérequis (éligibilité) : tous / débloquables / verrouillés / avec prérequis.
+type EligFilter = 'all' | 'met' | 'locked' | 'prereq'
+const eligFromUrl = queryToString(route.query.elig)
+const eligibilityFilter = ref<EligFilter>(
+  (['met', 'locked', 'prereq'] as string[]).includes(eligFromUrl) ? eligFromUrl as EligFilter : 'all'
+)
+const eligibilityOptions: Array<{ label: string, value: EligFilter }> = [
+  { label: 'Tous', value: 'all' },
+  { label: 'Débloquables', value: 'met' },
+  { label: 'Verrouillés', value: 'locked' },
+  { label: 'Avec prérequis', value: 'prereq' }
+]
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
   ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
 )
@@ -264,6 +271,11 @@ const filteredItems = computed(() => {
     // OU : l'item a un coût dans au moins une des devises sélectionnées.
     list = list.filter(i => !!i.cost && selectedCurrencies.value.some(c => (i.cost as Record<string, number | undefined>)[c] != null))
   }
+  if (eligibilityFilter.value !== 'all') {
+    list = eligibilityFilter.value === 'prereq'
+      ? list.filter(i => i.eligibility != null)
+      : list.filter(i => i.eligibility?.status === eligibilityFilter.value)
+  }
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(i =>
@@ -292,7 +304,8 @@ watch(
     () => selectedPrimaryColors.value.join(','),
     () => selectedSecondaryColors.value.join(','),
     secondaryColorsMatchAll,
-    () => selectedCurrencies.value.join(',')
+    () => selectedCurrencies.value.join(','),
+    eligibilityFilter
   ],
   () => {
     currentPage.value = 1
@@ -315,6 +328,7 @@ function syncUrl() {
   if (selectedSecondaryColors.value.length) query.scolor = selectedSecondaryColors.value.join(',')
   if (secondaryColorsMatchAll.value) query.smatch = 'all'
   if (selectedCurrencies.value.length) query.cur = selectedCurrencies.value.join(',')
+  if (eligibilityFilter.value !== 'all') query.elig = eligibilityFilter.value
   if (currentPage.value > 1) query.page = String(currentPage.value)
   router.replace({ query })
 }
@@ -329,7 +343,8 @@ watch(
     () => selectedPrimaryColors.value.join(','),
     () => selectedSecondaryColors.value.join(','),
     secondaryColorsMatchAll,
-    () => selectedCurrencies.value.join(',')
+    () => selectedCurrencies.value.join(','),
+    eligibilityFilter
   ],
   () => syncUrl()
 )
@@ -544,6 +559,20 @@ watch(
             >
             {{ cur.label }}
           </UButton>
+        </div>
+
+        <!-- Filtre prérequis (éligibilité) -->
+        <div class="flex items-center gap-2 flex-wrap mb-3">
+          <span class="text-sm font-medium text-muted">Prérequis :</span>
+          <UButton
+            v-for="opt in eligibilityOptions"
+            :key="opt.value"
+            :label="opt.label"
+            size="sm"
+            :color="eligibilityFilter === opt.value ? 'primary' : 'neutral'"
+            :variant="eligibilityFilter === opt.value ? 'solid' : 'outline'"
+            @click="eligibilityFilter = opt.value"
+          />
         </div>
 
         <!-- Grille -->
@@ -795,15 +824,19 @@ watch(
                 </span>
               </li>
               <li
-                v-for="f in factionLevelEntries(selectedItem)"
+                v-for="f in (selectedItem.eligibility?.factions || [])"
                 :key="f.key"
-                class="flex items-start gap-2 text-muted"
+                class="flex items-start gap-2"
               >
                 <UIcon
-                  name="i-lucide-flag"
+                  :name="f.met ? 'i-lucide-circle-check' : (f.userLevel === null ? 'i-lucide-flag' : 'i-lucide-circle-x')"
+                  :class="f.met ? 'text-success' : (f.userLevel === null ? 'text-muted' : 'text-warning')"
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
-                <span>Réputation {{ f.label }} ≥ {{ f.level }}</span>
+                <span>
+                  Réputation <span class="font-medium">{{ factionLabel(f.key) }}</span> ≥ {{ f.requiredLevel }}
+                  <span class="text-muted">(toi : {{ f.userLevel === null ? '?' : f.userLevel }})</span>
+                </span>
               </li>
               <li
                 v-if="selectedItem.prerequisites.legendary"

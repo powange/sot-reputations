@@ -71,6 +71,16 @@ export function getReputationDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_user_emblems_user ON user_emblems(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_emblems_emblem ON user_emblems(emblem_id);
 
+    -- Niveau de réputation par faction et par utilisateur (capté à l'import ;
+    -- sert à juger les prérequis « niveau de faction » des objets du coffre).
+    CREATE TABLE IF NOT EXISTS user_faction_levels (
+      user_id INTEGER NOT NULL,
+      faction_key TEXT NOT NULL,
+      level INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, faction_key),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     -- Groupes
     CREATE TABLE IF NOT EXISTS groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -447,6 +457,7 @@ interface CampaignData {
 
 interface FactionData {
   Motto?: string
+  Level?: number
   Emblems?: {
     Emblems?: EmblemData[]
   }
@@ -535,6 +546,11 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
     UPDATE users SET last_import_at = CURRENT_TIMESTAMP WHERE id = ?
   `)
 
+  const upsertUserFactionLevel = db.prepare(`
+    INSERT INTO user_faction_levels (user_id, faction_key, level) VALUES (?, ?, ?)
+    ON CONFLICT(user_id, faction_key) DO UPDATE SET level = excluded.level
+  `)
+
   // Mettre à jour l'image si l'emblème est complété et l'image importée est différente
   const updateEmblemImageIfCompleted = db.prepare(`
     UPDATE emblems SET image = ?
@@ -554,6 +570,11 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
 
       const factionRow = getFactionId.get(factionKey) as { id: number }
       const factionId = factionRow.id
+
+      // Niveau de réputation de la faction (pour l'éligibilité des objets du coffre).
+      if (typeof factionData.Level === 'number') {
+        upsertUserFactionLevel.run(userId, factionKey, factionData.Level)
+      }
 
       // Factions avec Campaigns (BilgeRats, HuntersCall)
       if (factionData.Campaigns) {
@@ -1032,6 +1053,7 @@ export interface ChestItem {
 export interface ChestItemEligibility {
   status: 'met' | 'locked' | 'unknown'
   commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean }>
+  factions: Array<{ key: string, requiredLevel: number, userLevel: number | null, met: boolean }>
 }
 
 interface ParsedChestItem {
@@ -1291,19 +1313,32 @@ export function importChestData(
   return { items: totalItems, categories: parsed.length }
 }
 
-interface CommendationContext {
+// Clé courte du wiki (champ *-level) -> clé de faction du site.
+const WIKI_FACTION_TO_KEY: Record<string, string> = {
+  hoarder: 'GoldHoarders',
+  merchant: 'MerchantAlliance',
+  souls: 'OrderOfSouls',
+  hunter: 'HuntersCall',
+  seadog: 'SeaDogs',
+  reaper: 'ReapersBones',
+  athena: 'AthenasFortune'
+}
+
+interface EligibilityContext {
   // nom d'emblème normalisé (EN ET base) -> grade gagné par l'utilisateur
   grades: Map<string, number>
   // tous les noms d'emblèmes connus (EN + base), normalisés
   emblemNames: Set<string>
   // l'utilisateur a-t-il importé sa progression d'emblèmes ?
   hasImported: boolean
+  // clé de faction (ex. AthenasFortune) -> niveau de réputation de l'utilisateur
+  factionLevels: Map<string, number>
 }
 
-// Contexte commendations de l'utilisateur, pour juger l'éligibilité des prérequis.
-// On indexe par nom EN ET par nom de base (selon la langue d'import des emblèmes),
-// pour que le rapprochement avec le nom anglais du wiki marche dans les deux cas.
-function getUserCommendationContext(userId: number): CommendationContext {
+// Contexte de l'utilisateur pour juger l'éligibilité des prérequis (commendations +
+// niveaux de faction). Emblèmes indexés par nom EN ET par nom de base (selon la langue
+// d'import), pour que le rapprochement avec le nom anglais du wiki marche dans les deux cas.
+function getUserEligibilityContext(userId: number): EligibilityContext {
   const db = getReputationDb()
   const rows = db.prepare(`
     SELECT
@@ -1328,11 +1363,15 @@ function getUserCommendationContext(userId: number): CommendationContext {
       }
     }
   }
-  return { grades, emblemNames, hasImported }
+  const factionLevels = new Map<string, number>()
+  const flRows = db.prepare('SELECT faction_key as key, level FROM user_faction_levels WHERE user_id = ?')
+    .all(userId) as Array<{ key: string, level: number }>
+  for (const r of flRows) factionLevels.set(r.key, r.level)
+  return { grades, emblemNames, hasImported, factionLevels }
 }
 
-// Statut d'éligibilité d'un item vs la progression commendations de l'utilisateur.
-function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: CommendationContext): ChestItemEligibility | null {
+// Statut d'éligibilité d'un item vs la progression de l'utilisateur (commendations + factions).
+function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityContext): ChestItemEligibility | null {
   if (!prereqs) return null
   // Garde-fou : des prérequis stockés malformés ne doivent pas faire planter le catalogue.
   const rawComms = Array.isArray(prereqs.commendations) ? prereqs.commendations : []
@@ -1352,16 +1391,30 @@ function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: CommendationC
       met: userGrade !== null && userGrade >= requiredGrade
     }
   })
-  const hasOther = !!prereqs.factionLevels || !!prereqs.legendary || !!prereqs.requires
-  if (commendations.length === 0 && !hasOther) return null
-  // 'locked' : on SAIT qu'une commendation requise n'est pas atteinte (grade connu < requis).
+
+  const rawFl = (prereqs.factionLevels && typeof prereqs.factionLevels === 'object') ? prereqs.factionLevels : {}
+  const factions = Object.entries(rawFl).map(([shortKey, required]) => {
+    const requiredLevel = typeof required === 'number' ? required : 0
+    const factionKey = WIKI_FACTION_TO_KEY[shortKey]
+    // Niveau connu si l'utilisateur a (ré)importé sa réputation, sinon ? (jamais verrouillé à tort).
+    const userLevel = factionKey ? (ctx.factionLevels.get(factionKey) ?? null) : null
+    return { key: shortKey, requiredLevel, userLevel, met: userLevel !== null && userLevel >= requiredLevel }
+  })
+
+  // Conditions encore non vérifiables par les données du site.
+  const hasUnverifiable = !!prereqs.legendary || !!prereqs.requires
+  if (commendations.length === 0 && factions.length === 0 && !hasUnverifiable) return null
+
+  // 'locked' : on SAIT qu'un prérequis (grade ou niveau connu) n'est pas atteint.
   const anyLocked = commendations.some(c => c.userGrade !== null && !c.met)
-  const allCommMet = commendations.length > 0 && commendations.every(c => c.met)
+    || factions.some(f => f.userLevel !== null && !f.met)
+  const hasCheckable = commendations.length > 0 || factions.length > 0
+  const allMet = commendations.every(c => c.met) && factions.every(f => f.met)
   let status: ChestItemEligibility['status']
   if (anyLocked) status = 'locked'
-  else if (allCommMet && !hasOther) status = 'met'
+  else if (hasCheckable && allMet && !hasUnverifiable) status = 'met'
   else status = 'unknown'
-  return { status, commendations }
+  return { status, commendations, factions }
 }
 
 /** Items du coffre possédés par un utilisateur, triés par catégorie puis ordre d'import. */
@@ -1407,9 +1460,9 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   const groupOwners = getChestGroupOwners(db, userId)
   // Contexte commendations de l'utilisateur (pour l'éligibilité des prérequis).
   // Inutile de faire la jointure emblèmes si aucun item du catalogue n'a de prérequis.
-  const commCtx: CommendationContext = rows.some(r => r.prerequisites)
-    ? getUserCommendationContext(userId)
-    : { grades: new Map<string, number>(), emblemNames: new Set<string>(), hasImported: false }
+  const commCtx: EligibilityContext = rows.some(r => r.prerequisites)
+    ? getUserEligibilityContext(userId)
+    : { grades: new Map<string, number>(), emblemNames: new Set<string>(), hasImported: false, factionLevels: new Map<string, number>() }
 
   return rows.map((r) => {
     const prerequisites = parseChestItemPrereqs(r.prerequisites)
@@ -2350,6 +2403,7 @@ export function getUserById(userId: number): UserInfo | null {
 export function deleteUserReputationData(userId: number): void {
   const db = getReputationDb()
   db.prepare('DELETE FROM user_emblems WHERE user_id = ?').run(userId)
+  db.prepare('DELETE FROM user_faction_levels WHERE user_id = ?').run(userId)
   db.prepare('UPDATE users SET last_import_at = NULL WHERE id = ?').run(userId)
 }
 
@@ -2433,6 +2487,7 @@ export function deleteUserAccount(
 
     // 6. Supprimer les données de réputation et le coffre
     db.prepare('DELETE FROM user_emblems WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM user_faction_levels WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM user_chest_items WHERE user_id = ?').run(userId)
 
     // 7. Supprimer l'utilisateur
