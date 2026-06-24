@@ -102,13 +102,6 @@ function subLabel(category: string, sub: string | null): string {
   return taxonomy.value?.subcategories?.[category]?.[sub]?.[locale.value] || humanizeKey(sub)
 }
 
-// Infobulle au survol : co-membres possédant aussi l'item, regroupés par groupe.
-function groupOwnersText(item: ChestItem): string {
-  if (!item.groupOwners.length) return ''
-  const lines = item.groupOwners.map(g => `${g.group} : ${g.members.join(', ')}`)
-  return `${t('yourChest.alsoOwnedBy')} :\n${lines.join('\n')}`
-}
-
 // Nombre de co-membres distincts possédant l'item (pour l'indicateur).
 function groupOwnersCount(item: ChestItem): number {
   const set = new Set<string>()
@@ -589,7 +582,6 @@ watch(
             <div
               class="relative aspect-square bg-muted/20 flex items-center justify-center overflow-hidden"
               :class="item.image ? 'cursor-pointer' : ''"
-              :title="groupOwnersText(item)"
               @click="openItem(item)"
             >
               <NuxtImg
@@ -617,16 +609,17 @@ watch(
               >
                 {{ $t('yourChest.notOwnedBadge') }}
               </UBadge>
+              <!-- Indicateur « a des prérequis » (haut-gauche) : statut si non possédé. -->
               <UBadge
-                v-if="!item.owned && item.eligibility?.status === 'locked'"
-                color="warning"
+                v-if="item.eligibility"
+                :color="!item.owned && item.eligibility.status === 'locked' ? 'warning' : (!item.owned && item.eligibility.status === 'met' ? 'success' : 'neutral')"
                 variant="solid"
                 size="xs"
                 class="absolute top-1 left-1"
-                title="Prérequis non atteint"
+                :title="!item.owned && item.eligibility.status === 'locked' ? 'Prérequis non atteint' : (!item.owned && item.eligibility.status === 'met' ? 'Débloquable' : 'A des prérequis')"
               >
                 <UIcon
-                  name="i-lucide-lock"
+                  :name="!item.owned && item.eligibility.status === 'locked' ? 'i-lucide-lock' : (!item.owned && item.eligibility.status === 'met' ? 'i-lucide-lock-open' : 'i-lucide-scroll-text')"
                   class="w-3 h-3"
                 />
               </UBadge>
@@ -700,15 +693,17 @@ watch(
           {{ $t('yourChest.noResults') }}
         </div>
 
-        <!-- Pagination -->
+        <!-- Pagination (overflow-x-auto + peu de voisins : pas de débordement mobile) -->
         <div
           v-if="totalPages > 1"
-          class="flex justify-center mt-6"
+          class="mt-6 flex justify-center max-w-full overflow-x-auto"
         >
           <UPagination
             v-model:page="currentPage"
             :total="filteredItems.length"
             :items-per-page="pageSize"
+            :sibling-count="1"
+            size="sm"
             show-edges
           />
         </div>
@@ -791,7 +786,15 @@ watch(
               />
               <span class="font-medium">Prérequis</span>
               <UBadge
-                v-if="selectedItem.eligibility?.status === 'met'"
+                v-if="selectedItem.owned"
+                color="primary"
+                variant="subtle"
+                size="xs"
+              >
+                Possédé
+              </UBadge>
+              <UBadge
+                v-else-if="selectedItem.eligibility?.status === 'met'"
                 color="success"
                 variant="subtle"
                 size="xs"
@@ -857,6 +860,38 @@ watch(
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>{{ selectedItem.prerequisites.requires }}</span>
+              </li>
+              <li
+                v-if="(selectedItem.eligibility?.factions || []).some(f => f.userLevel === null)"
+                class="flex items-start gap-2 text-xs text-muted italic"
+              >
+                <UIcon
+                  name="i-lucide-refresh-cw"
+                  class="w-3.5 h-3.5 shrink-0 mt-0.5"
+                />
+                <span>Réimporte ta réputation pour évaluer les niveaux de faction.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Co-membres qui possèdent aussi cet item (déplacé du survol). -->
+          <div
+            v-if="selectedItem?.groupOwners.length"
+            class="mt-4 w-full max-w-md text-sm border-t border-muted/20 pt-3"
+          >
+            <div class="flex items-center gap-2 mb-1.5">
+              <UIcon
+                name="i-lucide-users"
+                class="w-4 h-4 text-muted"
+              />
+              <span class="font-medium">{{ $t('yourChest.alsoOwnedBy') }}</span>
+            </div>
+            <ul class="space-y-0.5 text-muted">
+              <li
+                v-for="g in selectedItem.groupOwners"
+                :key="g.group"
+              >
+                <span class="font-medium">{{ g.group }}</span> : {{ g.members.join(', ') }}
               </li>
             </ul>
           </div>

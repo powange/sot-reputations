@@ -1393,13 +1393,15 @@ function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityCo
   })
 
   const rawFl = (prereqs.factionLevels && typeof prereqs.factionLevels === 'object') ? prereqs.factionLevels : {}
-  const factions = Object.entries(rawFl).map(([shortKey, required]) => {
-    const requiredLevel = typeof required === 'number' ? required : 0
-    const factionKey = WIKI_FACTION_TO_KEY[shortKey]
-    // Niveau connu si l'utilisateur a (ré)importé sa réputation, sinon ? (jamais verrouillé à tort).
-    const userLevel = factionKey ? (ctx.factionLevels.get(factionKey) ?? null) : null
-    return { key: shortKey, requiredLevel, userLevel, met: userLevel !== null && userLevel >= requiredLevel }
-  })
+  const factions = Object.entries(rawFl)
+    .filter(([, required]) => typeof required === 'number' && required > 0)
+    .map(([shortKey, required]) => {
+      const requiredLevel = required as number
+      const factionKey = WIKI_FACTION_TO_KEY[shortKey]
+      // Niveau connu si l'utilisateur a (ré)importé sa réputation, sinon ? (jamais verrouillé à tort).
+      const userLevel = factionKey ? (ctx.factionLevels.get(factionKey) ?? null) : null
+      return { key: shortKey, requiredLevel, userLevel, met: userLevel !== null && userLevel >= requiredLevel }
+    })
 
   // Conditions encore non vérifiables par les données du site.
   const hasUnverifiable = !!prereqs.legendary || !!prereqs.requires

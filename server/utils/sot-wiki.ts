@@ -76,7 +76,8 @@ export function normalizeName(s: string): string {
  * pour ne PAS s'arrêter au premier `}}` d'un éventuel template imbriqué.
  */
 function extractVariantBody(wikitext: string): string | null {
-  const m = wikitext.match(/\{\{\s*variant/i)
+  // `\b` : ne pas matcher {{variants}} / {{variantfoo}} (un autre template).
+  const m = wikitext.match(/\{\{\s*variant\b/i)
   if (!m || m.index == null) return null
   const start = m.index + m[0].length
   let depth = 1
@@ -92,8 +93,12 @@ function extractVariantBody(wikitext: string): string | null {
       i++
     }
   }
+  // Infobox non fermée (accolades déséquilibrées) : on n'extrait rien plutôt que de
+  // capturer le reste de la page (qui contiendrait des `|` d'autres templates).
+  if (depth !== 0) return null
   // depth === 0 -> i pointe juste après le `}}` fermant : le corps est [start, i-2).
-  return depth === 0 ? wikitext.slice(start, i - 2) : wikitext.slice(start)
+  // On retire les commentaires HTML (leurs chiffres fausseraient les coûts).
+  return wikitext.slice(start, i - 2).replace(/<!--[\s\S]*?-->/g, '')
 }
 
 /** Allège un fragment de wikitext (liens, gras, refs, templates) pour l'affichage. */
