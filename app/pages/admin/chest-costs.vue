@@ -170,7 +170,7 @@ async function apply() {
   try {
     const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
       method: 'POST',
-      body: { items: toApply.map(m => ({ id: m.id, cost: m.cost, prereqs: m.prereqs })) }
+      body: { items: toApply.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }) }
     })
     toast.add({ title: `${res.updated} coût(s) appliqué(s)`, color: 'success' })
     result.value = null
@@ -217,9 +217,11 @@ async function runBulk() {
           body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCat }
         })
         // Écrit coût (matchés) + prérequis (matchés ET sans-coût) de tout le scope.
+        // On n'envoie prereqs QUE s'il est non-null : un null effacerait les prérequis
+        // déjà importés (ex. faux négatif de parsing). Import = backfill/mise à jour.
         const items = [
-          ...res.matched.map(m => ({ id: m.id, cost: m.cost, prereqs: m.prereqs })),
-          ...res.noCost.map(n => ({ id: n.id, prereqs: n.prereqs }))
+          ...res.matched.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
+          ...res.noCost.filter(n => n.prereqs).map(n => ({ id: n.id, prereqs: n.prereqs }))
         ]
         if (items.length) {
           const ap = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {

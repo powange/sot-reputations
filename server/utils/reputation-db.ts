@@ -1300,40 +1300,70 @@ function normalizeMatch(s: string): string {
     .toLowerCase()
 }
 
-// Grade atteint par l'utilisateur pour chaque emblème, indexé par nom EN normalisé.
-function getUserCommendationGrades(userId: number): Map<string, number> {
+interface CommendationContext {
+  // nom d'emblème normalisé (EN ET base) -> grade gagné par l'utilisateur
+  grades: Map<string, number>
+  // tous les noms d'emblèmes connus (EN + base), normalisés
+  emblemNames: Set<string>
+  // l'utilisateur a-t-il importé sa progression d'emblèmes ?
+  hasImported: boolean
+}
+
+// Contexte commendations de l'utilisateur, pour juger l'éligibilité des prérequis.
+// On indexe par nom EN ET par nom de base (selon la langue d'import des emblèmes),
+// pour que le rapprochement avec le nom anglais du wiki marche dans les deux cas.
+function getUserCommendationContext(userId: number): CommendationContext {
   const db = getReputationDb()
   const rows = db.prepare(`
-    SELECT COALESCE(NULLIF(et.name, ''), e.name) as name, COALESCE(ue.grade, 0) as grade
+    SELECT
+      COALESCE(NULLIF(et.name, ''), e.name) as enName,
+      e.name as baseName,
+      ue.grade as grade
     FROM emblems e
     LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = 'en'
     LEFT JOIN user_emblems ue ON ue.emblem_id = e.id AND ue.user_id = ?
-  `).all(userId) as Array<{ name: string, grade: number }>
-  const map = new Map<string, number>()
+  `).all(userId) as Array<{ enName: string, baseName: string, grade: number | null }>
+  const grades = new Map<string, number>()
+  const emblemNames = new Set<string>()
+  let hasImported = false
   for (const r of rows) {
-    const key = normalizeMatch(r.name)
-    const prev = map.get(key)
-    if (prev == null || r.grade > prev) map.set(key, r.grade)
+    const keys = new Set([normalizeMatch(r.enName), normalizeMatch(r.baseName)])
+    for (const k of keys) emblemNames.add(k)
+    if (r.grade !== null) {
+      hasImported = true
+      for (const k of keys) {
+        const prev = grades.get(k)
+        if (prev == null || r.grade > prev) grades.set(k, r.grade)
+      }
+    }
   }
-  return map
+  return { grades, emblemNames, hasImported }
 }
 
 // Statut d'éligibilité d'un item vs la progression commendations de l'utilisateur.
-function computeEligibility(prereqs: ChestItemPrereqs | null, commGrades: Map<string, number>): ChestItemEligibility | null {
+function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: CommendationContext): ChestItemEligibility | null {
   if (!prereqs) return null
-  const commendations = (prereqs.commendations ?? []).map((c) => {
-    const requiredGrade = c.grade ?? 1
-    const userGrade = commGrades.get(normalizeMatch(c.name))
+  // Garde-fou : des prérequis stockés malformés ne doivent pas faire planter le catalogue.
+  const rawComms = Array.isArray(prereqs.commendations) ? prereqs.commendations : []
+  const commendations = rawComms.map((c) => {
+    const requiredGrade = typeof c.grade === 'number' ? c.grade : 1
+    const key = normalizeMatch(c.name)
+    // grade connu / emblème existant mais sans progression (0 si importé, sinon ?) /
+    // aucun emblème correspondant (?).
+    let userGrade: number | null
+    if (ctx.grades.has(key)) userGrade = ctx.grades.get(key)!
+    else if (ctx.emblemNames.has(key)) userGrade = ctx.hasImported ? 0 : null
+    else userGrade = null
     return {
       name: c.name,
       requiredGrade,
-      userGrade: userGrade ?? null,
-      met: userGrade !== undefined && userGrade >= requiredGrade
+      userGrade,
+      met: userGrade !== null && userGrade >= requiredGrade
     }
   })
   const hasOther = !!prereqs.factionLevels || !!prereqs.legendary || !!prereqs.requires
   if (commendations.length === 0 && !hasOther) return null
-  // 'locked' : on SAIT qu'une commendation requise n'est pas atteinte.
+  // 'locked' : on SAIT qu'une commendation requise n'est pas atteinte (grade connu < requis).
   const anyLocked = commendations.some(c => c.userGrade !== null && !c.met)
   const allCommMet = commendations.length > 0 && commendations.every(c => c.met)
   let status: ChestItemEligibility['status']
@@ -1384,8 +1414,8 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
 
   // Co-membres (de tous les groupes de l'utilisateur) possédant chaque item.
   const groupOwners = getChestGroupOwners(db, userId)
-  // Grades commendations de l'utilisateur (pour l'éligibilité des prérequis).
-  const commGrades = getUserCommendationGrades(userId)
+  // Contexte commendations de l'utilisateur (pour l'éligibilité des prérequis).
+  const commCtx = getUserCommendationContext(userId)
 
   return rows.map((r) => {
     const prerequisites = parseChestItemPrereqs(r.prerequisites)
@@ -1401,7 +1431,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
       colors: parseColors(r.colors),
       cost: parseChestItemCost(r.cost),
       prerequisites,
-      eligibility: computeEligibility(prerequisites, commGrades),
+      eligibility: computeEligibility(prerequisites, commCtx),
       groupOwners: groupOwners.get(r.id) || []
     }
   })
