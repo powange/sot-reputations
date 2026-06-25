@@ -1486,11 +1486,45 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   })
 }
 
+// Index inverse « nom de commendation normalisé -> [{ itemId, grade requis }] », mis en
+// cache (les prérequis ne changent qu'à l'import admin). Évite de re-scanner + re-parser
+// tous les prérequis à chaque ouverture de popup. Invalidé par setChestItemPrereqs.
+let prereqCommIndex: Map<string, Array<{ id: number, grade: number | null }>> | null = null
+let prereqCommIndexAt = 0
+const PREREQ_INDEX_TTL = 5 * 60 * 1000
+
+function invalidatePrereqIndex(): void {
+  prereqCommIndex = null
+}
+
+function getPrereqCommIndex(db: Database.Database): Map<string, Array<{ id: number, grade: number | null }>> {
+  const now = Date.now()
+  if (prereqCommIndex && now - prereqCommIndexAt < PREREQ_INDEX_TTL) return prereqCommIndex
+  const rows = db.prepare(`
+    SELECT id, prerequisites FROM chest_items WHERE prerequisites IS NOT NULL AND prerequisites != ''
+  `).all() as Array<{ id: number, prerequisites: string | null }>
+  const idx = new Map<string, Array<{ id: number, grade: number | null }>>()
+  for (const r of rows) {
+    const pr = parseChestItemPrereqs(r.prerequisites)
+    if (!pr?.commendations) continue
+    for (const c of pr.commendations) {
+      const key = normalizeName(c.name)
+      const arr = idx.get(key)
+      if (arr) arr.push({ id: r.id, grade: c.grade ?? null })
+      else idx.set(key, [{ id: r.id, grade: c.grade ?? null }])
+    }
+  }
+  prereqCommIndex = idx
+  prereqCommIndexAt = now
+  return idx
+}
+
 /**
  * Vue inverse : objets du coffre dont l'emblème donné est un prérequis (commendation).
- * Rapproche le nom EN/base de l'emblème des commendations stockées dans les prérequis.
+ * Rapproche le nom EN/base de l'emblème des commendations des prérequis ; noms d'objets
+ * résolus selon la locale. Borné à 100 résultats.
  */
-export function getChestItemsForEmblem(emblemId: number): Array<{ id: number, name: string, image: string | null, subcategory: string | null, grade: number | null }> {
+export function getChestItemsForEmblem(emblemId: number, locale = 'fr'): Array<{ id: number, name: string, image: string | null, grade: number | null }> {
   const db = getReputationDb()
   const e = db.prepare(`
     SELECT COALESCE(NULLIF(et.name, ''), em.name) as enName, em.name as baseName
@@ -1499,24 +1533,27 @@ export function getChestItemsForEmblem(emblemId: number): Array<{ id: number, na
     WHERE em.id = ?
   `).get(emblemId) as { enName: string, baseName: string } | undefined
   if (!e) return []
-  const keys = new Set([normalizeName(e.enName), normalizeName(e.baseName)])
 
-  const rows = db.prepare(`
-    SELECT id, name, image, subcategory, prerequisites
-    FROM chest_items
-    WHERE prerequisites IS NOT NULL AND prerequisites != ''
-    ORDER BY sort_order
-  `).all() as Array<{ id: number, name: string, image: string | null, subcategory: string | null, prerequisites: string | null }>
-
-  const out: Array<{ id: number, name: string, image: string | null, subcategory: string | null, grade: number | null }> = []
-  for (const r of rows) {
-    const pr = parseChestItemPrereqs(r.prerequisites)
-    const match = pr?.commendations?.find(c => keys.has(normalizeName(c.name)))
-    if (match) {
-      out.push({ id: r.id, name: r.name, image: r.image, subcategory: r.subcategory, grade: match.grade ?? null })
+  const idx = getPrereqCommIndex(db)
+  const gradeById = new Map<number, number | null>()
+  for (const key of new Set([normalizeName(e.enName), normalizeName(e.baseName)])) {
+    for (const m of idx.get(key) || []) {
+      if (!gradeById.has(m.id)) gradeById.set(m.id, m.grade)
     }
   }
-  return out
+  if (gradeById.size === 0) return []
+  const ids = [...gradeById.keys()].slice(0, 100)
+
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = db.prepare(`
+    SELECT ci.id, COALESCE(NULLIF(t.name, ''), ci.name) as name, ci.image
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
+    WHERE ci.id IN (${placeholders})
+    ORDER BY ci.sort_order
+  `).all(locale, ...ids) as Array<{ id: number, name: string, image: string | null }>
+
+  return rows.map(r => ({ id: r.id, name: r.name, image: r.image, grade: gradeById.get(r.id) ?? null }))
 }
 
 function parseColors(json: string | null): string[] {
@@ -1714,6 +1751,7 @@ export function setChestItemPrereqs(id: number, prereqs: ChestItemPrereqs | null
   const db = getReputationDb()
   const value = prereqs && Object.keys(prereqs).length > 0 ? JSON.stringify(prereqs) : null
   const res = db.prepare('UPDATE chest_items SET prerequisites = ? WHERE id = ?').run(value, id)
+  invalidatePrereqIndex()
   return res.changes > 0
 }
 

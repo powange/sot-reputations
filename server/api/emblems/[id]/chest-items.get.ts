@@ -10,5 +10,7 @@ export default defineEventHandler((event) => {
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'id invalide' })
   }
-  return { items: getChestItemsForEmblem(id) }
+  const localeRaw = String(getQuery(event).locale || 'fr')
+  const locale = ['fr', 'en', 'es'].includes(localeRaw) ? localeRaw : 'fr'
+  return { items: getChestItemsForEmblem(id, locale) }
 })

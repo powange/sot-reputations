@@ -6,18 +6,27 @@ const props = defineProps<{
   emblemId?: number
 }>()
 
+const { locale } = useI18n()
 const isImageModalOpen = ref(false)
 
 // Vue inverse : objets du coffre dont cet emblème est un prérequis (chargé à l'ouverture).
-interface ChestItemRef { id: number, name: string, image: string | null, subcategory: string | null, grade: number | null }
+interface ChestItemRef { id: number, name: string, image: string | null, grade: number | null }
 const chestItems = ref<ChestItemRef[]>([])
 const itemsLoaded = ref(false)
+
+// Cellule réutilisée pour un autre emblème (réordonnancement de table) -> on reset.
+watch(() => props.emblemId, () => {
+  itemsLoaded.value = false
+  chestItems.value = []
+})
 
 watch(isImageModalOpen, async (open) => {
   if (!open || !props.emblemId || itemsLoaded.value) return
   itemsLoaded.value = true
   try {
-    const res = await $fetch<{ items: ChestItemRef[] }>(`/api/emblems/${props.emblemId}/chest-items`)
+    const res = await $fetch<{ items: ChestItemRef[] }>(`/api/emblems/${props.emblemId}/chest-items`, {
+      query: { locale: locale.value }
+    })
     chestItems.value = res.items
   } catch {
     itemsLoaded.value = false // autorise un nouvel essai à la prochaine ouverture
