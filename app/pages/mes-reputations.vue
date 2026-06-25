@@ -329,7 +329,7 @@ async function handleDelete() {
 
     <template v-else>
       <!-- Header -->
-      <div class="flex justify-between items-start mb-8">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
         <div>
           <div class="flex items-center gap-2 mb-2">
             <NuxtLink
