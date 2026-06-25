@@ -211,6 +211,7 @@
   },
   "yourChest": {
     "title": "Tu Cofre",
+    "publicTitle": "El Cofre",
     "subtitle": "Los objetos que posees en tu cuenta de Sea of Thieves.",
     "searchPlaceholder": "Buscar un objeto...",
     "allCategories": "Todas las categorías",

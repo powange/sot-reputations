@@ -1486,6 +1486,56 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   })
 }
 
+/**
+ * Catalogue public du coffre : tous les items connus, sans données liées à un
+ * utilisateur (owned = false, groupOwners vides). Coûts + prérequis présents ;
+ * l'éligibilité ne porte que les exigences (pas de progression utilisateur).
+ */
+export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT
+      ci.id, ci.uid, ci.category, ci.subcategory,
+      COALESCE(NULLIF(t.name, ''), ci.name) as name,
+      COALESCE(NULLIF(t.description, ''), ci.description) as description,
+      ci.image, ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
+  `).all(locale) as Array<{
+    id: number
+    uid: string
+    category: string
+    subcategory: string | null
+    name: string
+    description: string | null
+    image: string | null
+    sortOrder: number
+    colors: string | null
+    cost: string | null
+    prerequisites: string | null
+  }>
+  rows.sort(compareChestRows)
+  const emptyCtx: EligibilityContext = { grades: new Map(), emblemNames: new Set(), hasImported: false, factionLevels: new Map() }
+  return rows.map((r) => {
+    const prerequisites = parseChestItemPrereqs(r.prerequisites)
+    return {
+      id: r.id,
+      uid: r.uid,
+      category: r.category,
+      subcategory: r.subcategory,
+      name: r.name,
+      description: r.description,
+      image: r.image,
+      owned: false,
+      colors: parseColors(r.colors),
+      cost: parseChestItemCost(r.cost),
+      prerequisites,
+      eligibility: computeEligibility(prerequisites, emptyCtx),
+      groupOwners: []
+    }
+  })
+}
+
 // Index inverse « nom de commendation normalisé -> [{ itemId, grade requis }] », mis en
 // cache (les prérequis ne changent qu'à l'import admin). Évite de re-scanner + re-parser
 // tous les prérequis à chaque ouverture de popup. Invalidé par setChestItemPrereqs.

@@ -28,7 +28,7 @@ useSeoMeta({
 const navItems = computed(() => {
   const items = [
     { label: t('nav.myReputations'), to: '/mes-reputations', icon: 'i-lucide-trophy', requiresAuth: true, requiresAdmin: false },
-    { label: t('nav.yourChest'), to: '/your-chest', icon: 'i-lucide-package', requiresAuth: true, requiresAdmin: false },
+    { label: isAuthenticated.value ? t('nav.yourChest') : t('yourChest.publicTitle'), to: isAuthenticated.value ? '/your-chest' : '/coffre', icon: 'i-lucide-package', requiresAuth: false, requiresAdmin: false },
     { label: t('nav.myGroups'), to: '/', icon: 'i-lucide-users', requiresAuth: true, requiresAdmin: false },
     { label: t('nav.tutorial'), to: '/tutoriel', icon: 'i-lucide-help-circle', requiresAuth: false, requiresAdmin: false },
     { label: t('nav.releaseNotes'), to: '/release-notes', icon: 'i-lucide-scroll-text', requiresAuth: false, requiresAdmin: false },

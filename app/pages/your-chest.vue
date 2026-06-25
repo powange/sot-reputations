@@ -1,13 +1,18 @@
 <script setup lang="ts">
 const { t, locale } = useI18n()
 const { isAuthenticated, saveRedirectUrl } = useAuth()
+const route = useRoute()
+// Mode public (catalogue « Le coffre », sans données ni filtres liés à l'utilisateur).
+const isPublic = computed(() => route.path === '/coffre')
+
+definePageMeta({ alias: ['/coffre'] })
 
 useSeoMeta({
-  title: () => `${t('yourChest.title')} - SoT Reputations`
+  title: () => `${isPublic.value ? t('yourChest.publicTitle') : t('yourChest.title')} - SoT Reputations`
 })
 
-// Rediriger si non connecté (en sauvegardant l'URL pour y revenir après connexion)
-if (!isAuthenticated.value) {
+// Rediriger si non connecté (sauf en mode public, accessible à tous)
+if (!isPublic.value && !isAuthenticated.value) {
   saveRedirectUrl()
   navigateTo('/')
 }
@@ -44,9 +49,10 @@ interface TaxonomyMap {
 
 // La locale est passée au serveur pour résoudre les noms d'items (FR/EN/ES) ;
 // useFetch refait l'appel automatiquement au changement de langue.
-const { data, status, error } = await useFetch<ChestItem[]>('/api/my-chest', {
-  query: { locale }
-})
+const { data, status, error } = await useFetch<ChestItem[]>(
+  () => (isPublic.value ? '/api/chest' : '/api/my-chest'),
+  { query: { locale } }
+)
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
 const { data: palette } = await useFetch<Array<{ name: string, hex: string }>>('/api/chest-colors')
 const items = computed(() => data.value || [])
@@ -112,7 +118,6 @@ function groupOwnersCount(item: ChestItem): number {
 }
 
 // --- Filtres (synchronisés avec l'URL : liens partageables + retour arrière fidèle) ---
-const route = useRoute()
 const router = useRouter()
 
 // Une valeur de query peut être string | string[] | undefined selon l'URL.
@@ -240,9 +245,10 @@ function toggleSubcategory(key: string) {
 
 const filteredItems = computed(() => {
   let list = items.value
-  if (ownershipFilter.value === 'owned') {
+  // Filtres liés à l'utilisateur : ignorés en mode public.
+  if (!isPublic.value && ownershipFilter.value === 'owned') {
     list = list.filter(i => i.owned)
-  } else if (ownershipFilter.value === 'notowned') {
+  } else if (!isPublic.value && ownershipFilter.value === 'notowned') {
     list = list.filter(i => !i.owned)
   }
   if (selectedCategories.value.length) {
@@ -264,7 +270,7 @@ const filteredItems = computed(() => {
     // OU : l'item a un coût dans au moins une des devises sélectionnées.
     list = list.filter(i => !!i.cost && selectedCurrencies.value.some(c => (i.cost as Record<string, number | undefined>)[c] != null))
   }
-  if (eligibilityFilter.value !== 'all') {
+  if (!isPublic.value && eligibilityFilter.value !== 'all') {
     list = eligibilityFilter.value === 'prereq'
       ? list.filter(i => i.eligibility != null)
       : list.filter(i => i.eligibility?.status === eligibilityFilter.value)
@@ -370,7 +376,7 @@ watch(
             />
           </NuxtLink>
           <h1 class="text-3xl font-pirate">
-            {{ $t('yourChest.title') }}
+            {{ isPublic ? $t('yourChest.publicTitle') : $t('yourChest.title') }}
           </h1>
         </div>
         <p class="text-muted">
@@ -395,9 +401,9 @@ watch(
         </p>
       </div>
 
-      <!-- Aucun item importé (l'utilisateur ne possède rien) -->
+      <!-- Aucun item importé (l'utilisateur ne possède rien) — masqué en mode public -->
       <div
-        v-else-if="ownedCount === 0"
+        v-else-if="!isPublic && ownedCount === 0"
         class="text-center py-16"
       >
         <UIcon
@@ -427,6 +433,7 @@ watch(
             class="w-full sm:w-72"
           />
           <USelectMenu
+            v-if="!isPublic"
             v-model="ownershipFilter"
             :items="ownershipOptions"
             value-key="value"
@@ -554,8 +561,11 @@ watch(
           </UButton>
         </div>
 
-        <!-- Filtre prérequis (éligibilité) -->
-        <div class="flex items-center gap-2 flex-wrap mb-3">
+        <!-- Filtre prérequis (éligibilité) — masqué en public -->
+        <div
+          v-if="!isPublic"
+          class="flex items-center gap-2 flex-wrap mb-3"
+        >
           <span class="text-sm font-medium text-muted">Prérequis :</span>
           <UButton
             v-for="opt in eligibilityOptions"
@@ -601,7 +611,7 @@ watch(
                 class="w-8 h-8 text-muted"
               />
               <UBadge
-                v-if="!item.owned"
+                v-if="!isPublic && !item.owned"
                 color="error"
                 variant="solid"
                 size="xs"
@@ -817,13 +827,16 @@ watch(
                 class="flex items-start gap-2"
               >
                 <UIcon
-                  :name="c.met ? 'i-lucide-circle-check' : (c.userGrade === null ? 'i-lucide-circle-help' : 'i-lucide-circle-x')"
-                  :class="c.met ? 'text-success' : (c.userGrade === null ? 'text-muted' : 'text-warning')"
+                  :name="isPublic ? 'i-lucide-award' : (c.met ? 'i-lucide-circle-check' : (c.userGrade === null ? 'i-lucide-circle-help' : 'i-lucide-circle-x'))"
+                  :class="isPublic ? 'text-muted' : (c.met ? 'text-success' : (c.userGrade === null ? 'text-muted' : 'text-warning'))"
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
                   Commendation <span class="font-medium">{{ c.name }}</span> — grade {{ c.requiredGrade }}
-                  <span class="text-muted">(toi : {{ c.userGrade === null ? '?' : c.userGrade }})</span>
+                  <span
+                    v-if="!isPublic"
+                    class="text-muted"
+                  >(toi : {{ c.userGrade === null ? '?' : c.userGrade }})</span>
                 </span>
               </li>
               <li
@@ -832,13 +845,16 @@ watch(
                 class="flex items-start gap-2"
               >
                 <UIcon
-                  :name="f.met ? 'i-lucide-circle-check' : (f.userLevel === null ? 'i-lucide-flag' : 'i-lucide-circle-x')"
-                  :class="f.met ? 'text-success' : (f.userLevel === null ? 'text-muted' : 'text-warning')"
+                  :name="isPublic ? 'i-lucide-flag' : (f.met ? 'i-lucide-circle-check' : (f.userLevel === null ? 'i-lucide-flag' : 'i-lucide-circle-x'))"
+                  :class="isPublic ? 'text-muted' : (f.met ? 'text-success' : (f.userLevel === null ? 'text-muted' : 'text-warning'))"
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
                   Réputation <span class="font-medium">{{ factionLabel(f.key) }}</span> ≥ {{ f.requiredLevel }}
-                  <span class="text-muted">(toi : {{ f.userLevel === null ? '?' : f.userLevel }})</span>
+                  <span
+                    v-if="!isPublic"
+                    class="text-muted"
+                  >(toi : {{ f.userLevel === null ? '?' : f.userLevel }})</span>
                 </span>
               </li>
               <li
@@ -862,7 +878,7 @@ watch(
                 <span>{{ selectedItem.prerequisites.requires }}</span>
               </li>
               <li
-                v-if="(selectedItem.eligibility?.factions || []).some(f => f.userLevel === null)"
+                v-if="!isPublic && (selectedItem.eligibility?.factions || []).some(f => f.userLevel === null)"
                 class="flex items-start gap-2 text-xs text-muted italic"
               >
                 <UIcon

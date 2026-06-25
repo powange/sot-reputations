@@ -211,6 +211,7 @@
   },
   "yourChest": {
     "title": "Your Chest",
+    "publicTitle": "The Chest",
     "subtitle": "The items you own on your Sea of Thieves account.",
     "searchPlaceholder": "Search an item...",
     "allCategories": "All categories",

@@ -211,6 +211,7 @@
   },
   "yourChest": {
     "title": "Mon coffre",
+    "publicTitle": "Le coffre",
     "subtitle": "Les objets que vous possédez sur votre compte Sea of Thieves.",
     "searchPlaceholder": "Rechercher un objet...",
     "allCategories": "Toutes les catégories",
