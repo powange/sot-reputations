@@ -446,28 +446,30 @@ async function handleDelete() {
           </div>
         </div>
 
-        <!-- Filtres -->
-        <ReputationFilters
-          v-model:search-query="searchQuery"
-          v-model:selected-faction-keys="selectedFactionKeys"
-          v-model:selected-campaign-ids="selectedCampaignIds"
-          v-model:emblem-completion-filter="emblemCompletionFilter"
-          :factions="factions"
-          :show-completion-filter="hasImportedData"
-        >
-          <template #completion-extra>
-            <div
-              v-if="emblemCompletionFilter === 'incomplete'"
-              class="flex items-center gap-2 ml-4 pl-4 border-l border-muted"
-            >
-              <USwitch
-                v-model="ignoreWithoutData"
-                size="sm"
-              />
-              <span class="text-sm text-muted">{{ $t('reputations.ignoreWithoutData') }}</span>
-            </div>
-          </template>
-        </ReputationFilters>
+        <!-- Filtres (en ligne sur desktop, dans une modale sur mobile) -->
+        <FilterPanel>
+          <ReputationFilters
+            v-model:search-query="searchQuery"
+            v-model:selected-faction-keys="selectedFactionKeys"
+            v-model:selected-campaign-ids="selectedCampaignIds"
+            v-model:emblem-completion-filter="emblemCompletionFilter"
+            :factions="factions"
+            :show-completion-filter="hasImportedData"
+          >
+            <template #completion-extra>
+              <div
+                v-if="emblemCompletionFilter === 'incomplete'"
+                class="flex items-center gap-2 ml-4 pl-4 border-l border-muted"
+              >
+                <USwitch
+                  v-model="ignoreWithoutData"
+                  size="sm"
+                />
+                <span class="text-sm text-muted">{{ $t('reputations.ignoreWithoutData') }}</span>
+              </div>
+            </template>
+          </ReputationFilters>
+        </FilterPanel>
 
         <!-- Message si pas de données importées (masqué en public) -->
         <UAlert

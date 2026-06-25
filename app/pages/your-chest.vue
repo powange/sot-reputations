@@ -444,139 +444,142 @@ watch(
           </span>
         </div>
 
-        <!-- Filtre catégories (multi-sélection) -->
-        <div class="flex flex-wrap gap-2 mb-3">
-          <UButton
-            :color="allCategoriesSelected ? 'primary' : 'neutral'"
-            :variant="allCategoriesSelected ? 'solid' : 'outline'"
-            size="sm"
-            @click="clearCategories"
-          >
-            {{ $t('yourChest.allCategories') }}
-          </UButton>
-          <UButton
-            v-for="cat in categories"
-            :key="cat"
-            :color="selectedCategories.includes(cat) ? 'primary' : 'neutral'"
-            :variant="selectedCategories.includes(cat) ? 'solid' : 'outline'"
-            size="sm"
-            @click="toggleCategory(cat)"
-          >
-            {{ catLabel(cat) }}
-          </UButton>
-        </div>
-
-        <!-- Filtre sous-catégories (des catégories sélectionnées) -->
-        <template v-if="subcategoryGroups.length > 0">
-          <div
-            v-for="group in subcategoryGroups"
-            :key="group.category"
-            class="flex items-center gap-2 flex-wrap mb-2"
-          >
-            <span class="text-sm font-medium text-muted">{{ catLabel(group.category) }} :</span>
+        <!-- Filtres (en ligne sur desktop, dans une modale sur mobile) -->
+        <FilterPanel>
+          <!-- Filtre catégories (multi-sélection) -->
+          <div class="flex flex-wrap gap-2 mb-3">
             <UButton
-              v-for="sub in group.subcategories"
-              :key="sub"
-              :color="selectedSubcategories.includes(subKey(group.category, sub)) ? 'info' : 'neutral'"
-              :variant="selectedSubcategories.includes(subKey(group.category, sub)) ? 'solid' : 'outline'"
+              :color="allCategoriesSelected ? 'primary' : 'neutral'"
+              :variant="allCategoriesSelected ? 'solid' : 'outline'"
               size="sm"
-              @click="toggleSubcategory(subKey(group.category, sub))"
+              @click="clearCategories"
             >
-              {{ subLabel(group.category, sub) }}
+              {{ $t('yourChest.allCategories') }}
+            </UButton>
+            <UButton
+              v-for="cat in categories"
+              :key="cat"
+              :color="selectedCategories.includes(cat) ? 'primary' : 'neutral'"
+              :variant="selectedCategories.includes(cat) ? 'solid' : 'outline'"
+              size="sm"
+              @click="toggleCategory(cat)"
+            >
+              {{ catLabel(cat) }}
             </UButton>
           </div>
-        </template>
 
-        <!-- Filtre couleur principale (colors[0]) -->
-        <div
-          v-if="(palette || []).length"
-          class="flex items-center gap-2 flex-wrap mb-2"
-        >
-          <span class="text-sm font-medium text-muted">{{ $t('yourChest.primaryColor') }} :</span>
-          <UButton
-            v-for="c in (palette || [])"
-            :key="c.name"
-            :color="selectedPrimaryColors.includes(c.name) ? 'primary' : 'neutral'"
-            :variant="selectedPrimaryColors.includes(c.name) ? 'solid' : 'outline'"
-            size="sm"
-            @click="toggleColor('primary', c.name)"
-          >
-            <span
-              class="inline-block w-3 h-3 rounded-full border border-muted/40"
-              :style="{ backgroundColor: c.hex }"
-            />
-            {{ colorLabel(c.name) }}
-          </UButton>
-        </div>
-
-        <!-- Filtre couleurs secondaires (colors[1..]) -->
-        <div
-          v-if="(palette || []).length"
-          class="flex items-center gap-2 flex-wrap mb-3"
-        >
-          <span class="text-sm font-medium text-muted">{{ $t('yourChest.secondaryColors') }} :</span>
-          <label
-            class="flex items-center gap-1.5 cursor-pointer"
-            :title="$t('yourChest.secondaryColorsMatchAllTooltip')"
-          >
-            <USwitch
-              v-model="secondaryColorsMatchAll"
-              size="sm"
-            />
-            <span class="text-sm text-muted">{{ $t('yourChest.secondaryColorsMatchAll') }}</span>
-          </label>
-          <UButton
-            v-for="c in (palette || [])"
-            :key="c.name"
-            :color="selectedSecondaryColors.includes(c.name) ? 'info' : 'neutral'"
-            :variant="selectedSecondaryColors.includes(c.name) ? 'solid' : 'outline'"
-            size="sm"
-            @click="toggleColor('secondary', c.name)"
-          >
-            <span
-              class="inline-block w-3 h-3 rounded-full border border-muted/40"
-              :style="{ backgroundColor: c.hex }"
-            />
-            {{ colorLabel(c.name) }}
-          </UButton>
-        </div>
-
-        <!-- Filtre devises (coût) -->
-        <div class="flex items-center gap-2 flex-wrap mb-3">
-          <span class="text-sm font-medium text-muted">Devises :</span>
-          <UButton
-            v-for="cur in currencyOptions"
-            :key="cur.key"
-            :color="selectedCurrencies.includes(cur.key) ? 'primary' : 'neutral'"
-            :variant="selectedCurrencies.includes(cur.key) ? 'solid' : 'outline'"
-            size="sm"
-            @click="toggleCurrency(cur.key)"
-          >
-            <img
-              :src="cur.icon"
-              :alt="cur.label"
-              class="w-4 h-4"
+          <!-- Filtre sous-catégories (des catégories sélectionnées) -->
+          <template v-if="subcategoryGroups.length > 0">
+            <div
+              v-for="group in subcategoryGroups"
+              :key="group.category"
+              class="flex items-center gap-2 flex-wrap mb-2"
             >
-            {{ cur.label }}
-          </UButton>
-        </div>
+              <span class="text-sm font-medium text-muted">{{ catLabel(group.category) }} :</span>
+              <UButton
+                v-for="sub in group.subcategories"
+                :key="sub"
+                :color="selectedSubcategories.includes(subKey(group.category, sub)) ? 'info' : 'neutral'"
+                :variant="selectedSubcategories.includes(subKey(group.category, sub)) ? 'solid' : 'outline'"
+                size="sm"
+                @click="toggleSubcategory(subKey(group.category, sub))"
+              >
+                {{ subLabel(group.category, sub) }}
+              </UButton>
+            </div>
+          </template>
 
-        <!-- Filtre prérequis (éligibilité) — masqué en public -->
-        <div
-          v-if="!isPublic"
-          class="flex items-center gap-2 flex-wrap mb-3"
-        >
-          <span class="text-sm font-medium text-muted">Prérequis :</span>
-          <UButton
-            v-for="opt in eligibilityOptions"
-            :key="opt.value"
-            :label="opt.label"
-            size="sm"
-            :color="eligibilityFilter === opt.value ? 'primary' : 'neutral'"
-            :variant="eligibilityFilter === opt.value ? 'solid' : 'outline'"
-            @click="eligibilityFilter = opt.value"
-          />
-        </div>
+          <!-- Filtre couleur principale (colors[0]) -->
+          <div
+            v-if="(palette || []).length"
+            class="flex items-center gap-2 flex-wrap mb-2"
+          >
+            <span class="text-sm font-medium text-muted">{{ $t('yourChest.primaryColor') }} :</span>
+            <UButton
+              v-for="c in (palette || [])"
+              :key="c.name"
+              :color="selectedPrimaryColors.includes(c.name) ? 'primary' : 'neutral'"
+              :variant="selectedPrimaryColors.includes(c.name) ? 'solid' : 'outline'"
+              size="sm"
+              @click="toggleColor('primary', c.name)"
+            >
+              <span
+                class="inline-block w-3 h-3 rounded-full border border-muted/40"
+                :style="{ backgroundColor: c.hex }"
+              />
+              {{ colorLabel(c.name) }}
+            </UButton>
+          </div>
+
+          <!-- Filtre couleurs secondaires (colors[1..]) -->
+          <div
+            v-if="(palette || []).length"
+            class="flex items-center gap-2 flex-wrap mb-3"
+          >
+            <span class="text-sm font-medium text-muted">{{ $t('yourChest.secondaryColors') }} :</span>
+            <label
+              class="flex items-center gap-1.5 cursor-pointer"
+              :title="$t('yourChest.secondaryColorsMatchAllTooltip')"
+            >
+              <USwitch
+                v-model="secondaryColorsMatchAll"
+                size="sm"
+              />
+              <span class="text-sm text-muted">{{ $t('yourChest.secondaryColorsMatchAll') }}</span>
+            </label>
+            <UButton
+              v-for="c in (palette || [])"
+              :key="c.name"
+              :color="selectedSecondaryColors.includes(c.name) ? 'info' : 'neutral'"
+              :variant="selectedSecondaryColors.includes(c.name) ? 'solid' : 'outline'"
+              size="sm"
+              @click="toggleColor('secondary', c.name)"
+            >
+              <span
+                class="inline-block w-3 h-3 rounded-full border border-muted/40"
+                :style="{ backgroundColor: c.hex }"
+              />
+              {{ colorLabel(c.name) }}
+            </UButton>
+          </div>
+
+          <!-- Filtre devises (coût) -->
+          <div class="flex items-center gap-2 flex-wrap mb-3">
+            <span class="text-sm font-medium text-muted">Devises :</span>
+            <UButton
+              v-for="cur in currencyOptions"
+              :key="cur.key"
+              :color="selectedCurrencies.includes(cur.key) ? 'primary' : 'neutral'"
+              :variant="selectedCurrencies.includes(cur.key) ? 'solid' : 'outline'"
+              size="sm"
+              @click="toggleCurrency(cur.key)"
+            >
+              <img
+                :src="cur.icon"
+                :alt="cur.label"
+                class="w-4 h-4"
+              >
+              {{ cur.label }}
+            </UButton>
+          </div>
+
+          <!-- Filtre prérequis (éligibilité) — masqué en public -->
+          <div
+            v-if="!isPublic"
+            class="flex items-center gap-2 flex-wrap mb-3"
+          >
+            <span class="text-sm font-medium text-muted">Prérequis :</span>
+            <UButton
+              v-for="opt in eligibilityOptions"
+              :key="opt.value"
+              :label="opt.label"
+              size="sm"
+              :color="eligibilityFilter === opt.value ? 'primary' : 'neutral'"
+              :variant="eligibilityFilter === opt.value ? 'solid' : 'outline'"
+              @click="eligibilityFilter = opt.value"
+            />
+          </div>
+        </FilterPanel>
 
         <!-- Grille -->
         <div
