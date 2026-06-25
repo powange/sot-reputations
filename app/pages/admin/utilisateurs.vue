@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
+import type { BadgeProps, TableColumn } from '@nuxt/ui'
 
 const { isAdmin, isAuthenticated, saveRedirectUrl, user: currentUser } = useAuth()
 const toast = useToast()
@@ -78,7 +78,7 @@ const roleLabels: Record<string, string> = {
   member: 'Membre'
 }
 
-const roleColors: Record<string, string> = {
+const roleColors: Record<string, BadgeProps['color']> = {
   chef: 'warning',
   moderator: 'info',
   member: 'neutral'
@@ -102,7 +102,7 @@ function getSiteRoleLabel(user: User): string {
   return 'Utilisateur'
 }
 
-function getSiteRoleColor(user: User): string {
+function getSiteRoleColor(user: User): BadgeProps['color'] {
   if (user.isAdmin) return 'warning'
   if (user.isModerator) return 'info'
   return 'neutral'
@@ -462,7 +462,7 @@ watch(totalPages, (newTotal) => {
                 </UBadge>
                 <UButton
                   icon="i-lucide-x"
-                  size="2xs"
+                  size="xs"
                   variant="ghost"
                   color="error"
                   :loading="deletingGroupUid === group.uid"

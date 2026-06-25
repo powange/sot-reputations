@@ -442,7 +442,7 @@ function formatDate(dateStr: string): string {
     <!-- Modal édition contenu -->
     <UModal
       v-model:open="isEditModalOpen"
-      :ui="{ width: 'max-w-4xl' }"
+      :ui="{ content: 'max-w-4xl' }"
     >
       <template #content>
         <UCard>

@@ -41,7 +41,7 @@ const selectedFactions = computed(() => {
 const factionsWithCampaigns = computed(() => {
   return selectedFactions.value.filter(f =>
     f.campaigns.length > 1
-    || (f.campaigns.length === 1 && f.campaigns[0].key !== 'default')
+    || (f.campaigns.length === 1 && f.campaigns[0]?.key !== 'default')
   )
 })
 

@@ -1,4 +1,5 @@
 import { parse as parseHtml } from 'node-html-parser'
+import type { HTMLElement as HtmlElementNode, Node as HtmlNode } from 'node-html-parser'
 
 export const RELEASE_NOTES_FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -9,12 +10,13 @@ export const RELEASE_NOTES_FETCH_HEADERS = {
 function htmlFragmentToMarkdown(html: string): string {
   const root = parseHtml(html)
 
-  function processNode(node: ReturnType<typeof parseHtml>): string {
+  function processNode(node: HtmlNode): string {
     if (node.nodeType === 3) { // Text node
       return node.text
     }
 
-    const tag = node.tagName?.toLowerCase()
+    const el = node as HtmlElementNode
+    const tag = el.tagName?.toLowerCase()
     const children = node.childNodes.map(processNode).join('')
 
     switch (tag) {
@@ -32,7 +34,7 @@ function htmlFragmentToMarkdown(html: string): string {
       case 'li': return `- ${children.trim()}\n`
       case 'br': return '\n'
       case 'a': {
-        const href = node.getAttribute('href') || ''
+        const href = el.getAttribute('href') || ''
         const ytMatch = href.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/)
         if (ytMatch) {
           return `\n\n<iframe width="560" height="315" src="https://www.youtube.com/embed/${ytMatch[1]}" frameborder="0" allowfullscreen></iframe>\n\n`
@@ -40,12 +42,12 @@ function htmlFragmentToMarkdown(html: string): string {
         return href ? `[${children.trim()}](${href})` : children
       }
       case 'img': {
-        const alt = node.getAttribute('alt') || ''
-        const src = node.getAttribute('src') || ''
+        const alt = el.getAttribute('alt') || ''
+        const src = el.getAttribute('src') || ''
         return src ? `![${alt}](${src})` : ''
       }
       case 'iframe': {
-        const src = node.getAttribute('src') || ''
+        const src = el.getAttribute('src') || ''
         if (src.includes('youtube.com') || src.includes('youtu.be')) {
           return `\n\n<iframe width="560" height="315" src="${src}" frameborder="0" allowfullscreen></iframe>\n\n`
         }
@@ -72,6 +74,11 @@ function htmlFragmentToMarkdown(html: string): string {
   return processNode(root)
 }
 
+interface ArticlePageHeader {
+  Title?: string
+  SnippetText?: string
+}
+
 interface AppPropsBlock {
   '#Type'?: string
   '#Name'?: string
@@ -79,9 +86,13 @@ interface AppPropsBlock {
   'BodyText'?: string
   'YouTubeVideoCode'?: string
   'Questions'?: { Question?: string, Answer?: string }[]
+  'ArticlePageHeader'?: ArticlePageHeader
+  'ArticleContentComponents'?: AppPropsBlock[]
   'data'?: {
-    ArticlePageHeader?: { Title?: string, SnippetText?: string }
-    ArticleContentComponents?: AppPropsBlock[]
+    'components'?: AppPropsBlock[]
+    'ArticlePageHeader'?: ArticlePageHeader
+    'ArticleContentComponents'?: AppPropsBlock[]
+    '#Type'?: string
   }
 }
 
@@ -116,10 +127,10 @@ function extractJsonFromHtml(html: string): Record<string, unknown> | null {
 
 // Parcourt les composants APP_PROPS et retourne le bloc Article (en-tête + contenu)
 function findArticleComponent(html: string): AppPropsBlock | null {
-  const props = extractJsonFromHtml(html)
+  const props = extractJsonFromHtml(html) as AppPropsBlock | null
   if (!props) return null
 
-  const components = props?.data?.components as AppPropsBlock[] | undefined
+  const components = props.data?.components
   if (!components) return null
 
   for (const comp of components) {

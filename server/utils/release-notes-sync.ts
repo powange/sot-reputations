@@ -158,8 +158,10 @@ function parseTopicsFromForumHtml(html: string): ForumTopic[] {
   const topicRegex = /"slug":"\d+\/release-notes-([\d-]+)","timestamp":(\d+)/g
 
   for (const match of html.matchAll(topicRegex)) {
+    if (!match[1] || !match[2]) continue
     const version = match[1].replace(/-/g, '.')
-    const date = new Date(Number(match[2])).toISOString().split('T')[0]
+    // toISOString() always contains 'T', so split('T')[0] is the date part
+    const date = new Date(Number(match[2])).toISOString().split('T')[0]!
 
     if (!topics.some(t => t.version === version)) {
       topics.push({ version, date })
@@ -200,7 +202,8 @@ export async function resolveReleaseDate(version: string): Promise<string> {
   const known = getKnownVersionDate(version)
   if (known) return known
 
-  return new Date().toISOString().split('T')[0]
+  // toISOString() always contains 'T', so split('T')[0] is the date part
+  return new Date().toISOString().split('T')[0]!
 }
 
 // Synchronise les release notes : scrape le forum + la page principale,
@@ -248,7 +251,8 @@ export async function syncReleaseNotes(): Promise<SyncResult> {
   // Puis la dernière version détectée sur la page principale, si absente ailleurs.
   // Date inconnue (pas exposée sur la page) : on retombe sur la date du jour.
   if (latestVersion && !allTopics.has(latestVersion)) {
-    const today = new Date().toISOString().split('T')[0]
+    // toISOString() always contains 'T', so split('T')[0] is the date part
+    const today = new Date().toISOString().split('T')[0]!
     allTopics.set(latestVersion, { version: latestVersion, date: today })
   }
 

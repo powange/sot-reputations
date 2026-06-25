@@ -43,10 +43,8 @@ export default defineEventHandler(async (event) => {
   // Indexer par emblem_id
   const translationsByEmblem: Record<number, Record<string, EmblemTranslation>> = {}
   for (const t of allTranslations) {
-    if (!translationsByEmblem[t.emblem_id]) {
-      translationsByEmblem[t.emblem_id] = {}
-    }
-    translationsByEmblem[t.emblem_id][t.locale] = { name: t.name, description: t.description }
+    const byLocale = translationsByEmblem[t.emblem_id] ?? (translationsByEmblem[t.emblem_id] = {})
+    byLocale[t.locale] = { name: t.name, description: t.description }
   }
 
   const result: {

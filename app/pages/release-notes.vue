@@ -89,6 +89,15 @@ const versionOptions = computed(() => {
   }))
 })
 
+// USelectMenu (avec value-key) attend string | undefined ; on conserve null
+// en interne et on convertit null <-> undefined pour le v-model.
+const selectedVersionModel = computed({
+  get: () => selectedVersion.value ?? undefined,
+  set: (value: string | undefined) => {
+    selectedVersion.value = value ?? null
+  }
+})
+
 function clearSelection() {
   selectedVersion.value = null
 }
@@ -100,12 +109,14 @@ const currentVersionIndex = computed(() => {
 
 function prevVersion() {
   if (!releaseNotes.value || currentVersionIndex.value <= 0) return
-  selectedVersion.value = releaseNotes.value[currentVersionIndex.value - 1].version
+  const prev = releaseNotes.value[currentVersionIndex.value - 1]
+  if (prev) selectedVersion.value = prev.version
 }
 
 function nextVersion() {
   if (!releaseNotes.value || currentVersionIndex.value >= releaseNotes.value.length - 1) return
-  selectedVersion.value = releaseNotes.value[currentVersionIndex.value + 1].version
+  const next = releaseNotes.value[currentVersionIndex.value + 1]
+  if (next) selectedVersion.value = next.version
 }
 
 function updateOccurrences() {
@@ -132,8 +143,10 @@ function scrollToOccurrence(index: number) {
   marks.forEach(m => m.classList.remove('ring-2', 'ring-primary'))
   if (index >= 1 && index <= marks.length) {
     const mark = marks[index - 1]
-    mark.classList.add('ring-2', 'ring-primary')
-    mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (mark) {
+      mark.classList.add('ring-2', 'ring-primary')
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   }
 }
 
@@ -208,7 +221,7 @@ function formatDate(dateStr: string): string {
       class="flex flex-col sm:flex-row gap-3 mb-6"
     >
       <USelectMenu
-        v-model="selectedVersion"
+        v-model="selectedVersionModel"
         :items="versionOptions"
         value-key="value"
         :placeholder="$t('releaseNotes.selectVersion')"

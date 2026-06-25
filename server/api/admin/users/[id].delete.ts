@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   // Pour les groupes avec d'autres membres, transférer au premier modérateur ou membre
   const chefTransfers = chefGroups.map(group => ({
     groupId: group.groupId,
-    newChefId: group.members[0].userId
+    newChefId: group.members[0]!.userId
   }))
 
   deleteUserAccount(id, chefTransfers)

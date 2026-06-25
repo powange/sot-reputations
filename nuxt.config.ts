@@ -83,8 +83,8 @@ export default defineNuxtConfig({
       preload: true
     },
     assets: {
-      // Ne pas télécharger les polices pendant le build (utilise le CDN directement)
-      strategy: 'external'
+      // Les polices sont exposées comme assets publics dans le build (seule stratégie supportée)
+      strategy: 'public'
     }
   },
 

@@ -22,7 +22,7 @@ const isSaving = ref(false)
 const error = ref<string | null>(null)
 
 // Tableau des seuils pour chaque grade (index 0 = grade 1)
-const thresholds = ref<(number | null)[]>([])
+const thresholds = ref<(number | undefined)[]>([])
 
 // Charger les seuils existants
 async function loadGrades() {
@@ -34,8 +34,8 @@ async function loadGrades() {
       `/api/admin/emblems/${props.emblem.id}/grades`
     )
 
-    // Initialiser le tableau avec null pour chaque grade
-    const values: (number | null)[] = Array(props.emblem.maxGrade).fill(null)
+    // Initialiser le tableau avec undefined pour chaque grade
+    const values: (number | undefined)[] = Array(props.emblem.maxGrade).fill(undefined)
 
     // Remplir avec les valeurs existantes
     for (const { grade, threshold } of data) {

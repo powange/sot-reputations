@@ -1144,7 +1144,7 @@ async function importAllFromBookmarklet(matches: Array<{
     <!-- Modal édition -->
     <UModal
       v-model:open="isEditModalOpen"
-      :ui="{ width: 'max-w-2xl' }"
+      :ui="{ content: 'max-w-2xl' }"
     >
       <template #content>
         <UCard>
@@ -1259,7 +1259,7 @@ async function importAllFromBookmarklet(matches: Array<{
     <!-- Modal import automatique -->
     <UModal
       v-model:open="isImportModalOpen"
-      :ui="{ width: 'max-w-3xl' }"
+      :ui="{ content: 'max-w-3xl' }"
     >
       <template #content>
         <UCard>
@@ -1382,7 +1382,7 @@ async function importAllFromBookmarklet(matches: Array<{
     <!-- Modal traduction en chaîne -->
     <UModal
       v-model:open="isChainMode"
-      :ui="{ width: 'max-w-2xl' }"
+      :ui="{ content: 'max-w-2xl' }"
     >
       <template #content>
         <UCard>

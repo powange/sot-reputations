@@ -48,7 +48,7 @@ function generateCode(): string {
   const bytes = randomBytes(16)
   let result = ''
   for (let i = 0; i < 16; i++) {
-    result += chars.charAt(bytes[i] % chars.length)
+    result += chars.charAt(bytes[i]! % chars.length)
   }
   return result
 }

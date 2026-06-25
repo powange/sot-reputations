@@ -19,7 +19,7 @@ interface EmblemTranslations {
  * et dans les traductions de la langue courante si spécifiée
  */
 export function emblemMatchesSearch(
-  emblem: { name: string, description: string, key?: string } & EmblemTranslations,
+  emblem: { name: string, description: string | null, key?: string } & EmblemTranslations,
   query: string,
   options: { includeKey?: boolean, locale?: string } = {}
 ): boolean {
@@ -29,7 +29,7 @@ export function emblemMatchesSearch(
 
   // Chercher dans les textes français (par défaut)
   if (normalizeForSearch(emblem.name).includes(q)) return true
-  if (normalizeForSearch(emblem.description).includes(q)) return true
+  if (emblem.description && normalizeForSearch(emblem.description).includes(q)) return true
   if (includeKey && emblem.key && normalizeForSearch(emblem.key).includes(q)) return true
 
   // Chercher dans les traductions de la langue courante

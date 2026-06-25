@@ -2763,10 +2763,8 @@ export function getGroupReputationData(groupId: number) {
   // Indexer par emblem_id
   const translationsByEmblem: Record<number, Record<string, { name: string | null, description: string | null }>> = {}
   for (const t of allTranslations) {
-    if (!translationsByEmblem[t.emblem_id]) {
-      translationsByEmblem[t.emblem_id] = {}
-    }
-    translationsByEmblem[t.emblem_id][t.locale] = { name: t.name, description: t.description }
+    const byLocale = translationsByEmblem[t.emblem_id] ?? (translationsByEmblem[t.emblem_id] = {})
+    byLocale[t.locale] = { name: t.name, description: t.description }
   }
 
   const result: {
@@ -3050,10 +3048,8 @@ export function getAllGradeThresholdsForEmblems(emblemIds: number[]): Record<num
 
   const result: Record<number, GradeThreshold[]> = {}
   for (const row of rows) {
-    if (!result[row.emblemId]) {
-      result[row.emblemId] = []
-    }
-    result[row.emblemId].push({ grade: row.grade, threshold: row.threshold })
+    const grades = result[row.emblemId] ?? (result[row.emblemId] = [])
+    grades.push({ grade: row.grade, threshold: row.threshold })
   }
   return result
 }
