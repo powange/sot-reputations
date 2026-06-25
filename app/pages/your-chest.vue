@@ -717,7 +717,7 @@ watch(
       :ui="{ content: 'sm:max-w-2xl' }"
     >
       <template #content>
-        <div class="p-4 flex flex-col items-center">
+        <div class="p-4 flex flex-col items-center max-h-[85vh] overflow-y-auto">
           <NuxtImg
             v-if="selectedItem?.image"
             :src="selectedItem.image"
@@ -726,7 +726,7 @@ watch(
             height="1024"
             format="webp"
             :quality="90"
-            class="max-w-full max-h-[70vh] object-contain"
+            class="max-w-full max-h-[45vh] sm:max-h-[60vh] object-contain"
           />
           <p class="mt-4 text-lg font-medium text-center">
             {{ selectedItem?.name }}

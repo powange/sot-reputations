@@ -79,11 +79,11 @@ watch(isImageModalOpen, async (open) => {
       v-model:open="isImageModalOpen"
     >
       <template #content>
-        <div class="p-4 flex flex-col items-center">
+        <div class="p-4 flex flex-col items-center max-h-[85vh] overflow-y-auto">
           <img
             :src="image"
             :alt="name"
-            class="max-w-full max-h-[70vh] object-contain"
+            class="max-w-full max-h-[45vh] sm:max-h-[60vh] object-contain"
           >
           <p class="mt-4 text-lg font-medium text-center">
             {{ name }}
