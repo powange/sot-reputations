@@ -40,8 +40,14 @@ function cleanup() {
   }
 }
 
-// Nettoyer toutes les minutes
-setInterval(cleanup, 60 * 1000)
+// Nettoyer toutes les minutes. unref() pour ne pas bloquer l'arrêt propre du
+// process, et garde sur globalThis pour ne pas empiler un timer par rechargement
+// de module (HMR en dev).
+const cleanupGlobal = globalThis as unknown as { __tempStoreCleanup?: ReturnType<typeof setInterval> }
+if (!cleanupGlobal.__tempStoreCleanup) {
+  cleanupGlobal.__tempStoreCleanup = setInterval(cleanup, 60 * 1000)
+  cleanupGlobal.__tempStoreCleanup.unref?.()
+}
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'

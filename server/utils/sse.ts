@@ -50,7 +50,14 @@ export function createSSEStream(event: H3Event, groupUid: string): SSEConnection
 
   const send = (eventName: string, data: unknown) => {
     const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`
-    event.node.res.write(message)
+    try {
+      event.node.res.write(message)
+    } catch {
+      // Socket déjà fermée/détruite (course avec l'événement 'close') : un write
+      // qui throw ne doit pas casser le broadcast aux autres membres du groupe.
+      // On retire la connexion morte du registre.
+      removeGroupConnection(groupUid, connectionId)
+    }
   }
 
   const close = () => {

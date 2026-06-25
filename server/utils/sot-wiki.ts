@@ -166,7 +166,12 @@ function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiP
   const int = (name: string): number | undefined => {
     const v = str(name)
     if (v == null) return undefined
-    const n = Number.parseInt(v.replace(/[^0-9]/g, ''), 10)
+    // Ne prendre que le PREMIER nombre du champ (chiffres + séparateurs de
+    // milliers), sans concaténer d'éventuels nombres suivants : "1,000 (sale 500)"
+    // -> 1000, et non 1000500. "49 999" (espace = séparateur) -> 49999.
+    const m = v.match(/\d[\d.,\u00A0\u202F ]*/)
+    if (!m) return undefined
+    const n = Number.parseInt(m[0].replace(/[^0-9]/g, ''), 10)
     return Number.isFinite(n) ? n : undefined
   }
 

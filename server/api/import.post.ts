@@ -2,6 +2,13 @@ import bcrypt from 'bcrypt'
 import { getReputationDb, importReputationData, importChestData, getGroupsByUserId } from '../utils/reputation-db'
 import { broadcastToGroups } from '../utils/sse'
 
+// Mappe une erreur d'import vers un code HTTP (400 si JSON pas en français, 500 sinon).
+function throwImportError(error: unknown): never {
+  const message = error instanceof Error ? error.message : 'Erreur inconnue'
+  const isValidationError = message.includes('français') || message.includes('francais')
+  throw createError({ statusCode: isValidationError ? 400 : 500, message })
+}
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { username, password, jsonData } = body
@@ -66,24 +73,33 @@ export default defineEventHandler(async (event) => {
       userId = existingUser.id
       db.prepare('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(userId)
     } else {
-      // Nouvel utilisateur : créer le compte
+      // Nouvel utilisateur : créer le compte ET importer dans UNE transaction,
+      // pour ne pas laisser un compte orphelin si l'import échoue (cas fréquent :
+      // JSON non-français rejeté par importReputationData -> rollback de l'INSERT).
       const passwordHash = await bcrypt.hash(password, 10)
-      const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, passwordHash)
-      userId = Number(result.lastInsertRowid)
+      const createAndImport = db.transaction(() => {
+        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, passwordHash)
+        const newId = Number(result.lastInsertRowid)
+        importReputationData(newId, reputationData)
+        return newId
+      })
+      try {
+        userId = createAndImport()
+      } catch (error) {
+        throwImportError(error)
+      }
       isNewUser = true
     }
   }
 
-  // Importer les données de réputation
-  try {
-    importReputationData(userId, reputationData)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erreur inconnue'
-    const isValidationError = message.includes('français') || message.includes('francais')
-    throw createError({
-      statusCode: isValidationError ? 400 : 500,
-      message
-    })
+  // Importer les données de réputation (déjà fait dans la transaction de création
+  // pour un nouveau compte).
+  if (!isNewUser) {
+    try {
+      importReputationData(userId, reputationData)
+    } catch (error) {
+      throwImportError(error)
+    }
   }
 
   // Importer le coffre si présent (best-effort : ne fait pas échouer l'import
