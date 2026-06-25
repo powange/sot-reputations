@@ -1550,10 +1550,12 @@ export function getChestItemsForEmblem(emblemId: number, locale = 'fr'): Array<{
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
     WHERE ci.id IN (${placeholders})
-    ORDER BY ci.sort_order
   `).all(locale, ...ids) as Array<{ id: number, name: string, image: string | null }>
 
-  return rows.map(r => ({ id: r.id, name: r.name, image: r.image, grade: gradeById.get(r.id) ?? null }))
+  // Tri par grade requis croissant (les sans-grade en dernier), nom en départage.
+  return rows
+    .map(r => ({ id: r.id, name: r.name, image: r.image, grade: gradeById.get(r.id) ?? null }))
+    .sort((a, b) => (a.grade ?? Number.MAX_SAFE_INTEGER) - (b.grade ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
 }
 
 function parseColors(json: string | null): string[] {
