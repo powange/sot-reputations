@@ -90,6 +90,17 @@ async function handleLogout() {
           />
           {{ item.label }}
         </ULink>
+        <button
+          v-if="!isAuthenticated"
+          class="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-foreground transition-colors"
+          @click="loginWithMicrosoft"
+        >
+          <UIcon
+            name="i-lucide-log-in"
+            class="w-4 h-4"
+          />
+          {{ t('nav.login') }}
+        </button>
       </nav>
 
       <template #body>
@@ -145,13 +156,6 @@ async function handleLogout() {
               @click="handleLogout"
             />
           </template>
-          <UButton
-            v-else
-            icon="i-lucide-log-in"
-            size="sm"
-            :label="t('nav.login')"
-            @click="loginWithMicrosoft"
-          />
           <UColorModeSwitch color="info" />
           <UDropdownMenu
             :items="availableLocales.map(l => ({ label: l.name, onSelect: () => setLocale(l.code) }))"
