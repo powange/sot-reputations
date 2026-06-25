@@ -69,6 +69,7 @@
   },
   "reputations": {
     "title": "My Reputations",
+    "publicTitle": "Reputations",
     "lastImport": "Last import: {date}",
     "noData": "No reputation data",
     "noDataDescription": "Import your reputation data to view them",

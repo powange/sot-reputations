@@ -18,6 +18,15 @@ interface MyReputationsData {
 const { t, locale } = useI18n()
 const toast = useToast()
 const { isAuthenticated } = useAuth()
+const route = useRoute()
+// Mode public (catalogue « Les réputations », sans progression ni filtres user).
+const isPublic = computed(() => route.path === '/reputations')
+
+definePageMeta({ alias: ['/reputations'] })
+
+useSeoMeta({
+  title: () => `${isPublic.value ? t('reputations.publicTitle') : t('reputations.title')} - SoT Reputations`
+})
 
 // Helper pour obtenir le nom/description traduit
 function getTranslatedText(
@@ -38,18 +47,20 @@ function getTranslatedText(
   return emblem[field]
 }
 
-// Rediriger si non connecté (en sauvegardant l'URL pour y revenir après connexion)
+// Rediriger si non connecté (sauf en mode public, accessible à tous)
 const { saveRedirectUrl } = useAuth()
-if (!isAuthenticated.value) {
+if (!isPublic.value && !isAuthenticated.value) {
   saveRedirectUrl()
   navigateTo('/')
 }
 
-// Récupérer les données
-const { data, error, refresh, status } = await useFetch<MyReputationsData>('/api/my-reputations')
+// Récupérer les données (catalogue public ou réputations de l'utilisateur)
+const { data, error, refresh, status } = await useFetch<MyReputationsData>(
+  () => (isPublic.value ? '/api/reputations' : '/api/my-reputations')
+)
 const isLoading = computed(() => status.value === 'pending')
 
-if (error.value) {
+if (error.value && !isPublic.value) {
   navigateTo('/')
 }
 
@@ -114,7 +125,8 @@ const isStatsModalOpen = ref(false)
 
 const user = computed(() => data.value?.user)
 const factions = computed(() => data.value?.factions || [])
-const hasImportedData = computed(() => !!user.value?.lastImportAt)
+// En public : pas de progression (donc pas de colonnes/boutons/stats utilisateur).
+const hasImportedData = computed(() => !isPublic.value && !!user.value?.lastImportAt)
 
 // Statistiques de complétion
 const completionStats = computed(() => {
@@ -342,15 +354,21 @@ async function handleDelete() {
               />
             </NuxtLink>
             <h1 class="text-3xl font-pirate">
-              {{ $t('reputations.title') }}
+              {{ isPublic ? $t('reputations.publicTitle') : $t('reputations.title') }}
             </h1>
           </div>
-          <p class="text-muted">
+          <p
+            v-if="!isPublic"
+            class="text-muted"
+          >
             {{ $t('reputations.lastImport', { date: formatLastImport(user?.lastImportAt || null) }) }}
           </p>
         </div>
 
-        <div class="flex gap-2">
+        <div
+          v-if="!isPublic"
+          class="flex gap-2"
+        >
           <UButton
             v-if="hasImportedData"
             icon="i-lucide-trash-2"
@@ -451,9 +469,9 @@ async function handleDelete() {
           </template>
         </ReputationFilters>
 
-        <!-- Message si pas de données importées -->
+        <!-- Message si pas de données importées (masqué en public) -->
         <UAlert
-          v-if="!hasImportedData"
+          v-if="!isPublic && !hasImportedData"
           icon="i-lucide-info"
           color="info"
           :title="$t('reputations.importMyData')"
