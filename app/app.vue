@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { user, isAuthenticated, isAdminOrModerator, logout } = useAuth()
+const { user, isAuthenticated, isAdminOrModerator, logout, loginWithMicrosoft } = useAuth()
 const toast = useToast()
 const { t, locale, locales, setLocale } = useI18n()
 
@@ -119,6 +119,17 @@ async function handleLogout() {
             />
             {{ t('nav.logout') }}
           </button>
+          <button
+            v-else
+            class="flex items-center gap-2 py-2 text-sm font-medium text-muted hover:text-foreground transition-colors"
+            @click="loginWithMicrosoft"
+          >
+            <UIcon
+              name="i-lucide-log-in"
+              class="w-5 h-5"
+            />
+            {{ t('nav.login') }}
+          </button>
         </nav>
       </template>
 
@@ -134,6 +145,13 @@ async function handleLogout() {
               @click="handleLogout"
             />
           </template>
+          <UButton
+            v-else
+            icon="i-lucide-log-in"
+            size="sm"
+            :label="t('nav.login')"
+            @click="loginWithMicrosoft"
+          />
           <UColorModeSwitch color="info" />
           <UDropdownMenu
             :items="availableLocales.map(l => ({ label: l.name, onSelect: () => setLocale(l.code) }))"
