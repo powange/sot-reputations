@@ -134,24 +134,22 @@ const roleBadgeColors: Record<GroupRole, 'primary' | 'info' | 'neutral'> = {
 
 // Menu dropdown actions
 const dropdownItems = computed(() => {
-  const items = [
-    [{
-      label: t('groupPage.leaveGroup'),
-      icon: 'i-lucide-log-out',
-      onSelect: () => { isLeaveModalOpen.value = true }
-    }]
-  ]
+  const mainGroup: Array<{ label: string, icon: string, color?: 'error', onSelect: () => void }> = [{
+    label: t('groupPage.leaveGroup'),
+    icon: 'i-lucide-log-out',
+    onSelect: () => { isLeaveModalOpen.value = true }
+  }]
 
   if (isChef.value) {
-    items[0].push({
+    mainGroup.push({
       label: t('groupPage.deleteGroup'),
       icon: 'i-lucide-trash-2',
-      color: 'error' as const,
+      color: 'error',
       onSelect: () => { isDeleteModalOpen.value = true }
     })
   }
 
-  return items
+  return [mainGroup]
 })
 
 // Filtre utilisateurs spécifique au groupe
@@ -267,8 +265,9 @@ function selectAllUsers() {
 
 function _selectNoUsers() {
   // Garder au moins un utilisateur sélectionné
-  if (users.value.length > 0) {
-    selectedUserIds.value = [users.value[0].id]
+  const first = users.value[0]
+  if (first) {
+    selectedUserIds.value = [first.id]
   }
 }
 

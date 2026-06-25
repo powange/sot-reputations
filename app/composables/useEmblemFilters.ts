@@ -1,16 +1,21 @@
-import type { FactionInfo, CampaignInfo } from '~/types/reputation'
+import type { FactionInfo } from '~/types/reputation'
 
-interface FactionWithCampaigns extends FactionInfo {
-  campaigns: CampaignInfo[]
+// Le composable filtre les factions par `key` et les campagnes par `id`/`key`,
+// sans jamais lire les emblèmes. On reste générique sur le type de campagne `C`
+// (et non sur une forme minimale via contrainte, sinon `faction.campaigns` serait
+// élargi à la contrainte) pour préserver le type exact fourni par l'appelant —
+// emblèmes et traductions compris.
+type FactionWithCampaignsLike<C> = FactionInfo & {
+  campaigns: C[]
 }
 
-interface UseEmblemFiltersOptions {
-  factions: Ref<FactionWithCampaigns[]> | ComputedRef<FactionWithCampaigns[]>
+interface UseEmblemFiltersOptions<C extends { id: number, key: string }> {
+  factions: Ref<FactionWithCampaignsLike<C>[]> | ComputedRef<FactionWithCampaignsLike<C>[]>
   /** Paramètres URL supplémentaires à synchroniser */
   extraUrlParams?: () => Record<string, string | undefined>
 }
 
-export function useEmblemFilters(options: UseEmblemFiltersOptions) {
+export function useEmblemFilters<C extends { id: number, key: string }>(options: UseEmblemFiltersOptions<C>) {
   const route = useRoute()
 
   // Filtres de base - initialisés depuis l'URL
