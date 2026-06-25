@@ -232,7 +232,36 @@
     "primaryColor": "Couleur principale",
     "secondaryColors": "Couleurs secondaires",
     "secondaryColorsMatchAll": "Toutes (ET)",
-    "secondaryColorsMatchAllTooltip": "Activé : l'objet doit avoir toutes les couleurs sélectionnées (ET). Désactivé : au moins une (OU)."
+    "secondaryColorsMatchAllTooltip": "Activé : l'objet doit avoir toutes les couleurs sélectionnées (ET). Désactivé : au moins une (OU).",
+    "currencies": "Devises",
+    "currency": {
+      "gold": "Or",
+      "doubloons": "Doublons",
+      "ancientCoins": "Pièces anciennes"
+    },
+    "prerequisitesTitle": "Prérequis",
+    "eligibility": {
+      "all": "Tous",
+      "met": "Débloquables",
+      "locked": "Verrouillés",
+      "prereq": "Avec prérequis"
+    },
+    "eligibilityBadge": {
+      "locked": "Prérequis non atteint",
+      "met": "Débloquable",
+      "prereq": "A des prérequis"
+    },
+    "prereqStatus": {
+      "owned": "Possédé",
+      "met": "Débloquable",
+      "locked": "Verrouillé"
+    },
+    "prereqCommendationLabel": "Commendation",
+    "gradeLabel": "grade {grade}",
+    "prereqReputationLabel": "Réputation",
+    "prereqYou": "(toi : {value})",
+    "prereqLegendary": "Titre Pirate Legend requis",
+    "prereqReimport": "Réimporte ta réputation pour évaluer les niveaux de faction."
   },
   "chestColors": {
     "red": "Rouge",

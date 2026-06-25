@@ -71,17 +71,21 @@ function openItem(item: ChestItem) {
 }
 
 // --- Coût de l'item (icône de devise + montant) ---
-const CURRENCY_META: Record<string, { icon: string, label: string }> = {
-  gold: { icon: '/img/currencies/gold.png', label: 'Or' },
-  doubloons: { icon: '/img/currencies/doubloons.png', label: 'Doublons' },
-  ancientCoins: { icon: '/img/currencies/ancient-coins.png', label: 'Pièces anciennes' }
+// Libellés des devises via i18n (réactifs à la locale) ; l'icône reste statique.
+const CURRENCY_META: Record<string, { icon: string }> = {
+  gold: { icon: '/img/currencies/gold.png' },
+  doubloons: { icon: '/img/currencies/doubloons.png' },
+  ancientCoins: { icon: '/img/currencies/ancient-coins.png' }
+}
+function currencyLabel(key: string): string {
+  return t(`yourChest.currency.${key}`)
 }
 function costEntries(item: ChestItem): Array<{ key: string, icon: string, label: string, value: number }> {
   const cost = item.cost
   if (!cost) return []
   return (['gold', 'doubloons', 'ancientCoins'] as const)
     .filter(k => cost[k] != null)
-    .map(k => ({ key: k, icon: CURRENCY_META[k]!.icon, label: CURRENCY_META[k]!.label, value: cost[k]! }))
+    .map(k => ({ key: k, icon: CURRENCY_META[k]!.icon, label: currencyLabel(k), value: cost[k]! }))
 }
 
 // --- Prérequis d'obtention (depuis le wiki) ---
@@ -148,12 +152,12 @@ const eligFromUrl = queryToString(route.query.elig)
 const eligibilityFilter = ref<EligFilter>(
   (['met', 'locked', 'prereq'] as string[]).includes(eligFromUrl) ? eligFromUrl as EligFilter : 'all'
 )
-const eligibilityOptions: Array<{ label: string, value: EligFilter }> = [
-  { label: 'Tous', value: 'all' },
-  { label: 'Débloquables', value: 'met' },
-  { label: 'Verrouillés', value: 'locked' },
-  { label: 'Avec prérequis', value: 'prereq' }
-]
+const eligibilityOptions = computed<Array<{ label: string, value: EligFilter }>>(() => [
+  { label: t('yourChest.eligibility.all'), value: 'all' },
+  { label: t('yourChest.eligibility.met'), value: 'met' },
+  { label: t('yourChest.eligibility.locked'), value: 'locked' },
+  { label: t('yourChest.eligibility.prereq'), value: 'prereq' }
+])
 const ownershipFilter = ref<'owned' | 'notowned' | 'all'>(
   ownershipFromUrl === 'notowned' || ownershipFromUrl === 'all' ? ownershipFromUrl : 'owned'
 )
@@ -175,7 +179,7 @@ function toggleColor(which: 'primary' | 'secondary', name: string) {
 
 // Options du filtre devises (icône + libellé via CURRENCY_META) et bascule.
 const CURRENCY_KEYS = ['gold', 'ancientCoins', 'doubloons'] as const
-const currencyOptions = CURRENCY_KEYS.map(k => ({ key: k as string, icon: CURRENCY_META[k]!.icon, label: CURRENCY_META[k]!.label }))
+const currencyOptions = computed(() => CURRENCY_KEYS.map(k => ({ key: k as string, icon: CURRENCY_META[k]!.icon, label: currencyLabel(k) })))
 function toggleCurrency(key: string) {
   const i = selectedCurrencies.value.indexOf(key)
   if (i === -1) selectedCurrencies.value.push(key)
@@ -545,7 +549,7 @@ watch(
 
           <!-- Filtre devises (coût) -->
           <div class="flex items-center gap-2 flex-wrap mb-3">
-            <span class="text-sm font-medium text-muted">Devises :</span>
+            <span class="text-sm font-medium text-muted">{{ $t('yourChest.currencies') }} :</span>
             <UButton
               v-for="cur in currencyOptions"
               :key="cur.key"
@@ -568,7 +572,7 @@ watch(
             v-if="!isPublic"
             class="flex items-center gap-2 flex-wrap mb-3"
           >
-            <span class="text-sm font-medium text-muted">Prérequis :</span>
+            <span class="text-sm font-medium text-muted">{{ $t('yourChest.prerequisitesTitle') }} :</span>
             <UButton
               v-for="opt in eligibilityOptions"
               :key="opt.value"
@@ -629,7 +633,7 @@ watch(
                 variant="solid"
                 size="xs"
                 class="absolute top-1 left-1"
-                :title="!item.owned && item.eligibility.status === 'locked' ? 'Prérequis non atteint' : (!item.owned && item.eligibility.status === 'met' ? 'Débloquable' : 'A des prérequis')"
+                :title="!item.owned && item.eligibility.status === 'locked' ? $t('yourChest.eligibilityBadge.locked') : (!item.owned && item.eligibility.status === 'met' ? $t('yourChest.eligibilityBadge.met') : $t('yourChest.eligibilityBadge.prereq'))"
               >
                 <UIcon
                   :name="!item.owned && item.eligibility.status === 'locked' ? 'i-lucide-lock' : (!item.owned && item.eligibility.status === 'met' ? 'i-lucide-lock-open' : 'i-lucide-scroll-text')"
@@ -660,7 +664,7 @@ watch(
                   class="inline-flex items-center gap-0.5 rounded bg-black/65 text-white px-1 py-0.5 text-xs font-medium leading-none"
                   :title="c.label"
                 >
-                  {{ c.value.toLocaleString('fr-FR') }}
+                  {{ c.value.toLocaleString(locale) }}
                   <img
                     :src="c.icon"
                     :alt="c.label"
@@ -778,7 +782,7 @@ watch(
               class="inline-flex items-center gap-1 text-sm font-medium"
               :title="c.label"
             >
-              {{ c.value.toLocaleString('fr-FR') }}
+              {{ c.value.toLocaleString(locale) }}
               <img
                 :src="c.icon"
                 :alt="c.label"
@@ -797,14 +801,14 @@ watch(
                 name="i-lucide-list-checks"
                 class="w-4 h-4 text-muted"
               />
-              <span class="font-medium">Prérequis</span>
+              <span class="font-medium">{{ $t('yourChest.prerequisitesTitle') }}</span>
               <UBadge
                 v-if="selectedItem.owned"
                 color="primary"
                 variant="subtle"
                 size="xs"
               >
-                Possédé
+                {{ $t('yourChest.prereqStatus.owned') }}
               </UBadge>
               <UBadge
                 v-else-if="selectedItem.eligibility?.status === 'met'"
@@ -812,7 +816,7 @@ watch(
                 variant="subtle"
                 size="xs"
               >
-                Débloquable
+                {{ $t('yourChest.prereqStatus.met') }}
               </UBadge>
               <UBadge
                 v-else-if="selectedItem.eligibility?.status === 'locked'"
@@ -820,7 +824,7 @@ watch(
                 variant="subtle"
                 size="xs"
               >
-                Verrouillé
+                {{ $t('yourChest.prereqStatus.locked') }}
               </UBadge>
             </div>
             <ul class="space-y-1">
@@ -835,11 +839,11 @@ watch(
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  Commendation <span class="font-medium">{{ c.name }}</span> — grade {{ c.requiredGrade }}
+                  {{ $t('yourChest.prereqCommendationLabel') }} <span class="font-medium">{{ c.name }}</span> — {{ $t('yourChest.gradeLabel', { grade: c.requiredGrade }) }}
                   <span
                     v-if="!isPublic"
                     class="text-muted"
-                  >(toi : {{ c.userGrade === null ? '?' : c.userGrade }})</span>
+                  >{{ $t('yourChest.prereqYou', { value: c.userGrade === null ? '?' : c.userGrade }) }}</span>
                 </span>
               </li>
               <li
@@ -853,11 +857,11 @@ watch(
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  Réputation <span class="font-medium">{{ factionLabel(f.key) }}</span> ≥ {{ f.requiredLevel }}
+                  {{ $t('yourChest.prereqReputationLabel') }} <span class="font-medium">{{ factionLabel(f.key) }}</span> ≥ {{ f.requiredLevel }}
                   <span
                     v-if="!isPublic"
                     class="text-muted"
-                  >(toi : {{ f.userLevel === null ? '?' : f.userLevel }})</span>
+                  >{{ $t('yourChest.prereqYou', { value: f.userLevel === null ? '?' : f.userLevel }) }}</span>
                 </span>
               </li>
               <li
@@ -868,7 +872,7 @@ watch(
                   name="i-lucide-crown"
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
-                <span>Titre Pirate Legend requis</span>
+                <span>{{ $t('yourChest.prereqLegendary') }}</span>
               </li>
               <li
                 v-if="selectedItem.prerequisites.requires"
@@ -888,7 +892,7 @@ watch(
                   name="i-lucide-refresh-cw"
                   class="w-3.5 h-3.5 shrink-0 mt-0.5"
                 />
-                <span>Réimporte ta réputation pour évaluer les niveaux de faction.</span>
+                <span>{{ $t('yourChest.prereqReimport') }}</span>
               </li>
             </ul>
           </div>

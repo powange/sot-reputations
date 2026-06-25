@@ -118,6 +118,15 @@ export function useEmblemFilters<C extends { id: number, key: string }>(options:
     { deep: true }
   )
 
+  // Nettoyer le timer de debounce au démontage : sinon un updateUrlWithFilters
+  // planifié peut s'exécuter après navigation et faire un history.replaceState
+  // sur la mauvaise page (window.location.pathname a déjà changé).
+  onScopeDispose(() => {
+    if (urlUpdateTimeout) {
+      clearTimeout(urlUpdateTimeout)
+    }
+  })
+
   return {
     // Refs
     searchQuery,

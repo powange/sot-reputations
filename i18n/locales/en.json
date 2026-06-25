@@ -232,7 +232,36 @@
     "primaryColor": "Main color",
     "secondaryColors": "Secondary colors",
     "secondaryColorsMatchAll": "All (AND)",
-    "secondaryColorsMatchAllTooltip": "On: the item must have every selected color (AND). Off: at least one (OR)."
+    "secondaryColorsMatchAllTooltip": "On: the item must have every selected color (AND). Off: at least one (OR).",
+    "currencies": "Currencies",
+    "currency": {
+      "gold": "Gold",
+      "doubloons": "Doubloons",
+      "ancientCoins": "Ancient Coins"
+    },
+    "prerequisitesTitle": "Prerequisites",
+    "eligibility": {
+      "all": "All",
+      "met": "Unlockable",
+      "locked": "Locked",
+      "prereq": "With prerequisites"
+    },
+    "eligibilityBadge": {
+      "locked": "Prerequisite not met",
+      "met": "Unlockable",
+      "prereq": "Has prerequisites"
+    },
+    "prereqStatus": {
+      "owned": "Owned",
+      "met": "Unlockable",
+      "locked": "Locked"
+    },
+    "prereqCommendationLabel": "Commendation",
+    "gradeLabel": "grade {grade}",
+    "prereqReputationLabel": "Reputation",
+    "prereqYou": "(you: {value})",
+    "prereqLegendary": "Pirate Legend title required",
+    "prereqReimport": "Re-import your reputation to evaluate faction levels."
   },
   "chestColors": {
     "red": "Red",

@@ -747,9 +747,14 @@ function canKickMember(member: GroupMember): boolean {
 
 // Connexion SSE pour les mises à jour en temps réel
 const eventSource = ref<EventSource | null>(null)
+// Timer de reconnexion + drapeau de démontage : sans ça, un setTimeout planifié
+// pendant une erreur SSE peut rouvrir une connexion APRÈS le démontage de la page
+// (EventSource zombie qui reconnecte indéfiniment à chaque navigation entre groupes).
+let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null
+let sseClosed = false
 
 function connectSSE() {
-  if (!import.meta.client) return
+  if (!import.meta.client || sseClosed) return
 
   eventSource.value = new EventSource(`/api/sse/groups/${groupUid}`)
 
@@ -769,7 +774,9 @@ function connectSSE() {
   eventSource.value.addEventListener('error', () => {
     // Reconnexion automatique après 5 secondes en cas d'erreur
     eventSource.value?.close()
-    setTimeout(() => {
+    if (sseClosed) return
+    if (sseReconnectTimer) clearTimeout(sseReconnectTimer)
+    sseReconnectTimer = setTimeout(() => {
       connectSSE()
     }, 5000)
   })
@@ -780,6 +787,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  sseClosed = true
+  if (sseReconnectTimer) clearTimeout(sseReconnectTimer)
   eventSource.value?.close()
 })
 </script>

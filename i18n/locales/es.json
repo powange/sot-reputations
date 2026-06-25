@@ -232,7 +232,36 @@
     "primaryColor": "Color principal",
     "secondaryColors": "Colores secundarios",
     "secondaryColorsMatchAll": "Todos (Y)",
-    "secondaryColorsMatchAllTooltip": "Activado: el objeto debe tener todos los colores seleccionados (Y). Desactivado: al menos uno (O)."
+    "secondaryColorsMatchAllTooltip": "Activado: el objeto debe tener todos los colores seleccionados (Y). Desactivado: al menos uno (O).",
+    "currencies": "Monedas",
+    "currency": {
+      "gold": "Oro",
+      "doubloons": "Doblones",
+      "ancientCoins": "Monedas antiguas"
+    },
+    "prerequisitesTitle": "Requisitos",
+    "eligibility": {
+      "all": "Todos",
+      "met": "Desbloqueables",
+      "locked": "Bloqueados",
+      "prereq": "Con requisitos"
+    },
+    "eligibilityBadge": {
+      "locked": "Requisito no alcanzado",
+      "met": "Desbloqueable",
+      "prereq": "Tiene requisitos"
+    },
+    "prereqStatus": {
+      "owned": "En posesión",
+      "met": "Desbloqueable",
+      "locked": "Bloqueado"
+    },
+    "prereqCommendationLabel": "Distinción",
+    "gradeLabel": "grado {grade}",
+    "prereqReputationLabel": "Reputación",
+    "prereqYou": "(tú: {value})",
+    "prereqLegendary": "Se requiere el título Leyenda Pirata",
+    "prereqReimport": "Reimporta tu reputación para evaluar los niveles de facción."
   },
   "chestColors": {
     "red": "Rojo",
