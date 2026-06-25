@@ -508,6 +508,7 @@ async function handleDelete() {
                     :name="row.original.name"
                     :description="row.original.description"
                     :image="row.original.image"
+                    :emblem-id="row.original.id"
                   />
                 </template>
                 <template #maxThreshold-cell="{ row }">
@@ -574,6 +575,7 @@ async function handleDelete() {
                           :name="row.original.name"
                           :description="row.original.description"
                           :image="row.original.image"
+                          :emblem-id="row.original.id"
                         />
                       </template>
                       <template #maxThreshold-cell="{ row }">

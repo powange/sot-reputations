@@ -1486,6 +1486,39 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   })
 }
 
+/**
+ * Vue inverse : objets du coffre dont l'emblème donné est un prérequis (commendation).
+ * Rapproche le nom EN/base de l'emblème des commendations stockées dans les prérequis.
+ */
+export function getChestItemsForEmblem(emblemId: number): Array<{ id: number, name: string, image: string | null, subcategory: string | null, grade: number | null }> {
+  const db = getReputationDb()
+  const e = db.prepare(`
+    SELECT COALESCE(NULLIF(et.name, ''), em.name) as enName, em.name as baseName
+    FROM emblems em
+    LEFT JOIN emblem_translations et ON et.emblem_id = em.id AND et.locale = 'en'
+    WHERE em.id = ?
+  `).get(emblemId) as { enName: string, baseName: string } | undefined
+  if (!e) return []
+  const keys = new Set([normalizeName(e.enName), normalizeName(e.baseName)])
+
+  const rows = db.prepare(`
+    SELECT id, name, image, subcategory, prerequisites
+    FROM chest_items
+    WHERE prerequisites IS NOT NULL AND prerequisites != ''
+    ORDER BY sort_order
+  `).all() as Array<{ id: number, name: string, image: string | null, subcategory: string | null, prerequisites: string | null }>
+
+  const out: Array<{ id: number, name: string, image: string | null, subcategory: string | null, grade: number | null }> = []
+  for (const r of rows) {
+    const pr = parseChestItemPrereqs(r.prerequisites)
+    const match = pr?.commendations?.find(c => keys.has(normalizeName(c.name)))
+    if (match) {
+      out.push({ id: r.id, name: r.name, image: r.image, subcategory: r.subcategory, grade: match.grade ?? null })
+    }
+  }
+  return out
+}
+
 function parseColors(json: string | null): string[] {
   if (!json) return []
   try {
