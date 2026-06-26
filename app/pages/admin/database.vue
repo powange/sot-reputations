@@ -123,6 +123,52 @@ async function executeRestore() {
     isRestoring.value = false
   }
 }
+
+// --- Doublons du coffre ---
+interface DupItem { id: number, image: string | null, itemKey: string, owners: number, hasCost: boolean, hasPrereqs: boolean }
+interface DupGroup { name: string, category: string, subcategory: string | null, items: DupItem[] }
+
+const dupGroups = ref<DupGroup[] | null>(null)
+const isDetecting = ref(false)
+const isMerging = ref(false)
+const showMergeModal = ref(false)
+
+// Nombre de lignes qui seront supprimées (toutes sauf la plus ancienne de chaque groupe).
+const dupCount = computed(() => (dupGroups.value || []).reduce((n, g) => n + Math.max(0, g.items.length - 1), 0))
+
+async function detectDuplicates() {
+  isDetecting.value = true
+  try {
+    const res = await $fetch<{ groups: DupGroup[] }>('/api/admin/chest-duplicates')
+    dupGroups.value = res.groups
+    toast.add({
+      title: res.groups.length ? `${res.groups.length} groupe(s) de doublons` : 'Aucun doublon',
+      color: res.groups.length ? 'warning' : 'success'
+    })
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Détection impossible', color: 'error' })
+  } finally {
+    isDetecting.value = false
+  }
+}
+
+async function mergeDuplicates() {
+  showMergeModal.value = false
+  isMerging.value = true
+  try {
+    const res = await $fetch<{ groups: number, deleted: number }>('/api/admin/chest-duplicates', { method: 'POST' })
+    toast.add({
+      title: 'Fusion terminée',
+      description: `${res.groups} groupe(s) fusionné(s), ${res.deleted} doublon(s) supprimé(s)`,
+      color: 'success'
+    })
+    await detectDuplicates()
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Fusion impossible', color: 'error' })
+  } finally {
+    isMerging.value = false
+  }
+}
 </script>
 
 <template>
@@ -231,6 +277,86 @@ async function executeRestore() {
       </UCard>
     </div>
 
+    <!-- Doublons du coffre -->
+    <UCard class="mt-6">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon
+            name="i-lucide-copy"
+            class="w-5 h-5 text-warning"
+          />
+          <h2 class="text-xl font-semibold">
+            Doublons du coffre
+          </h2>
+        </div>
+      </template>
+
+      <p class="text-muted mb-4">
+        Détecte les items du catalogue en double (même nom, catégorie et sous-catégorie mais
+        lignes distinctes). Ces doublons éclatent la possession entre plusieurs lignes et masquent
+        les co-membres d'un groupe. La fusion garde la ligne la plus ancienne, y reporte possession,
+        traductions, coût et prérequis, puis supprime les doublons.
+      </p>
+
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          icon="i-lucide-search"
+          label="Détecter les doublons"
+          color="primary"
+          variant="outline"
+          :loading="isDetecting"
+          @click="detectDuplicates"
+        />
+        <UButton
+          v-if="dupGroups && dupGroups.length"
+          icon="i-lucide-merge"
+          :label="`Fusionner (${dupCount})`"
+          color="warning"
+          :loading="isMerging"
+          @click="showMergeModal = true"
+        />
+      </div>
+
+      <div
+        v-if="dupGroups"
+        class="mt-4"
+      >
+        <p
+          v-if="!dupGroups.length"
+          class="text-sm text-success"
+        >
+          Aucun doublon détecté.
+        </p>
+        <ul
+          v-else
+          class="space-y-2 max-h-96 overflow-y-auto text-sm"
+        >
+          <li
+            v-for="g in dupGroups"
+            :key="`${g.category}/${g.subcategory}/${g.name}`"
+            class="border border-muted/20 rounded p-2"
+          >
+            <div class="font-medium">
+              {{ g.name }}
+            </div>
+            <div class="text-xs text-muted mb-1">
+              {{ g.category }} / {{ g.subcategory || '—' }} · {{ g.items.length }} lignes
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="(it, idx) in g.items"
+                :key="it.id"
+                class="text-xs px-1.5 py-0.5 rounded bg-muted/10"
+                :class="idx === 0 ? 'ring-1 ring-success/40' : ''"
+              >
+                #{{ it.id }} · {{ it.owners }} poss.{{ idx === 0 ? ' (gardé)' : '' }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </UCard>
+
     <!-- Modal de confirmation -->
     <UModal v-model:open="showConfirmModal">
       <template #content>
@@ -269,6 +395,51 @@ async function executeRestore() {
                 color="warning"
                 icon="i-lucide-upload"
                 @click="executeRestore"
+              />
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal de confirmation fusion doublons -->
+    <UModal v-model:open="showMergeModal">
+      <template #content>
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2 text-warning">
+              <UIcon
+                name="i-lucide-alert-triangle"
+                class="w-6 h-6"
+              />
+              <h2 class="text-xl font-semibold">
+                Fusionner les doublons
+              </h2>
+            </div>
+          </template>
+
+          <p class="mb-2">
+            <strong>{{ dupCount }}</strong> doublon(s) seront supprimés et leur possession reportée
+            sur la ligne la plus ancienne de chaque groupe.
+          </p>
+          <p class="text-warning font-medium">
+            Cette action ne peut pas être annulée.
+          </p>
+
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton
+                label="Annuler"
+                color="neutral"
+                variant="outline"
+                @click="showMergeModal = false"
+              />
+              <UButton
+                label="Fusionner"
+                color="warning"
+                icon="i-lucide-merge"
+                :loading="isMerging"
+                @click="mergeDuplicates"
               />
             </div>
           </template>

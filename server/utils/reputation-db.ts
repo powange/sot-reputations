@@ -1133,6 +1133,116 @@ function dedupeChestItemsByKey(db: Database.Database): void {
   tx()
 }
 
+export interface DuplicateChestItemGroup {
+  name: string
+  category: string
+  subcategory: string | null
+  items: Array<{ id: number, image: string | null, itemKey: string, owners: number, hasCost: boolean, hasPrereqs: boolean }>
+}
+
+/**
+ * Doublons « résiduels » du catalogue : lignes de même nom (non vide) + catégorie +
+ * sous-catégorie mais d'item_key DIFFÉRENT (donc non fusionnées par la dédup auto par
+ * clé). Apparaissent quand un item est ré-importé avec une image variable ou sans
+ * image (clé = #Name, par joueur). Aperçu admin avant fusion.
+ */
+export function findDuplicateChestItemGroups(): DuplicateChestItemGroup[] {
+  const db = getReputationDb()
+  const groups = db.prepare(`
+    SELECT lower(trim(name)) as nname, category, subcategory
+    FROM chest_items
+    WHERE name IS NOT NULL AND trim(name) != ''
+    GROUP BY lower(trim(name)), category, COALESCE(subcategory, '')
+    HAVING COUNT(*) > 1
+  `).all() as Array<{ nname: string, category: string, subcategory: string | null }>
+
+  const getRows = db.prepare(`
+    SELECT id, name, image, item_key as itemKey, cost, prerequisites,
+      (SELECT COUNT(*) FROM user_chest_items uci WHERE uci.item_id = chest_items.id) as owners
+    FROM chest_items
+    WHERE lower(trim(name)) = ? AND category = ? AND COALESCE(subcategory, '') = COALESCE(?, '')
+    ORDER BY id
+  `)
+
+  return groups.map((g) => {
+    const rows = getRows.all(g.nname, g.category, g.subcategory) as Array<{ id: number, name: string, image: string | null, itemKey: string, cost: string | null, prerequisites: string | null, owners: number }>
+    return {
+      name: rows[0]?.name ?? g.nname,
+      category: g.category,
+      subcategory: g.subcategory,
+      items: rows.map(r => ({ id: r.id, image: r.image, itemKey: r.itemKey, owners: r.owners, hasCost: !!r.cost, hasPrereqs: !!r.prerequisites }))
+    }
+  })
+}
+
+/**
+ * Fusionne les doublons résiduels (cf. findDuplicateChestItemGroups) : garde la ligne
+ * la plus ancienne (MIN id), comble ses champs manquants (coût, prérequis, image,
+ * couleurs) depuis les doublons, réaiguille la possession (user_chest_items) et les
+ * traductions (chest_item_translations, par item_key), puis supprime les doublons.
+ */
+export function mergeDuplicateChestItemGroups(): { groups: number, deleted: number } {
+  const db = getReputationDb()
+  const groups = db.prepare(`
+    SELECT lower(trim(name)) as nname, category, subcategory, MIN(id) as keepId
+    FROM chest_items
+    WHERE name IS NOT NULL AND trim(name) != ''
+    GROUP BY lower(trim(name)), category, COALESCE(subcategory, '')
+    HAVING COUNT(*) > 1
+  `).all() as Array<{ nname: string, category: string, subcategory: string | null, keepId: number }>
+  if (groups.length === 0) return { groups: 0, deleted: 0 }
+
+  type Row = { id: number, itemKey: string, image: string | null, cost: string | null, prerequisites: string | null, colors: string | null, colorsManual: number | null }
+  const getKeep = db.prepare('SELECT id, item_key as itemKey, image, cost, prerequisites, colors, colors_manual as colorsManual FROM chest_items WHERE id = ?')
+  const getDups = db.prepare(`
+    SELECT id, item_key as itemKey, image, cost, prerequisites, colors, colors_manual as colorsManual
+    FROM chest_items
+    WHERE lower(trim(name)) = ? AND category = ? AND COALESCE(subcategory, '') = COALESCE(?, '') AND id != ?
+    ORDER BY id
+  `)
+  const updateKeep = db.prepare('UPDATE chest_items SET cost = ?, prerequisites = ?, image = ?, colors = ?, colors_manual = ? WHERE id = ?')
+  const remapOwnership = db.prepare('UPDATE OR IGNORE user_chest_items SET item_id = ? WHERE item_id = ?')
+  const delOwnership = db.prepare('DELETE FROM user_chest_items WHERE item_id = ?')
+  const remapTranslations = db.prepare('UPDATE OR IGNORE chest_item_translations SET item_key = ? WHERE item_key = ?')
+  const delTranslations = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ?')
+  const delItem = db.prepare('DELETE FROM chest_items WHERE id = ?')
+
+  let deleted = 0
+  const tx = db.transaction(() => {
+    for (const g of groups) {
+      const keep = getKeep.get(g.keepId) as Row | undefined
+      if (!keep) continue
+      const dups = getDups.all(g.nname, g.category, g.subcategory, g.keepId) as Row[]
+
+      // Comble les champs vides du keep avec le 1er doublon qui les porte.
+      let cost = keep.cost, prereqs = keep.prerequisites, image = keep.image, colors = keep.colors
+      let manual = keep.colorsManual ?? 0
+      for (const d of dups) {
+        if (!cost && d.cost) cost = d.cost
+        if (!prereqs && d.prerequisites) prereqs = d.prerequisites
+        if ((!image || image === '') && d.image) image = d.image
+        if (!colors && d.colors) colors = d.colors
+        if (d.colorsManual) manual = 1
+      }
+      updateKeep.run(cost, prereqs, image, colors, manual, g.keepId)
+
+      for (const d of dups) {
+        remapOwnership.run(g.keepId, d.id)
+        delOwnership.run(d.id)
+        if (d.itemKey !== keep.itemKey) {
+          remapTranslations.run(keep.itemKey, d.itemKey)
+          delTranslations.run(d.itemKey)
+        }
+        delItem.run(d.id)
+        deleted++
+      }
+    }
+  })
+  tx()
+  invalidatePrereqIndex()
+  return { groups: groups.length, deleted }
+}
+
 function parseChestItem(raw: unknown): ParsedChestItem | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -1282,6 +1392,15 @@ export function importChestData(
     WHERE id = ?
   `)
   const getExistingByCategory = db.prepare('SELECT item_key as key, sort_order as sortOrder FROM chest_items WHERE category = ?')
+  // Repli d'appariement : si la clé ne matche pas (image absente ou URL variable),
+  // réutiliser une ligne existante de même nom + catégorie + sous-catégorie pour ne
+  // pas créer de doublon (qui éclaterait la possession entre lignes). On vise la plus
+  // ancienne (MIN id) si plusieurs subsistent encore.
+  const getByNameInScope = db.prepare(`
+    SELECT id, item_key as itemKey FROM chest_items
+    WHERE lower(trim(name)) = lower(trim(?)) AND category = ? AND COALESCE(subcategory, '') = COALESCE(?, '')
+    ORDER BY id LIMIT 1
+  `)
   const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
   const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
 
@@ -1302,6 +1421,9 @@ export function importChestData(
   }
   // Items créés lors de cet import (catalogue partagé) : candidats à l'enrichissement wiki.
   const newItems: Array<{ id: number, enTitle: string }> = []
+  // Clé d'import -> clé réellement stockée sur la ligne (diffèrent quand on a réutilisé
+  // une ligne existante par nom). Sert à indexer les traductions sur la bonne ligne.
+  const keyRemap = new Map<string, string>()
 
   const upsertTranslation = db.prepare(`
     INSERT INTO chest_item_translations (item_key, locale, name, description)
@@ -1322,7 +1444,19 @@ export function importChestData(
       const orders = computeChestSortOrders(items.map(i => i.itemKey), existing)
 
       for (const item of items) {
-        const row = getByItemKey.get(item.itemKey) as { id: number } | undefined
+        let row = getByItemKey.get(item.itemKey) as { id: number } | undefined
+        // La traduction de cet item doit s'indexer sur la clé réellement stockée.
+        let storedKey = item.itemKey
+        // Pas de match par clé : réutiliser une ligne existante de même nom dans le
+        // même périmètre plutôt que d'en créer une nouvelle (anti-doublon).
+        if (!row && item.name) {
+          const byName = getByNameInScope.get(item.name, category, item.subcategory) as { id: number, itemKey: string } | undefined
+          if (byName) {
+            row = { id: byName.id }
+            storedKey = byName.itemKey
+          }
+        }
+        keyRemap.set(item.itemKey, storedKey)
         let id: number
         if (row) {
           updateItem.run(
@@ -1346,10 +1480,11 @@ export function importChestData(
       }
     }
 
-    // Traductions EN/ES (nom + description) : upsert par item_key (profite à tous).
+    // Traductions EN/ES (nom + description) : upsert sur la clé réellement stockée
+    // (via keyRemap) pour rester lié à la ligne réutilisée par nom le cas échéant.
     for (const { locale, items } of translationData) {
       for (const [itemKey, value] of items) {
-        if (value.name) upsertTranslation.run(itemKey, locale, value.name, value.description)
+        if (value.name) upsertTranslation.run(keyRemap.get(itemKey) || itemKey, locale, value.name, value.description)
       }
     }
   })
