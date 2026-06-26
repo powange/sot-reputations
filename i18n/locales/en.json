@@ -79,6 +79,7 @@
     "importMyData": "Import my data",
     "searchPlaceholder": "Search a commendation...",
     "factions": "Factions:",
+    "factionFilterHint": "Ctrl/Cmd+click to select multiple factions",
     "campaigns": "Campaigns:",
     "filterAchievements": "Filter commendations:",
     "notCompleted": "Not completed",

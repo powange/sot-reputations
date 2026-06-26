@@ -79,6 +79,7 @@
     "importMyData": "Importer mes données",
     "searchPlaceholder": "Rechercher un accomplissement...",
     "factions": "Factions :",
+    "factionFilterHint": "Ctrl/Cmd+clic pour sélectionner plusieurs factions",
     "campaigns": "Campagnes :",
     "filterAchievements": "Filtrer accomplissements :",
     "notCompleted": "Non complétés",

@@ -77,6 +77,21 @@ function toggleFaction(factionKey: string) {
   }
 }
 
+// Clic sur une faction : sélection simple (remplace l'existante). Ctrl/Cmd+clic :
+// multi-sélection (ajoute/retire). Re-cliquer la seule faction sélectionnée revient
+// à « toutes » (sélection vide).
+function onFactionClick(factionKey: string, event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey) {
+    toggleFaction(factionKey)
+    return
+  }
+  if (selectedFactionKeys.value.length === 1 && selectedFactionKeys.value[0] === factionKey) {
+    selectedFactionKeys.value = []
+  } else {
+    selectedFactionKeys.value = [factionKey]
+  }
+}
+
 function selectAllFactions() {
   selectedFactionKeys.value = []
 }
@@ -132,7 +147,8 @@ function toggleCampaign(campaignId: number) {
           :color="selectedFactionKeys.includes(faction.key) ? 'primary' : 'neutral'"
           :variant="selectedFactionKeys.includes(faction.key) ? 'solid' : 'outline'"
           size="sm"
-          @click="toggleFaction(faction.key)"
+          :title="$t('reputations.factionFilterHint')"
+          @click="onFactionClick(faction.key, $event)"
         >
           {{ translateFactionField(faction, 'name', locale) }}
         </UButton>

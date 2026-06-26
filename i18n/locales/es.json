@@ -79,6 +79,7 @@
     "importMyData": "Importar mis datos",
     "searchPlaceholder": "Buscar una alabanza...",
     "factions": "Facciones:",
+    "factionFilterHint": "Ctrl/Cmd+clic para seleccionar varias facciones",
     "campaigns": "Campanas:",
     "filterAchievements": "Filtrar alabanzas:",
     "notCompleted": "No completados",
