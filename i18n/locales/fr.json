@@ -264,6 +264,15 @@
     "prereqLegendary": "Titre Pirate Legend requis",
     "prereqReimport": "Réimporte ta réputation pour évaluer les niveaux de faction."
   },
+  "factionNames": {
+    "hoarder": "Collectionneurs d'or",
+    "merchant": "Alliance des marchands",
+    "souls": "Ordre des âmes",
+    "hunter": "L'appel du chasseur",
+    "seadog": "Loups de mer",
+    "reaper": "Os de la faucheuse",
+    "athena": "Fortune d'Athéna"
+  },
   "chestColors": {
     "red": "Rouge",
     "orange": "Orange",

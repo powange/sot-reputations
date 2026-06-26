@@ -264,6 +264,15 @@
     "prereqLegendary": "Se requiere el título Leyenda Pirata",
     "prereqReimport": "Reimporta tu reputación para evaluar los niveles de facción."
   },
+  "factionNames": {
+    "hoarder": "Acaparadores de Oro",
+    "merchant": "Alianza Comercial",
+    "souls": "Orden de las Almas",
+    "hunter": "Llamada del Cazador",
+    "seadog": "Lobos de Mar",
+    "reaper": "Huesos de la Parca",
+    "athena": "Fortuna de Atenea"
+  },
   "chestColors": {
     "red": "Rojo",
     "orange": "Naranja",

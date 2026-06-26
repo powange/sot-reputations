@@ -264,6 +264,15 @@
     "prereqLegendary": "Pirate Legend title required",
     "prereqReimport": "Re-import your reputation to evaluate faction levels."
   },
+  "factionNames": {
+    "hoarder": "Gold Hoarders",
+    "merchant": "Merchant Alliance",
+    "souls": "Order of Souls",
+    "hunter": "Hunter's Call",
+    "seadog": "Sea Dogs",
+    "reaper": "Reaper's Bones",
+    "athena": "Athena's Fortune"
+  },
   "chestColors": {
     "red": "Red",
     "orange": "Orange",

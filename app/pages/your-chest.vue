@@ -89,17 +89,10 @@ function costEntries(item: ChestItem): Array<{ key: string, icon: string, label:
 }
 
 // --- Prérequis d'obtention (depuis le wiki) ---
-const FACTION_LABELS: Record<string, string> = {
-  hoarder: 'Gold Hoarders',
-  merchant: 'Merchant Alliance',
-  souls: 'Order of Souls',
-  hunter: 'Hunter\'s Call',
-  seadog: 'Sea Dogs',
-  reaper: 'Reaper\'s Bones',
-  athena: 'Athena\'s Fortune'
-}
+// Nom de faction localisé à partir de la clé courte du wiki (hoarder, merchant,
+// souls, hunter, seadog, reaper, athena), via i18n (factionNames.<clé>).
 function factionLabel(key: string): string {
-  return FACTION_LABELS[key] || key
+  return t(`factionNames.${key}`)
 }
 
 // Libellé traduit (selon la locale courante) avec repli sur la clé humanisée
