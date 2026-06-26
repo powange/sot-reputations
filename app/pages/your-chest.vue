@@ -285,6 +285,8 @@ const filteredItems = computed(() => {
 // --- Pagination ---
 const pageSize = 60
 const currentPage = ref(Math.max(1, Number.parseInt(queryToString(route.query.page), 10) || 1))
+// Conteneur de la grille : on y revient en haut au changement de page.
+const gridRef = ref<HTMLElement | null>(null)
 const totalPages = computed(() => Math.ceil(filteredItems.value.length / pageSize))
 const paginatedItems = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -310,6 +312,12 @@ watch(
 watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal && newTotal > 0) currentPage.value = newTotal
 }, { immediate: true })
+
+// Changement de page (pagination ou reset de filtre) -> revenir en haut de la liste.
+watch(currentPage, () => {
+  if (!import.meta.client) return
+  nextTick(() => gridRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+})
 
 // Reflète filtres + page dans l'URL. `replace` : pas d'entrée d'historique à chaque
 // frappe. Les valeurs par défaut (possession « owned », page 1, filtres vides) sont
@@ -581,7 +589,8 @@ watch(
         <!-- Grille -->
         <div
           v-if="filteredItems.length > 0"
-          class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-4"
+          ref="gridRef"
+          class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-4 scroll-mt-4"
         >
           <UCard
             v-for="item in paginatedItems"
