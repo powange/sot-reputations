@@ -263,7 +263,15 @@
     "prereqReputationLabel": "Reputation",
     "prereqYou": "(you: {value})",
     "prereqLegendary": "Pirate Legend title required",
-    "prereqReimport": "Re-import your reputation to evaluate faction levels."
+    "prereqReimport": "Re-import your reputation to evaluate faction levels.",
+    "emblemModal": {
+      "progress": "Progress",
+      "completed": "Completed",
+      "notCompleted": "Not completed",
+      "grades": "Grade thresholds",
+      "noProgress": "No imported progress",
+      "error": "Could not load the emblem"
+    }
   },
   "factionNames": {
     "hoarder": "Gold Hoarders",

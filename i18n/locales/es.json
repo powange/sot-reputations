@@ -263,7 +263,15 @@
     "prereqReputationLabel": "Reputación",
     "prereqYou": "(tú: {value})",
     "prereqLegendary": "Se requiere el título Leyenda Pirata",
-    "prereqReimport": "Reimporta tu reputación para evaluar los niveles de facción."
+    "prereqReimport": "Reimporta tu reputación para evaluar los niveles de facción.",
+    "emblemModal": {
+      "progress": "Progreso",
+      "completed": "Completado",
+      "notCompleted": "No completado",
+      "grades": "Umbrales de grado",
+      "noProgress": "Sin progreso importado",
+      "error": "No se pudo cargar el emblema"
+    }
   },
   "factionNames": {
     "hoarder": "Acaparadores de Oro",

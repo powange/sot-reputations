@@ -36,7 +36,7 @@ interface ChestItem {
   } | null
   eligibility: {
     status: 'met' | 'locked' | 'unknown'
-    commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean, maxGrade: number | null }>
+    commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean, maxGrade: number | null, emblemId: number | null }>
     factions: Array<{ key: string, requiredLevel: number, userLevel: number | null, met: boolean }>
   } | null
   groupOwners: Array<{ group: string, members: string[] }>
@@ -68,6 +68,14 @@ function openItem(item: ChestItem) {
   if (!item.image) return
   selectedItem.value = item
   isImageModalOpen.value = true
+}
+
+// --- Popup détail d'un emblème (depuis un prérequis de commendation) ---
+const selectedEmblemId = ref<number | null>(null)
+const isEmblemModalOpen = ref(false)
+function openEmblem(emblemId: number) {
+  selectedEmblemId.value = emblemId
+  isEmblemModalOpen.value = true
 }
 
 // --- Coût de l'item (icône de devise + montant) ---
@@ -842,7 +850,17 @@ watch(
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  {{ $t('yourChest.prereqCommendationLabel') }} <span class="font-medium">{{ c.name }}</span>
+                  {{ $t('yourChest.prereqCommendationLabel') }}
+                  <button
+                    v-if="c.emblemId"
+                    type="button"
+                    class="font-medium underline decoration-dotted hover:text-primary"
+                    @click="openEmblem(c.emblemId)"
+                  >{{ c.name }}</button>
+                  <span
+                    v-else
+                    class="font-medium"
+                  >{{ c.name }}</span>
                   <!-- Grade affiché seulement pour les emblèmes multi-grades ; un emblème
                        binaire (max_grade <= 1) demande juste d'être complété. -->
                   <template v-if="c.maxGrade == null || c.maxGrade > 1">
@@ -929,5 +947,11 @@ watch(
         </div>
       </template>
     </UModal>
+
+    <!-- Popup détail d'un emblème (prérequis de commendation) -->
+    <EmblemDetailModal
+      v-model:open="isEmblemModalOpen"
+      :emblem-id="selectedEmblemId"
+    />
   </UContainer>
 </template>

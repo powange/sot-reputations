@@ -263,7 +263,15 @@
     "prereqReputationLabel": "Réputation",
     "prereqYou": "(toi : {value})",
     "prereqLegendary": "Titre Pirate Legend requis",
-    "prereqReimport": "Réimporte ta réputation pour évaluer les niveaux de faction."
+    "prereqReimport": "Réimporte ta réputation pour évaluer les niveaux de faction.",
+    "emblemModal": {
+      "progress": "Progression",
+      "completed": "Complété",
+      "notCompleted": "Non complété",
+      "grades": "Paliers de grade",
+      "noProgress": "Aucune progression importée",
+      "error": "Impossible de charger l'emblème"
+    }
   },
   "factionNames": {
     "hoarder": "Collectionneurs d'or",
