@@ -77,6 +77,8 @@ export function getReputationDb(): Database.Database {
       user_id INTEGER NOT NULL,
       faction_key TEXT NOT NULL,
       level INTEGER NOT NULL DEFAULT 0,
+      distinction_level INTEGER NOT NULL DEFAULT 0,
+      progress REAL NOT NULL DEFAULT 0,
       PRIMARY KEY (user_id, faction_key),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -349,6 +351,17 @@ export function getReputationDb(): Database.Database {
     db.exec('UPDATE emblems SET validated = 1') // Valider tous les emblèmes existants
   }
 
+  // Migration: ajouter distinction_level et progress à user_faction_levels
+  // (captés à l'import, en plus du Level cumulé : niveau de distinction et
+  // progression fractionnaire vers le niveau suivant).
+  const factionLevelCols = db.prepare('PRAGMA table_info(user_faction_levels)').all() as Array<{ name: string }>
+  if (!factionLevelCols.some(col => col.name === 'distinction_level')) {
+    db.exec('ALTER TABLE user_faction_levels ADD COLUMN distinction_level INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!factionLevelCols.some(col => col.name === 'progress')) {
+    db.exec('ALTER TABLE user_faction_levels ADD COLUMN progress REAL NOT NULL DEFAULT 0')
+  }
+
   // Migration: convertir les rôles 'admin' en 'chef' pour le nouveau système de grades
   const hasAdminRole = db.prepare(`
     SELECT id FROM group_members WHERE role = 'admin' LIMIT 1
@@ -458,6 +471,8 @@ interface CampaignData {
 interface FactionData {
   Motto?: string
   Level?: number
+  DistinctionLevel?: number
+  Progress?: number
   Emblems?: {
     Emblems?: EmblemData[]
   }
@@ -547,8 +562,12 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
   `)
 
   const upsertUserFactionLevel = db.prepare(`
-    INSERT INTO user_faction_levels (user_id, faction_key, level) VALUES (?, ?, ?)
-    ON CONFLICT(user_id, faction_key) DO UPDATE SET level = excluded.level
+    INSERT INTO user_faction_levels (user_id, faction_key, level, distinction_level, progress)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, faction_key) DO UPDATE SET
+      level = excluded.level,
+      distinction_level = excluded.distinction_level,
+      progress = excluded.progress
   `)
 
   // Mettre à jour l'image si l'emblème est complété et l'image importée est différente
@@ -572,8 +591,16 @@ export function importReputationData(userId: number, jsonData: ReputationJson): 
       const factionId = factionRow.id
 
       // Niveau de réputation de la faction (pour l'éligibilité des objets du coffre).
+      // On capte aussi le niveau de distinction et la progression fractionnaire
+      // quand ils sont présents dans le JSON officiel.
       if (typeof factionData.Level === 'number') {
-        upsertUserFactionLevel.run(userId, factionKey, factionData.Level)
+        upsertUserFactionLevel.run(
+          userId,
+          factionKey,
+          factionData.Level,
+          typeof factionData.DistinctionLevel === 'number' ? factionData.DistinctionLevel : 0,
+          typeof factionData.Progress === 'number' ? factionData.Progress : 0
+        )
       }
 
       // Factions avec Campaigns (BilgeRats, HuntersCall)
@@ -1206,7 +1233,7 @@ export function importChestData(
   userId: number,
   payload: { chestData?: Record<string, unknown> },
   translations?: { en?: unknown, es?: unknown }
-): { items: number, categories: number } {
+): { items: number, categories: number, newItems: Array<{ id: number, enTitle: string }> } {
   const chestData = payload?.chestData
   if (!chestData || typeof chestData !== 'object') {
     throw new Error('Données de coffre invalides')
@@ -1229,7 +1256,7 @@ export function importChestData(
   }
 
   if (totalItems === 0) {
-    return { items: 0, categories: 0 }
+    return { items: 0, categories: 0, newItems: [] as Array<{ id: number, enTitle: string }> }
   }
 
   const db = getReputationDb()
@@ -1263,6 +1290,19 @@ export function importChestData(
     { locale: 'en', items: parseChestTranslations((translations?.en as { chestData?: unknown } | undefined)?.chestData) },
     { locale: 'es', items: parseChestTranslations((translations?.es as { chestData?: unknown } | undefined)?.chestData) }
   ]
+
+  // Nom EN par item_key : sert à retrouver la page wiki (anglaise) des items
+  // nouvellement créés, pour les enrichir en coût/prérequis après l'import.
+  const enByItemKey = new Map<string, string>()
+  const enItems = translationData.find(t => t.locale === 'en')?.items
+  if (enItems) {
+    for (const [itemKey, value] of enItems) {
+      if (value.name) enByItemKey.set(itemKey, value.name)
+    }
+  }
+  // Items créés lors de cet import (catalogue partagé) : candidats à l'enrichissement wiki.
+  const newItems: Array<{ id: number, enTitle: string }> = []
+
   const upsertTranslation = db.prepare(`
     INSERT INTO chest_item_translations (item_key, locale, name, description)
     VALUES (?, ?, ?, ?)
@@ -1296,6 +1336,11 @@ export function importChestData(
             orders.get(item.itemKey) ?? 0
           )
           id = Number(res.lastInsertRowid)
+          // Item neuf : candidat à l'enrichissement wiki UNIQUEMENT si on a son nom EN.
+          // La page wiki est anglaise ; un repli sur le nom FR ne matcherait jamais et
+          // ne ferait que générer des requêtes sortantes inutiles.
+          const enTitle = enByItemKey.get(item.itemKey)
+          if (enTitle) newItems.push({ id, enTitle })
         }
         insertOwnership.run(userId, id)
       }
@@ -1310,7 +1355,7 @@ export function importChestData(
   })
   run()
 
-  return { items: totalItems, categories: parsed.length }
+  return { items: totalItems, categories: parsed.length, newItems }
 }
 
 // Clé courte du wiki (champ *-level) -> clé de faction du site.

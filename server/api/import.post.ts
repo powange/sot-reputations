@@ -1,6 +1,33 @@
 import bcrypt from 'bcrypt'
-import { getReputationDb, importReputationData, importChestData, getGroupsByUserId } from '../utils/reputation-db'
+import { getReputationDb, importReputationData, importChestData, getGroupsByUserId, setChestItemCost, setChestItemPrereqs } from '../utils/reputation-db'
+import { fetchWikiItemsByTitles, normalizeName } from '../utils/sot-wiki'
 import { broadcastToGroups } from '../utils/sse'
+
+// Plafond d'items enrichis par import. L'endpoint /api/import est non authentifié et
+// le payload de coffre est contrôlable : sans plafond, un import forgé déclencherait
+// un nombre illimité de requêtes sortantes vers le wiki. Au-delà du seuil, on s'abstient
+// (drop de contenu légitime → synchro admin ; payload abusif → ignoré).
+const ENRICH_MAX_NEW_ITEMS = 50
+
+/**
+ * Enrichit (best-effort) les items tout juste créés dans le catalogue partagé avec
+ * leur coût et leurs prérequis lus sur le wiki. N'est lancé qu'en arrière-plan
+ * (fire-and-forget) : ne bloque jamais la réponse d'import et n'écrit que sur des
+ * items neufs (donc encore vides). La synchro admin reste le filet de secours.
+ */
+async function enrichNewChestItemsFromWiki(newItems: Array<{ id: number, enTitle: string }>): Promise<void> {
+  // '|' est un caractère interdit dans un titre wiki et casserait le batch titles=A|B.
+  const titles = [...new Set(newItems.map(n => n.enTitle.trim()).filter(t => t && !t.includes('|')))]
+  if (!titles.length) return
+  const wiki = await fetchWikiItemsByTitles(titles)
+  const byTitle = new Map(wiki.map(w => [normalizeName(w.title), w]))
+  for (const n of newItems) {
+    const w = byTitle.get(normalizeName(n.enTitle))
+    if (!w) continue
+    if (w.cost) setChestItemCost(n.id, w.cost)
+    if (w.prereqs) setChestItemPrereqs(n.id, w.prereqs)
+  }
+}
 
 // Mappe une erreur d'import vers un code HTTP (400 si JSON pas en français, 500 sinon).
 function throwImportError(error: unknown): never {
@@ -104,13 +131,25 @@ export default defineEventHandler(async (event) => {
 
   // Importer le coffre si présent (best-effort : ne fait pas échouer l'import
   // de réputation déjà réussi en cas de données de coffre invalides).
+  let newChestItems: Array<{ id: number, enTitle: string }> = []
   if (chestData) {
     try {
-      importChestData(userId, chestData, { en: chestEn, es: chestEs })
+      newChestItems = importChestData(userId, chestData, { en: chestEn, es: chestEs }).newItems
     } catch (error) {
       // coffre optionnel : on n'échoue pas l'import de réputation, mais on trace.
       console.error('[import] Échec de l\'import du coffre:', error instanceof Error ? error.message : error)
     }
+  }
+
+  // Enrichissement wiki des nouveaux items du catalogue, en arrière-plan : on ne
+  // bloque pas la réponse. Les coûts/prérequis apparaîtront au prochain affichage.
+  // Borné par ENRICH_MAX_NEW_ITEMS pour éviter une amplification de requêtes sortantes.
+  if (newChestItems.length > 0 && newChestItems.length <= ENRICH_MAX_NEW_ITEMS) {
+    enrichNewChestItemsFromWiki(newChestItems).catch((error) => {
+      console.error('[import] Échec de l\'enrichissement wiki des nouveaux items:', error instanceof Error ? error.message : error)
+    })
+  } else if (newChestItems.length > ENRICH_MAX_NEW_ITEMS) {
+    console.warn(`[import] Enrichissement wiki ignoré (${newChestItems.length} nouveaux items > ${ENRICH_MAX_NEW_ITEMS}) ; synchro admin requise.`)
   }
 
   // Notifier les groupes de l'utilisateur via SSE

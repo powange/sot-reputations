@@ -234,9 +234,19 @@ export async function fetchWikiItemCosts(wikiCategory: string): Promise<WikiItem
   const rootKey = normalizeName(wikiCategory)
   const itemTitles = titles.filter(t => normalizeName(t) !== rootKey)
 
-  // 2) Wikitext par lots de 50 -> coût de l'infobox.
+  // 2) Wikitext par lots de 50 -> coût + prérequis de l'infobox.
+  return fetchWikiItemsByTitles(itemTitles)
+}
+
+/**
+ * Récupère coût + prérequis pour une liste de titres de pages wiki (lots de 50).
+ * Les pages absentes (ou sans infobox {{variant}}) ressortent avec cost/prereqs null.
+ * Utilisé pour enrichir ponctuellement quelques items (ex. nouveaux items à l'import),
+ * sans parcourir une Category: entière.
+ */
+export async function fetchWikiItemsByTitles(titles: string[]): Promise<WikiItem[]> {
   const out: WikiItem[] = []
-  for (const batch of chunk(itemTitles, 50)) {
+  for (const batch of chunk(titles, 50)) {
     const d = await wikiApi<RevisionsResponse>({
       action: 'query',
       prop: 'revisions',
