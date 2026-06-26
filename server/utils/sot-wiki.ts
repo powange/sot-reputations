@@ -39,6 +39,13 @@ const FACTION_LEVEL_FIELDS: Record<string, string> = {
   'athena-level': 'athena'
 }
 
+// Factions d'événement mondial : le prérequis est exprimé via `faction = <nom anglais>`
+// + `allegiance = <niveau>` (au lieu d'un champ `*-level`). Nom normalisé -> clé courte.
+const ALLEGIANCE_FACTION_TO_KEY: Record<string, string> = {
+  'servants of the flame': 'flame',
+  'guardians of fortune': 'guardians'
+}
+
 interface CategoryMembersResponse {
   query?: { categorymembers?: Array<{ title: string }> }
   continue?: { cmcontinue?: string }
@@ -196,6 +203,16 @@ function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiP
   for (const [fieldName, key] of Object.entries(FACTION_LEVEL_FIELDS)) {
     const v = int(fieldName)
     if (v != null) fl[key] = v
+  }
+  // Allégeance aux factions d'événement (Serviteurs de la Flamme / Gardiens de la
+  // Fortune) : `faction = <nom>` + `allegiance = <niveau>`. Même sémantique qu'un
+  // niveau de faction (comparé au Level capté à l'import). Les deux champs sont
+  // requis : un `faction` seul (vendeur) ne crée pas de prérequis.
+  const allegianceFaction = str('faction')
+  const allegiance = int('allegiance')
+  if (allegianceFaction && allegiance != null) {
+    const key = ALLEGIANCE_FACTION_TO_KEY[normalizeName(allegianceFaction)]
+    if (key) fl[key] = allegiance
   }
   if (Object.keys(fl).length) prereqs.factionLevels = fl
   const leg = str('legendary')

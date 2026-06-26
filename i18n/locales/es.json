@@ -271,7 +271,9 @@
     "hunter": "Llamada del Cazador",
     "seadog": "Lobos de Mar",
     "reaper": "Huesos de la Parca",
-    "athena": "Fortuna de Atenea"
+    "athena": "Fortuna de Atenea",
+    "flame": "Siervos de la Llama",
+    "guardians": "Guardianes de la Fortuna"
   },
   "chestColors": {
     "red": "Rojo",

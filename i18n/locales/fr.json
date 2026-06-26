@@ -271,7 +271,9 @@
     "hunter": "L'appel du chasseur",
     "seadog": "Loups de mer",
     "reaper": "Os de la faucheuse",
-    "athena": "Fortune d'Athéna"
+    "athena": "Fortune d'Athéna",
+    "flame": "Serviteurs de la Flamme",
+    "guardians": "Gardiens de la Fortune"
   },
   "chestColors": {
     "red": "Rouge",

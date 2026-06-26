@@ -1358,7 +1358,7 @@ export function importChestData(
   return { items: totalItems, categories: parsed.length, newItems }
 }
 
-// Clé courte du wiki (champ *-level) -> clé de faction du site.
+// Clé courte du wiki (champ *-level, ou allégeance d'événement) -> clé de faction du site.
 const WIKI_FACTION_TO_KEY: Record<string, string> = {
   hoarder: 'GoldHoarders',
   merchant: 'MerchantAlliance',
@@ -1366,7 +1366,10 @@ const WIKI_FACTION_TO_KEY: Record<string, string> = {
   hunter: 'HuntersCall',
   seadog: 'SeaDogs',
   reaper: 'ReapersBones',
-  athena: 'AthenasFortune'
+  athena: 'AthenasFortune',
+  // Factions d'événement mondial (prérequis via `faction` + `allegiance`).
+  flame: 'Flameheart',
+  guardians: 'PirateLord'
 }
 
 interface EligibilityContext {

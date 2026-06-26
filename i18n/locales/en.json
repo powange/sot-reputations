@@ -271,7 +271,9 @@
     "hunter": "Hunter's Call",
     "seadog": "Sea Dogs",
     "reaper": "Reaper's Bones",
-    "athena": "Athena's Fortune"
+    "athena": "Athena's Fortune",
+    "flame": "Servants of the Flame",
+    "guardians": "Guardians of Fortune"
   },
   "chestColors": {
     "red": "Red",
