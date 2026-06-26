@@ -248,6 +248,36 @@ function toggleSubcategory(key: string) {
   else selectedSubcategories.value.splice(i, 1)
 }
 
+// Clic catégorie : sélection simple (remplace). Ctrl/Cmd+clic : multi-sélection (toggle).
+// Re-cliquer la seule catégorie sélectionnée revient à « toutes ».
+function onCategoryClick(cat: string, event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey) {
+    toggleCategory(cat)
+    return
+  }
+  if (selectedCategories.value.length === 1 && selectedCategories.value[0] === cat) {
+    clearCategories()
+  } else {
+    selectedCategories.value = [cat]
+    // Ne garder que les sous-catégories appartenant à la catégorie retenue.
+    selectedSubcategories.value = selectedSubcategories.value.filter(k => k.startsWith(`${cat}::`))
+  }
+}
+
+// Clic sous-catégorie : sélection simple (remplace). Ctrl/Cmd+clic : multi (toggle).
+// Re-cliquer la seule sous-catégorie sélectionnée revient à « toutes ».
+function onSubcategoryClick(key: string, event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey) {
+    toggleSubcategory(key)
+    return
+  }
+  if (selectedSubcategories.value.length === 1 && selectedSubcategories.value[0] === key) {
+    selectedSubcategories.value = []
+  } else {
+    selectedSubcategories.value = [key]
+  }
+}
+
 const filteredItems = computed(() => {
   let list = items.value
   // Filtres liés à l'utilisateur : ignorés en mode public.
@@ -475,7 +505,8 @@ watch(
               :color="selectedCategories.includes(cat) ? 'primary' : 'neutral'"
               :variant="selectedCategories.includes(cat) ? 'solid' : 'outline'"
               size="sm"
-              @click="toggleCategory(cat)"
+              :title="$t('yourChest.filterMultiSelectHint')"
+              @click="onCategoryClick(cat, $event)"
             >
               {{ catLabel(cat) }}
             </UButton>
@@ -495,7 +526,8 @@ watch(
                 :color="selectedSubcategories.includes(subKey(group.category, sub)) ? 'info' : 'neutral'"
                 :variant="selectedSubcategories.includes(subKey(group.category, sub)) ? 'solid' : 'outline'"
                 size="sm"
-                @click="toggleSubcategory(subKey(group.category, sub))"
+                :title="$t('yourChest.filterMultiSelectHint')"
+                @click="onSubcategoryClick(subKey(group.category, sub), $event)"
               >
                 {{ subLabel(group.category, sub) }}
               </UButton>

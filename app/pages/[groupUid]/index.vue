@@ -516,6 +516,20 @@ function toggleUser(userId: number) {
   }
 }
 
+// Clic utilisateur : sélection simple (remplace). Ctrl/Cmd+clic : multi-sélection (toggle).
+// Re-cliquer le seul utilisateur sélectionné revient à « tous ».
+function onUserClick(userId: number, event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey) {
+    toggleUser(userId)
+    return
+  }
+  if (selectedUserIds.value.length === 1 && selectedUserIds.value[0] === userId) {
+    selectAllUsers()
+  } else {
+    selectedUserIds.value = [userId]
+  }
+}
+
 async function handleInvite() {
   if (!inviteUsername.value.trim()) {
     toast.add({ title: t('common.error'), description: t('groupPage.pseudoRequired'), color: 'error' })
@@ -931,7 +945,7 @@ onUnmounted(() => {
                 :color="selectedUserIds.includes(u.id) ? 'primary' : 'neutral'"
                 :variant="selectedUserIds.includes(u.id) ? 'solid' : 'outline'"
                 size="sm"
-                @click="toggleUser(u.id)"
+                @click="onUserClick(u.id, $event)"
               >
                 {{ u.username }} - {{ userCompletionStats[u.id]?.percentage || 0 }}%
               </UButton>

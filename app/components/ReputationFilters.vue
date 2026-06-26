@@ -96,19 +96,25 @@ function selectAllFactions() {
   selectedFactionKeys.value = []
 }
 
-function toggleCampaign(campaignId: number) {
+// Clic sur une campagne : sélection simple (remplace). Ctrl/Cmd+clic : multi-sélection
+// (toggle, en gardant au moins une campagne). Re-cliquer la seule campagne sélectionnée
+// revient à « toutes » (toutes les campagnes des factions sélectionnées).
+function onCampaignClick(campaignId: number, event: MouseEvent) {
   const allCampaignIds = selectedFactions.value.flatMap(f => f.campaigns.map(c => c.id))
-  const allSelected = selectedCampaignIds.value.length === allCampaignIds.length
-
-  if (allSelected) {
-    selectedCampaignIds.value = [campaignId]
-  } else {
-    const index = selectedCampaignIds.value.indexOf(campaignId)
-    if (index === -1) {
+  if (event.ctrlKey || event.metaKey) {
+    if (selectedCampaignIds.value.includes(campaignId)) {
+      if (selectedCampaignIds.value.length > 1) {
+        selectedCampaignIds.value = selectedCampaignIds.value.filter(id => id !== campaignId)
+      }
+    } else {
       selectedCampaignIds.value = [...selectedCampaignIds.value, campaignId]
-    } else if (selectedCampaignIds.value.length > 1) {
-      selectedCampaignIds.value = selectedCampaignIds.value.filter(id => id !== campaignId)
     }
+    return
+  }
+  if (selectedCampaignIds.value.length === 1 && selectedCampaignIds.value[0] === campaignId) {
+    selectedCampaignIds.value = allCampaignIds
+  } else {
+    selectedCampaignIds.value = [campaignId]
   }
 }
 </script>
@@ -170,7 +176,8 @@ function toggleCampaign(campaignId: number) {
             :color="selectedCampaignIds.includes(campaign.id) ? 'info' : 'neutral'"
             :variant="selectedCampaignIds.includes(campaign.id) ? 'solid' : 'outline'"
             size="sm"
-            @click="toggleCampaign(campaign.id)"
+            :title="$t('reputations.campaignFilterHint')"
+            @click="onCampaignClick(campaign.id, $event)"
           >
             {{ translateCampaignField(campaign, 'name', locale) }}
           </UButton>
