@@ -36,7 +36,7 @@ interface ChestItem {
   } | null
   eligibility: {
     status: 'met' | 'locked' | 'unknown'
-    commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean }>
+    commendations: Array<{ name: string, requiredGrade: number, userGrade: number | null, met: boolean, maxGrade: number | null }>
     factions: Array<{ key: string, requiredLevel: number, userLevel: number | null, met: boolean }>
   } | null
   groupOwners: Array<{ group: string, members: string[] }>
@@ -832,11 +832,16 @@ watch(
                   class="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  {{ $t('yourChest.prereqCommendationLabel') }} <span class="font-medium">{{ c.name }}</span> — {{ $t('yourChest.gradeLabel', { grade: c.requiredGrade }) }}
-                  <span
-                    v-if="!isPublic"
-                    class="text-muted"
-                  >{{ $t('yourChest.prereqYou', { value: c.userGrade === null ? '?' : c.userGrade }) }}</span>
+                  {{ $t('yourChest.prereqCommendationLabel') }} <span class="font-medium">{{ c.name }}</span>
+                  <!-- Grade affiché seulement pour les emblèmes multi-grades ; un emblème
+                       binaire (max_grade <= 1) demande juste d'être complété. -->
+                  <template v-if="c.maxGrade == null || c.maxGrade > 1">
+                    — {{ $t('yourChest.gradeLabel', { grade: c.requiredGrade }) }}
+                    <span
+                      v-if="!isPublic"
+                      class="text-muted"
+                    >{{ $t('yourChest.prereqYou', { value: c.userGrade === null ? '?' : c.userGrade }) }}</span>
+                  </template>
                 </span>
               </li>
               <li
