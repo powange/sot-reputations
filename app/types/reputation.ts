@@ -16,6 +16,9 @@ export interface FactionInfo {
   name: string
   motto: string
   translations?: Record<string, FactionTranslation>
+  // Niveau de réputation de l'utilisateur pour cette faction (capté à l'import).
+  // Absent en mode public et tant que l'utilisateur n'a pas importé sa progression.
+  level?: number
 }
 
 export interface EmblemInfo {

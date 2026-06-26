@@ -553,8 +553,16 @@ async function handleDelete() {
               v-if="campaigns.some(c => filterEmblemsList(c.emblems).length > 0)"
               class="mb-8"
             >
-              <h2 class="text-2xl font-pirate">
+              <h2 class="text-2xl font-pirate flex items-center gap-2 flex-wrap">
                 {{ translateFactionField(faction, 'name', locale) }}
+                <UBadge
+                  v-if="faction.level"
+                  color="neutral"
+                  variant="subtle"
+                  class="font-sans"
+                >
+                  {{ $t('reputations.factionLevel', { level: faction.level }) }}
+                </UBadge>
               </h2>
               <p
                 v-if="translateFactionField(faction, 'motto', locale)"

@@ -73,6 +73,7 @@
     "title": "My Reputations",
     "publicTitle": "Reputations",
     "lastImport": "Last import: {date}",
+    "factionLevel": "Level {level}",
     "noData": "No reputation data",
     "noDataDescription": "Import your reputation data to view them",
     "importMyData": "Import my data",

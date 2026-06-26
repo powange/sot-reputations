@@ -1415,6 +1415,22 @@ function getUserEligibilityContext(userId: number): EligibilityContext {
   return { grades, emblemNames, hasImported, factionLevels }
 }
 
+/**
+ * Niveaux de faction de l'utilisateur (captés à l'import), indexés par clé de faction.
+ * Objet vide tant que l'utilisateur n'a pas importé sa réputation (ou pour les factions
+ * sans niveau, ex. campagnes type Aventures en mer).
+ */
+export function getUserFactionLevels(userId: number): Record<string, { level: number, distinctionLevel: number, progress: number }> {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT faction_key as key, level, distinction_level as distinctionLevel, progress
+    FROM user_faction_levels WHERE user_id = ?
+  `).all(userId) as Array<{ key: string, level: number, distinctionLevel: number, progress: number }>
+  const out: Record<string, { level: number, distinctionLevel: number, progress: number }> = {}
+  for (const r of rows) out[r.key] = { level: r.level, distinctionLevel: r.distinctionLevel, progress: r.progress }
+  return out
+}
+
 // Statut d'éligibilité d'un item vs la progression de l'utilisateur (commendations + factions).
 function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityContext): ChestItemEligibility | null {
   if (!prereqs) return null
