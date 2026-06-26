@@ -1516,22 +1516,48 @@ interface EligibilityContext {
   hasImported: boolean
   // clé de faction (ex. AthenasFortune) -> niveau de réputation de l'utilisateur
   factionLevels: Map<string, number>
+  // nom d'emblème normalisé (EN + base) -> nom dans la locale courante (pour l'affichage)
+  localizedNames: Map<string, string>
 }
 
 // Contexte de l'utilisateur pour juger l'éligibilité des prérequis (commendations +
 // niveaux de faction). Emblèmes indexés par nom EN ET par nom de base (selon la langue
 // d'import), pour que le rapprochement avec le nom anglais du wiki marche dans les deux cas.
-function getUserEligibilityContext(userId: number): EligibilityContext {
+/**
+ * Nom d'emblème (EN + base, normalisés) -> nom dans la locale demandée. Sert à afficher
+ * le nom localisé d'une commendation dans les prérequis, à partir du nom anglais du wiki.
+ */
+function buildEmblemLocalizedNames(db: Database.Database, locale: string): Map<string, string> {
+  const rows = db.prepare(`
+    SELECT
+      COALESCE(NULLIF(et.name, ''), e.name) as enName,
+      e.name as baseName,
+      COALESCE(NULLIF(loc.name, ''), e.name) as localizedName
+    FROM emblems e
+    LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = 'en'
+    LEFT JOIN emblem_translations loc ON loc.emblem_id = e.id AND loc.locale = ?
+  `).all(locale) as Array<{ enName: string, baseName: string, localizedName: string }>
+  const map = new Map<string, string>()
+  for (const r of rows) {
+    for (const k of new Set([normalizeName(r.enName), normalizeName(r.baseName)])) {
+      map.set(k, r.localizedName)
+    }
+  }
+  return map
+}
+
+function getUserEligibilityContext(userId: number, locale = 'fr'): EligibilityContext {
   const db = getReputationDb()
   const rows = db.prepare(`
     SELECT
       COALESCE(NULLIF(et.name, ''), e.name) as enName,
       e.name as baseName,
-      ue.grade as grade
+      ue.grade as grade,
+      ue.completed as completed
     FROM emblems e
     LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = 'en'
     LEFT JOIN user_emblems ue ON ue.emblem_id = e.id AND ue.user_id = ?
-  `).all(userId) as Array<{ enName: string, baseName: string, grade: number | null }>
+  `).all(userId) as Array<{ enName: string, baseName: string, grade: number | null, completed: number | null }>
   const grades = new Map<string, number>()
   const emblemNames = new Set<string>()
   let hasImported = false
@@ -1540,9 +1566,13 @@ function getUserEligibilityContext(userId: number): EligibilityContext {
     for (const k of keys) emblemNames.add(k)
     if (r.grade !== null) {
       hasImported = true
+      // Emblèmes mono-grade / binaires : l'API renvoie Grade 0 même une fois obtenus.
+      // Un emblème complété vaut au moins grade 1 (sinon un prérequis « grade 1 » ne
+      // serait jamais satisfait pour ces emblèmes).
+      const effGrade = (r.completed && r.grade === 0) ? 1 : r.grade
       for (const k of keys) {
         const prev = grades.get(k)
-        if (prev == null || r.grade > prev) grades.set(k, r.grade)
+        if (prev == null || effGrade > prev) grades.set(k, effGrade)
       }
     }
   }
@@ -1550,7 +1580,8 @@ function getUserEligibilityContext(userId: number): EligibilityContext {
   const flRows = db.prepare('SELECT faction_key as key, level FROM user_faction_levels WHERE user_id = ?')
     .all(userId) as Array<{ key: string, level: number }>
   for (const r of flRows) factionLevels.set(r.key, r.level)
-  return { grades, emblemNames, hasImported, factionLevels }
+  const localizedNames = buildEmblemLocalizedNames(db, locale)
+  return { grades, emblemNames, hasImported, factionLevels, localizedNames }
 }
 
 /**
@@ -1584,7 +1615,8 @@ function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityCo
     else if (ctx.emblemNames.has(key)) userGrade = ctx.hasImported ? 0 : null
     else userGrade = null
     return {
-      name: c.name,
+      // Nom localisé (selon la locale d'appel) ; repli sur le nom du wiki (anglais).
+      name: ctx.localizedNames.get(key) || c.name,
       requiredGrade,
       userGrade,
       met: userGrade !== null && userGrade >= requiredGrade
@@ -1662,8 +1694,8 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   // Contexte commendations de l'utilisateur (pour l'éligibilité des prérequis).
   // Inutile de faire la jointure emblèmes si aucun item du catalogue n'a de prérequis.
   const commCtx: EligibilityContext = rows.some(r => r.prerequisites)
-    ? getUserEligibilityContext(userId)
-    : { grades: new Map<string, number>(), emblemNames: new Set<string>(), hasImported: false, factionLevels: new Map<string, number>() }
+    ? getUserEligibilityContext(userId, locale)
+    : { grades: new Map<string, number>(), emblemNames: new Set<string>(), hasImported: false, factionLevels: new Map<string, number>(), localizedNames: new Map<string, string>() }
 
   return rows.map((r) => {
     const prerequisites = parseChestItemPrereqs(r.prerequisites)
@@ -1714,7 +1746,8 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
     prerequisites: string | null
   }>
   rows.sort(compareChestRows)
-  const emptyCtx: EligibilityContext = { grades: new Map(), emblemNames: new Set(), hasImported: false, factionLevels: new Map() }
+  // Pas de progression utilisateur, mais on localise quand même le nom des commendations.
+  const emptyCtx: EligibilityContext = { grades: new Map(), emblemNames: new Set(), hasImported: false, factionLevels: new Map(), localizedNames: buildEmblemLocalizedNames(db, locale) }
   return rows.map((r) => {
     const prerequisites = parseChestItemPrereqs(r.prerequisites)
     return {
