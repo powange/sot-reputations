@@ -1,37 +1,12 @@
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   name: string
   description: string
   image?: string
   emblemId?: number
 }>()
 
-const { locale } = useI18n()
 const isImageModalOpen = ref(false)
-
-// Vue inverse : objets du coffre dont cet emblème est un prérequis (chargé à l'ouverture).
-interface ChestItemRef { id: number, name: string, image: string | null, grade: number | null }
-const chestItems = ref<ChestItemRef[]>([])
-const itemsLoaded = ref(false)
-
-// Cellule réutilisée pour un autre emblème (réordonnancement de table) -> on reset.
-watch(() => props.emblemId, () => {
-  itemsLoaded.value = false
-  chestItems.value = []
-})
-
-watch(isImageModalOpen, async (open) => {
-  if (!open || !props.emblemId || itemsLoaded.value) return
-  itemsLoaded.value = true
-  try {
-    const res = await $fetch<{ items: ChestItemRef[] }>(`/api/emblems/${props.emblemId}/chest-items`, {
-      query: { locale: locale.value }
-    })
-    chestItems.value = res.items
-  } catch {
-    itemsLoaded.value = false // autorise un nouvel essai à la prochaine ouverture
-  }
-})
 </script>
 
 <template>
@@ -73,61 +48,12 @@ watch(isImageModalOpen, async (open) => {
       </div>
     </div>
 
-    <!-- Modal image agrandie -->
-    <UModal
-      v-if="image"
+    <EmblemImageModal
       v-model:open="isImageModalOpen"
-    >
-      <template #content>
-        <div class="p-4 flex flex-col items-center max-h-[85vh] overflow-y-auto">
-          <img
-            :src="image"
-            :alt="name"
-            class="max-w-full max-h-[45vh] sm:max-h-[60vh] object-contain"
-          >
-          <p class="mt-4 text-lg font-medium text-center">
-            {{ name }}
-          </p>
-          <p
-            v-if="description"
-            class="mt-1 text-sm text-muted text-center max-w-md"
-          >
-            {{ description }}
-          </p>
-
-          <!-- Objets du coffre que cet emblème débloque (prérequis) -->
-          <div
-            v-if="chestItems.length"
-            class="mt-4 w-full max-w-md border-t border-muted/20 pt-3"
-          >
-            <p class="text-sm font-medium mb-2">
-              Débloque ces objets du coffre :
-            </p>
-            <ul class="space-y-1.5">
-              <li
-                v-for="it in chestItems"
-                :key="it.id"
-                class="flex items-center gap-2 text-sm"
-              >
-                <NuxtImg
-                  v-if="it.image"
-                  :src="it.image"
-                  :alt="it.name"
-                  width="40"
-                  height="40"
-                  format="webp"
-                  class="w-8 h-8 object-cover rounded bg-muted/20 shrink-0"
-                />
-                <span class="min-w-0">{{ it.name }}</span>
-                <span
-                  v-if="it.grade"
-                  class="text-xs text-muted shrink-0"
-                >(grade {{ it.grade }})</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </template>
-    </UModal>
+      :name="name"
+      :description="description"
+      :image="image"
+      :emblem-id="emblemId"
+    />
   </div>
 </template>

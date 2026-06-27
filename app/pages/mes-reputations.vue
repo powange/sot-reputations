@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
 import type {
   UserInfo,
   EmblemInfo,
@@ -8,7 +7,6 @@ import type {
   SingleUserTableRow
 } from '~/types/reputation'
 import { formatLastImport } from '~/utils/format'
-import { createSuccessColumn, createMaxColumn, createProgressColumn } from '~/utils/emblem-columns'
 
 interface MyReputationsData {
   user: UserInfo
@@ -249,19 +247,6 @@ function filterEmblemsList<T extends { progress: EmblemProgress | null }>(emblem
   )
 }
 
-const columns = computed<TableColumn<SingleUserTableRow>[]>(() => {
-  const cols: TableColumn<SingleUserTableRow>[] = [
-    createSuccessColumn<SingleUserTableRow>(),
-    createMaxColumn<SingleUserTableRow>()
-  ]
-
-  if (hasImportedData.value) {
-    cols.push(createProgressColumn<SingleUserTableRow>())
-  }
-
-  return cols
-})
-
 function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | null, translations?: Record<string, { name: string | null, description: string | null }> }>): SingleUserTableRow[] {
   const filteredEmblems = filterEmblemsList(emblems)
 
@@ -289,7 +274,9 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       gradeThresholds: emblem.gradeThresholds || [],
       progress: progressDisplay,
       completed,
-      hasProgress
+      hasProgress,
+      value: progress?.value ?? 0,
+      grade: progress?.grade ?? 0
     }
   })
 }
@@ -518,28 +505,14 @@ async function handleDelete() {
                 / {{ result.campaignName }}
               </span>
             </h3>
-            <TableLoader>
-              <UTable
-                :data="getTableData(result.emblems)"
-                :columns="columns"
-              >
-                <template #name-cell="{ row }">
-                  <EmblemNameCell
-                    :name="row.original.name"
-                    :description="row.original.description"
-                    :image="row.original.image"
-                    :emblem-id="row.original.id"
-                  />
-                </template>
-                <template #maxThreshold-cell="{ row }">
-                  <MaxThresholdCell
-                    :max-threshold="row.original.maxThreshold"
-                    :max-grade="row.original.maxGrade"
-                    :grade-thresholds="row.original.gradeThresholds"
-                  />
-                </template>
-              </UTable>
-            </TableLoader>
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <EmblemCard
+                v-for="row in getTableData(result.emblems)"
+                :key="row.id"
+                :row="row"
+                :show-progress="hasImportedData"
+              />
+            </div>
           </div>
         </template>
 
@@ -593,28 +566,14 @@ async function handleDelete() {
                       {{ translateCampaignField(campaign, 'description', locale) }}
                     </p>
                   </div>
-                  <TableLoader>
-                    <UTable
-                      :data="getTableData(campaign.emblems)"
-                      :columns="columns"
-                    >
-                      <template #name-cell="{ row }">
-                        <EmblemNameCell
-                          :name="row.original.name"
-                          :description="row.original.description"
-                          :image="row.original.image"
-                          :emblem-id="row.original.id"
-                        />
-                      </template>
-                      <template #maxThreshold-cell="{ row }">
-                        <MaxThresholdCell
-                          :max-threshold="row.original.maxThreshold"
-                          :max-grade="row.original.maxGrade"
-                          :grade-thresholds="row.original.gradeThresholds"
-                        />
-                      </template>
-                    </UTable>
-                  </TableLoader>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <EmblemCard
+                      v-for="row in getTableData(campaign.emblems)"
+                      :key="row.id"
+                      :row="row"
+                      :show-progress="hasImportedData"
+                    />
+                  </div>
                 </div>
               </template>
             </div>

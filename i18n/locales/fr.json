@@ -103,7 +103,9 @@
     "selectNewChef": "Choisir le nouveau chef...",
     "yes": "Oui",
     "no": "Non",
-    "grade": "Grade"
+    "grade": "Grade",
+    "max": "Max",
+    "unlocksChestItems": "Débloque ces objets du coffre :"
   },
   "myReputations": {
     "completedEmblems": "Emblèmes complétés",

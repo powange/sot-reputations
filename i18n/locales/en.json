@@ -103,7 +103,9 @@
     "selectNewChef": "Choose new leader...",
     "yes": "Yes",
     "no": "No",
-    "grade": "Grade"
+    "grade": "Grade",
+    "max": "Max",
+    "unlocksChestItems": "Unlocks these chest items:"
   },
   "myReputations": {
     "completedEmblems": "Completed emblems",

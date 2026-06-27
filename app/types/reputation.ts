@@ -98,6 +98,9 @@ export interface SingleUserTableRow extends BaseTableRow {
   progress: string
   completed: boolean
   hasProgress: boolean
+  // Valeurs numériques (pour la barre de progression des cards).
+  value: number
+  grade: number
 }
 
 export interface MultiUserTableRow extends BaseTableRow {
