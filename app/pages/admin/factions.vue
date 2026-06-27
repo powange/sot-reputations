@@ -142,6 +142,36 @@ async function validateEmblem(emblem: Emblem) {
   }
 }
 
+// Suppression des emblèmes (nettoyage des doublons d'import)
+const deletingEmblems = ref<number[]>([])
+
+async function deleteEmblem(emblem: Emblem) {
+  const warning = emblem.userCount > 0
+    ? `\n\nATTENTION : ${emblem.userCount} joueur(s) ont une progression sur cet accomplissement, elle sera également supprimée.`
+    : ''
+  if (!confirm(`Supprimer l'accomplissement "${emblem.name}" ?${warning}\n\nCette action est irréversible.`)) return
+
+  deletingEmblems.value.push(emblem.id)
+  try {
+    await $fetch(`/api/admin/emblems/${emblem.id}`, { method: 'DELETE' })
+    toast.add({
+      title: 'Accomplissement supprimé',
+      description: `"${emblem.name}" a été supprimé`,
+      color: 'success'
+    })
+    await refresh()
+  } catch (err) {
+    const message = (err as { data?: { message?: string } })?.data?.message || 'Impossible de supprimer l\'accomplissement'
+    toast.add({
+      title: 'Erreur',
+      description: message,
+      color: 'error'
+    })
+  } finally {
+    deletingEmblems.value = deletingEmblems.value.filter(id => id !== emblem.id)
+  }
+}
+
 // Filtre emblèmes non validés
 const showOnlyUnvalidated = ref(false)
 
@@ -540,6 +570,14 @@ watch(showOnlyIncompleteGrades, (value) => {
                           variant="ghost"
                           color="neutral"
                           @click.stop="editEmblemGrades(emblem)"
+                        />
+                        <UButton
+                          icon="i-lucide-trash-2"
+                          size="xs"
+                          variant="ghost"
+                          color="error"
+                          :loading="deletingEmblems.includes(emblem.id)"
+                          @click.stop="deleteEmblem(emblem)"
                         />
                       </div>
                     </td>
