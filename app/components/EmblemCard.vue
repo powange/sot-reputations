@@ -9,6 +9,11 @@ const props = defineProps<{
 
 const isImageOpen = ref(false)
 
+// Toute la card est cliquable (ouvre la modale), seulement s'il y a une image.
+function openModal() {
+  if (props.row.image) isImageOpen.value = true
+}
+
 // État visuel : complété (vert), en cours (ambre), rien (atténué).
 const stateText = computed(() =>
   props.row.completed ? 'text-success' : (props.row.hasProgress ? 'text-warning' : 'text-muted'))
@@ -35,14 +40,19 @@ const isScalar = computed(() => props.row.threshold > 0)
 </script>
 
 <template>
-  <div class="border border-muted/40 rounded-lg p-3 flex flex-col gap-2 bg-elevated/30 h-full">
+  <div
+    class="border border-muted/40 rounded-lg p-3 flex flex-col gap-2 bg-elevated/30 h-full transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_10rem]"
+    :class="{ 'cursor-pointer hover:border-primary/50 hover:bg-elevated/50': row.image }"
+    @click="openModal"
+  >
     <div class="flex items-start gap-3">
       <img
         v-if="row.image"
         :src="row.image"
         :alt="row.name"
-        class="w-12 h-12 object-contain shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-        @click="isImageOpen = true"
+        loading="lazy"
+        decoding="async"
+        class="w-12 h-12 object-contain shrink-0"
       >
       <div class="min-w-0 flex-1">
         <div class="flex items-start justify-between gap-2">
@@ -75,11 +85,11 @@ const isScalar = computed(() => props.row.threshold > 0)
         </div>
         <div class="flex items-center justify-between text-xs mt-1">
           <span :class="stateText">
-            {{ row.value }} / <MaxThresholdCell
+            {{ row.value }} / <span @click.stop><MaxThresholdCell
               :max-threshold="row.maxThreshold"
               :max-grade="row.maxGrade"
               :grade-thresholds="row.gradeThresholds"
-            />
+            /></span>
           </span>
           <span
             v-if="row.maxGrade >= 2"
@@ -102,11 +112,11 @@ const isScalar = computed(() => props.row.threshold > 0)
         class="text-xs text-muted flex items-center gap-1"
       >
         <span>{{ $t('reputations.max') }} :</span>
-        <MaxThresholdCell
+        <span @click.stop><MaxThresholdCell
           :max-threshold="row.maxThreshold"
           :max-grade="row.maxGrade"
           :grade-thresholds="row.gradeThresholds"
-        />
+        /></span>
       </div>
     </div>
 
