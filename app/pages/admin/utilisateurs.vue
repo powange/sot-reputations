@@ -1,8 +1,22 @@
 <script setup lang="ts">
 import type { BadgeProps, TableColumn } from '@nuxt/ui'
 
-const { isAdmin, isAuthenticated, saveRedirectUrl, user: currentUser } = useAuth()
+const { isAdmin, isAuthenticated, saveRedirectUrl, user: currentUser, impersonate } = useAuth()
 const toast = useToast()
+
+// Impersonation : se connecter en tant qu'un utilisateur pour voir ce qu'il voit.
+const impersonatingId = ref<number | null>(null)
+async function impersonateUser(user: { id: number, username: string }) {
+  impersonatingId.value = user.id
+  try {
+    await impersonate(user.id)
+    toast.add({ title: `Connecté en tant que ${user.username}`, color: 'success' })
+    await navigateTo('/')
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Impersonation impossible', color: 'error' })
+    impersonatingId.value = null
+  }
+}
 
 useSeoMeta({
   title: 'Utilisateurs - Administration'
@@ -485,15 +499,26 @@ watch(totalPages, (newTotal) => {
           </template>
 
           <template #actions-cell="{ row }">
-            <UButton
-              v-if="row.original.id !== currentUser?.id"
-              icon="i-lucide-trash-2"
-              size="xs"
-              variant="ghost"
-              color="error"
-              :loading="deletingUserId === row.original.id"
-              @click="deleteUser(row.original)"
-            />
+            <div class="flex items-center justify-end gap-1">
+              <UButton
+                v-if="row.original.id !== currentUser?.id"
+                icon="i-lucide-eye"
+                size="xs"
+                variant="ghost"
+                :title="`Se connecter en tant que ${row.original.username}`"
+                :loading="impersonatingId === row.original.id"
+                @click="impersonateUser(row.original)"
+              />
+              <UButton
+                v-if="row.original.id !== currentUser?.id"
+                icon="i-lucide-trash-2"
+                size="xs"
+                variant="ghost"
+                color="error"
+                :loading="deletingUserId === row.original.id"
+                @click="deleteUser(row.original)"
+              />
+            </div>
           </template>
         </UTable>
       </div>

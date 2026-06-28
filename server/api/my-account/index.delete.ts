@@ -1,4 +1,5 @@
 import { deleteUserAccount, getChefGroupsWithMembers } from '../../utils/reputation-db'
+import { requireNotImpersonating } from '../../utils/admin'
 
 interface DeleteAccountBody {
   chefTransfers?: Array<{ groupId: number, newChefId: number }>
@@ -13,6 +14,10 @@ export default defineEventHandler(async (event) => {
       message: 'Non authentifie'
     })
   }
+
+  // Pas de suppression de compte pendant une impersonation (sinon on détruirait le
+  // compte de l'utilisateur impersonné et on déconnecterait l'admin).
+  await requireNotImpersonating(event)
 
   const body = await readBody<DeleteAccountBody>(event)
   const chefTransfers = body?.chefTransfers || []

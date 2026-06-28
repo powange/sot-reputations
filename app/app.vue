@@ -1,7 +1,21 @@
 <script setup lang="ts">
-const { user, isAuthenticated, isAdminOrModerator, logout, loginWithMicrosoft } = useAuth()
+const { user, isAuthenticated, isAdminOrModerator, logout, loginWithMicrosoft, impersonatedBy, stopImpersonate } = useAuth()
 const toast = useToast()
 const { t, locale, locales, setLocale } = useI18n()
+
+// Fin d'impersonation : retour au compte admin d'origine.
+const stoppingImpersonation = ref(false)
+async function handleStopImpersonate() {
+  stoppingImpersonation.value = true
+  try {
+    await stopImpersonate()
+    await navigateTo('/admin/utilisateurs')
+  } catch {
+    toast.add({ title: t('common.error'), color: 'error' })
+  } finally {
+    stoppingImpersonation.value = false
+  }
+}
 
 useHead({
   meta: [
@@ -61,6 +75,29 @@ async function handleLogout() {
   <UApp>
     <!-- Easter egg: Konami code -->
     <SharkEasterEgg />
+
+    <!-- Bannière d'impersonation (admin connecté en tant qu'un autre utilisateur) -->
+    <div
+      v-if="impersonatedBy"
+      class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-500 px-4 py-2 text-center text-sm text-white dark:bg-amber-600"
+    >
+      <span class="flex items-center gap-1.5">
+        <UIcon
+          name="i-lucide-eye"
+          class="w-4 h-4"
+        />
+        Connecté en tant que <strong>{{ user?.username }}</strong>
+      </span>
+      <UButton
+        size="xs"
+        color="neutral"
+        variant="solid"
+        icon="i-lucide-log-out"
+        :loading="stoppingImpersonation"
+        :label="`Revenir à ${impersonatedBy.username}`"
+        @click="handleStopImpersonate"
+      />
+    </div>
     <UHeader>
       <template #left>
         <NuxtLink

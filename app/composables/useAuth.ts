@@ -63,8 +63,27 @@ export function useAuth() {
 
   const isAdminOrModerator = computed(() => isAdmin.value || isModerator.value)
 
+  // Impersonation (admin) : l'admin d'origine si on est en train d'en impersonner un autre.
+  const impersonatedBy = computed(() => {
+    const u = user.value as { impersonatedBy?: { id: number, username: string } } | null
+    return u?.impersonatedBy ?? null
+  })
+
+  async function impersonate(userId: number) {
+    await $fetch('/api/admin/impersonate', { method: 'POST', body: { userId } })
+    await fetchSession()
+  }
+
+  async function stopImpersonate() {
+    await $fetch('/api/auth/stop-impersonate', { method: 'POST' })
+    await fetchSession()
+  }
+
   return {
-    user: computed(() => user.value as { id: number, username: string, microsoftId?: string, isAdmin?: boolean, isModerator?: boolean } | null),
+    user: computed(() => user.value as { id: number, username: string, microsoftId?: string, isAdmin?: boolean, isModerator?: boolean, impersonatedBy?: { id: number, username: string } } | null),
+    impersonatedBy,
+    impersonate,
+    stopImpersonate,
     isAuthenticated,
     isAdmin,
     isModerator,

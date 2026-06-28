@@ -9,6 +9,9 @@ declare module '#auth-utils' {
     username: string
     microsoftId?: string
     isAdmin: boolean
+    // Présent uniquement lors d'une impersonation admin : l'admin d'origine
+    // (permet d'afficher la bannière et de revenir à son compte).
+    impersonatedBy?: { id: number, username: string }
   }
 }
 

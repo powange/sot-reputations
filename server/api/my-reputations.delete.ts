@@ -1,4 +1,5 @@
 import { deleteUserReputationData } from '../utils/reputation-db'
+import { requireNotImpersonating } from '../utils/admin'
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user
@@ -9,6 +10,9 @@ export default defineEventHandler(async (event) => {
       message: 'Non authentifie'
     })
   }
+
+  // Pas de suppression des données pendant une impersonation.
+  await requireNotImpersonating(event)
 
   deleteUserReputationData(user.id)
 
