@@ -276,6 +276,7 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       completed,
       hasProgress,
       value: progress?.value ?? 0,
+      threshold: progress?.threshold ?? 0,
       grade: progress?.grade ?? 0
     }
   })

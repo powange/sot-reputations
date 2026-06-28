@@ -100,6 +100,7 @@ export interface SingleUserTableRow extends BaseTableRow {
   hasProgress: boolean
   // Valeurs numériques (pour la barre de progression des cards).
   value: number
+  threshold: number
   grade: number
 }
 

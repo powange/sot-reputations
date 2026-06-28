@@ -28,7 +28,10 @@ const pct = computed(() => {
 const displayGrade = computed(() =>
   (props.row.completed && props.row.grade === 0) ? 1 : props.row.grade)
 
-const isScalar = computed(() => !!props.row.maxThreshold && props.row.maxThreshold > 0)
+// Scalaire = l'utilisateur a un seuil de progression (>0). Un emblème binaire pur
+// (HasScalar=false : Value/Threshold à 0) reste binaire même si un seuil de grade
+// « 1 » a été stocké pour l'éligibilité -> on affiche « complété », pas « 0 / 1 ».
+const isScalar = computed(() => props.row.threshold > 0)
 </script>
 
 <template>
