@@ -2516,6 +2516,58 @@ export function getEmblemDetailForUser(emblemId: number, userId: number | null, 
   return { id: row.id, name: row.name, description: row.description ?? '', image: row.image, maxGrade: row.maxGrade, gradeThresholds, progress }
 }
 
+// Marqueur de chemin commun aux URLs d'images d'emblèmes (le GUID/fichier suit).
+const EMBLEM_IMAGE_MARKER = '/Emblem/'
+
+export interface EmblemImagePrefix { prefix: string, count: number, sampleImage: string }
+
+/**
+ * Préfixes distincts (domaine + segment de version) des URLs d'images d'emblèmes,
+ * avec le nombre d'emblèmes et une image-exemple par préfixe. Permet à l'admin de
+ * repérer visuellement les versions périmées (image cassée) vs la version courante.
+ */
+export function getEmblemImagePrefixes(): EmblemImagePrefix[] {
+  const db = getReputationDb()
+  const rows = db.prepare(`SELECT image FROM emblems WHERE image IS NOT NULL AND image != ''`).all() as Array<{ image: string }>
+  const map = new Map<string, { count: number, sample: string }>()
+  for (const r of rows) {
+    const idx = r.image.indexOf(EMBLEM_IMAGE_MARKER)
+    if (idx === -1) continue
+    const prefix = r.image.slice(0, idx)
+    const e = map.get(prefix)
+    if (e) e.count++
+    else map.set(prefix, { count: 1, sample: r.image })
+  }
+  return [...map.entries()]
+    .map(([prefix, v]) => ({ prefix, count: v.count, sampleImage: v.sample }))
+    .sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Réécrit les URLs d'images d'emblèmes vers `targetPrefix` (domaine + version courants),
+ * en conservant la partie « /Emblem/.../GUID.png ». dryRun = aperçu (rien écrit).
+ */
+export function refreshEmblemImagesToPrefix(targetPrefix: string, dryRun: boolean): { changed: number, total: number } {
+  const db = getReputationDb()
+  const clean = targetPrefix.replace(/\/+$/, '') // retire un éventuel slash final
+  const rows = db.prepare(`SELECT id, image FROM emblems WHERE image IS NOT NULL AND image != ''`).all() as Array<{ id: number, image: string }>
+  const updates: Array<{ id: number, url: string }> = []
+  for (const r of rows) {
+    const idx = r.image.indexOf(EMBLEM_IMAGE_MARKER)
+    if (idx === -1) continue
+    const newUrl = clean + r.image.slice(idx)
+    if (newUrl !== r.image) updates.push({ id: r.id, url: newUrl })
+  }
+  if (!dryRun && updates.length) {
+    const upd = db.prepare('UPDATE emblems SET image = ? WHERE id = ?')
+    const tx = db.transaction(() => {
+      for (const u of updates) upd.run(u.url, u.id)
+    })
+    tx()
+  }
+  return { changed: updates.length, total: rows.length }
+}
+
 export function getFullReputationData() {
   const db = getReputationDb()
 

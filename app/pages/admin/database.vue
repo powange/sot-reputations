@@ -169,6 +169,59 @@ async function mergeDuplicates() {
     isMerging.value = false
   }
 }
+
+// --- Images d'emblèmes périmées ---
+interface EmblemImagePrefix { prefix: string, count: number, sampleImage: string }
+const imgPrefixes = ref<EmblemImagePrefix[] | null>(null)
+const isAnalyzing = ref(false)
+const targetPrefix = ref<string | null>(null)
+const previewChanged = ref<number | null>(null)
+const isRefreshing = ref(false)
+
+async function analyzeEmblemImages() {
+  isAnalyzing.value = true
+  targetPrefix.value = null
+  previewChanged.value = null
+  try {
+    const res = await $fetch<{ prefixes: EmblemImagePrefix[] }>('/api/admin/emblem-images')
+    imgPrefixes.value = res.prefixes
+    if (res.prefixes.length <= 1) {
+      toast.add({
+        title: res.prefixes.length === 1 ? 'Une seule version d\'URL — rien à corriger' : 'Aucune image d\'emblème',
+        color: 'info'
+      })
+    }
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Analyse impossible', color: 'error' })
+  } finally {
+    isAnalyzing.value = false
+  }
+}
+
+async function chooseTarget(prefix: string) {
+  targetPrefix.value = prefix
+  previewChanged.value = null
+  try {
+    const res = await $fetch<{ changed: number, total: number }>('/api/admin/emblem-images', { method: 'POST', body: { targetPrefix: prefix } })
+    previewChanged.value = res.changed
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Aperçu impossible', color: 'error' })
+  }
+}
+
+async function applyEmblemImages() {
+  if (!targetPrefix.value) return
+  isRefreshing.value = true
+  try {
+    const res = await $fetch<{ changed: number, total: number }>('/api/admin/emblem-images', { method: 'POST', body: { targetPrefix: targetPrefix.value, apply: true } })
+    toast.add({ title: 'Images mises à jour', description: `${res.changed} image(s) réécrite(s)`, color: 'success' })
+    await analyzeEmblemImages()
+  } catch {
+    toast.add({ title: 'Erreur', description: 'Mise à jour impossible', color: 'error' })
+  } finally {
+    isRefreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -354,6 +407,95 @@ async function mergeDuplicates() {
             </div>
           </li>
         </ul>
+      </div>
+    </UCard>
+
+    <!-- Images d'emblèmes périmées -->
+    <UCard class="mt-6">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon
+            name="i-lucide-image-off"
+            class="w-5 h-5 text-warning"
+          />
+          <h2 class="text-xl font-semibold">
+            Images d'emblèmes périmées
+          </h2>
+        </div>
+      </template>
+
+      <p class="text-muted mb-4">
+        Les URLs d'images d'emblèmes contiennent un segment de version qui peut devenir
+        périmé (image cassée). Analyse les versions présentes, repère celle qui s'affiche
+        correctement, puis réécris toutes les images vers cette version (le fichier/GUID
+        de chaque emblème est conservé).
+      </p>
+
+      <UButton
+        icon="i-lucide-search"
+        label="Analyser les versions"
+        color="primary"
+        variant="outline"
+        :loading="isAnalyzing"
+        @click="analyzeEmblemImages"
+      />
+
+      <div
+        v-if="imgPrefixes"
+        class="mt-4 space-y-2"
+      >
+        <p
+          v-if="!imgPrefixes.length"
+          class="text-sm text-muted"
+        >
+          Aucune image d'emblème.
+        </p>
+        <div
+          v-for="p in imgPrefixes"
+          :key="p.prefix"
+          class="flex items-center gap-3 border rounded p-2"
+          :class="targetPrefix === p.prefix ? 'border-primary' : 'border-muted/30'"
+        >
+          <img
+            :src="p.sampleImage"
+            alt=""
+            class="w-10 h-10 object-contain shrink-0 bg-muted/20 rounded"
+          >
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-mono truncate">
+              {{ p.prefix }}
+            </div>
+            <div class="text-xs text-muted">
+              {{ p.count }} emblème(s)
+            </div>
+          </div>
+          <UButton
+            size="xs"
+            :variant="targetPrefix === p.prefix ? 'solid' : 'outline'"
+            label="Cible"
+            @click="chooseTarget(p.prefix)"
+          />
+        </div>
+
+        <div
+          v-if="targetPrefix"
+          class="pt-2 border-t border-muted/20"
+        >
+          <p class="text-sm mb-2">
+            Cible : <span class="font-mono text-xs">{{ targetPrefix }}</span>
+            <template v-if="previewChanged !== null">
+              <br><strong>{{ previewChanged }}</strong> image(s) seront réécrites.
+            </template>
+          </p>
+          <UButton
+            icon="i-lucide-refresh-cw"
+            label="Mettre à jour les images"
+            color="warning"
+            :loading="isRefreshing"
+            :disabled="previewChanged === 0"
+            @click="applyEmblemImages"
+          />
+        </div>
       </div>
     </UCard>
 
