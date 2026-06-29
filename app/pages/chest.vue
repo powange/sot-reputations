@@ -38,7 +38,7 @@ interface TaxonomyMap {
 // changement de langue.
 const { data, status, error } = await useFetch<{ authenticated: boolean, items: ChestItem[] }>(
   '/api/my-chest',
-  { query: { locale } }
+  { query: { locale }, headers: useRequestHeaders(['cookie']) }
 )
 const isPublic = computed(() => !data.value?.authenticated)
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
