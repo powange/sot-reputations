@@ -60,6 +60,23 @@ const availableLocales = computed(() => {
   return locales.value.filter(l => typeof l === 'object')
 })
 
+// Overlay de chargement pour les navigations longues : la fine barre du haut
+// peut passer inaperçue, on affiche en plus un voile « Chargement… » si le
+// changement de page dépasse ~350 ms (en deçà, on évite le clignotement).
+const navLoading = ref(false)
+if (import.meta.client) {
+  const nuxtApp = useNuxtApp()
+  let navTimer: ReturnType<typeof setTimeout> | null = null
+  nuxtApp.hook('page:loading:start', () => {
+    if (navTimer) clearTimeout(navTimer)
+    navTimer = setTimeout(() => { navLoading.value = true }, 350)
+  })
+  nuxtApp.hook('page:loading:end', () => {
+    if (navTimer) { clearTimeout(navTimer); navTimer = null }
+    navLoading.value = false
+  })
+}
+
 async function handleLogout() {
   await logout()
   toast.add({
@@ -73,8 +90,35 @@ async function handleLogout() {
 
 <template>
   <UApp>
+    <!-- Barre de chargement lors des changements de page -->
+    <NuxtLoadingIndicator
+      color="var(--ui-primary)"
+      :height="4"
+    />
+
     <!-- Easter egg: Konami code -->
     <SharkEasterEgg />
+
+    <!-- Voile de chargement pour les navigations longues -->
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      leave-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="navLoading"
+        class="fixed inset-0 z-100 flex items-center justify-center bg-default/70 backdrop-blur-sm pointer-events-none"
+      >
+        <div class="flex flex-col items-center gap-3 rounded-xl bg-default px-6 py-5 shadow-lg ring ring-default">
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 animate-spin text-primary"
+          />
+          <span class="text-sm text-muted">{{ t('common.loading') }}</span>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Bannière d'impersonation (admin connecté en tant qu'un autre utilisateur) -->
     <div
