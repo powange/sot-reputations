@@ -18,11 +18,13 @@ const toast = useToast()
 
 // Un seul endpoint : le serveur renvoie la progression si connecté, sinon le catalogue
 // public (user: null). On décide « public » d'après la réponse -> fiable en SSR.
-// headers cookie : en SSR, useFetch ne transmet pas le cookie de session à l'appel
-// interne sans ça -> le serveur ne verrait pas la session et renverrait le public.
-const { data, refresh, status } = await useFetch<MyReputationsData>('/api/my-reputations', {
-  headers: useRequestHeaders(['cookie'])
-})
+// useRequestFetch() : forwarde le contexte de la requête (cookie de session) à l'appel
+// interne en SSR, sinon le serveur ne verrait pas la session et renverrait le public.
+const reqFetch = useRequestFetch()
+const { data, refresh, status } = await useAsyncData(
+  'my-reputations',
+  () => reqFetch<MyReputationsData>('/api/my-reputations')
+)
 const isPublic = computed(() => !data.value?.user)
 const isLoading = computed(() => status.value === 'pending')
 

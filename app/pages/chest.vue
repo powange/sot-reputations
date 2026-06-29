@@ -36,9 +36,11 @@ interface TaxonomyMap {
 // public. On décide « public » d'après `authenticated` -> fiable en SSR. La locale est
 // passée au serveur pour résoudre les noms d'items ; useFetch refait l'appel au
 // changement de langue.
-const { data, status, error } = await useFetch<{ authenticated: boolean, items: ChestItem[] }>(
-  '/api/my-chest',
-  { query: { locale }, headers: useRequestHeaders(['cookie']) }
+const reqFetch = useRequestFetch()
+const { data, status, error } = await useAsyncData(
+  'my-chest',
+  () => reqFetch<{ authenticated: boolean, items: ChestItem[] }>('/api/my-chest', { query: { locale: locale.value } }),
+  { watch: [locale] }
 )
 const isPublic = computed(() => !data.value?.authenticated)
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
