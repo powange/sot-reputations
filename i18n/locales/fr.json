@@ -158,6 +158,11 @@
     },
     "manual": {
       "intro": "Cette méthode est plus technique mais fonctionne sur tous les navigateurs.",
+      "mobileTitle": "Sur mobile (le plus simple)",
+      "mobile1": "Dans la fenêtre d'import, touche « Ouvrir mes réputations » (et « Ouvrir mon coffre »).",
+      "mobile2": "Connecte-toi à Sea of Thieves si demandé : le JSON s'affiche dans l'onglet.",
+      "mobile3": "Sélectionne tout le texte et copie-le.",
+      "mobile4": "Reviens sur le site, colle-le dans le champ correspondant, puis Importer.",
       "step1": "Aller sur seaofthieves.com",
       "step1Description": "Rendez-vous sur la page de réputation et connectez-vous.",
       "step2": "Mettre le site en français",
@@ -185,7 +190,17 @@
     "jsonPlaceholder": "Collez ici le JSON récupéré depuis seaofthieves.com...",
     "success": "Import réussi",
     "successMessage": "{count} accomplissements importés",
-    "error": "Erreur d'import"
+    "error": "Erreur d'import",
+    "manualHint": "Sur mobile ou sans bookmarklet : ouvre le lien (en étant connecté à Sea of Thieves), copie tout le texte affiché, puis colle-le dans le champ correspondant.",
+    "reputationLabel": "Réputation",
+    "chestLabel": "Coffre (optionnel)",
+    "openReputation": "Ouvrir mes réputations",
+    "openChest": "Ouvrir mon coffre",
+    "reputationPlaceholder": "Colle ici le JSON des réputations…",
+    "chestPlaceholder": "Colle ici le JSON du coffre…",
+    "reputationRequired": "Le JSON de réputation est requis",
+    "invalidReputation": "JSON de réputation invalide",
+    "invalidChest": "JSON du coffre invalide"
   },
   "invite": {
     "welcome": "Bienvenue !",

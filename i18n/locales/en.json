@@ -158,6 +158,11 @@
     },
     "manual": {
       "intro": "This method is more technical but works on all browsers.",
+      "mobileTitle": "On mobile (easiest)",
+      "mobile1": "In the import window, tap \"Open my reputations\" (and \"Open my chest\").",
+      "mobile2": "Log in to Sea of Thieves if asked: the JSON appears in the tab.",
+      "mobile3": "Select all the text and copy it.",
+      "mobile4": "Come back to the site, paste it into the matching field, then Import.",
       "step1": "Go to seaofthieves.com",
       "step1Description": "Go to the reputation page and sign in.",
       "step2": "Set the site language",
@@ -185,7 +190,17 @@
     "jsonPlaceholder": "Paste here the JSON retrieved from seaofthieves.com...",
     "success": "Import successful",
     "successMessage": "{count} commendations imported",
-    "error": "Import error"
+    "error": "Import error",
+    "manualHint": "On mobile or without the bookmarklet: open the link (while logged in to Sea of Thieves), copy all the displayed text, then paste it into the matching field.",
+    "reputationLabel": "Reputation",
+    "chestLabel": "Chest (optional)",
+    "openReputation": "Open my reputations",
+    "openChest": "Open my chest",
+    "reputationPlaceholder": "Paste the reputation JSON here…",
+    "chestPlaceholder": "Paste the chest JSON here…",
+    "reputationRequired": "Reputation JSON is required",
+    "invalidReputation": "Invalid reputation JSON",
+    "invalidChest": "Invalid chest JSON"
   },
   "invite": {
     "welcome": "Welcome!",

@@ -11,21 +11,50 @@ const isOpen = defineModel<boolean>('open', { required: true })
 
 const { t } = useI18n()
 const toast = useToast()
-const importJsonText = ref('')
+
+// URLs officielles SoT (forcées en /fr : l'import exige des données françaises).
+const SOT_BASE = 'https://www.seaofthieves.com/fr/api/profilev2'
+function openSot(path: 'reputation' | 'chest') {
+  window.open(`${SOT_BASE}/${path}`, '_blank', 'noopener')
+}
+
+const reputationText = ref('')
+const chestText = ref('')
 const isImporting = ref(false)
 
+function parseOrNull(raw: string): unknown | undefined {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+}
+
 async function handleImport() {
-  if (!importJsonText.value.trim()) {
-    toast.add({ title: t('common.error'), description: 'JSON requis', color: 'error' })
+  const repRaw = reputationText.value.trim()
+  if (!repRaw) {
+    toast.add({ title: t('common.error'), description: t('import.reputationRequired'), color: 'error' })
+    return
+  }
+  const repParsed = parseOrNull(repRaw)
+  if (repParsed === undefined || typeof repParsed !== 'object' || repParsed === null) {
+    toast.add({ title: t('common.error'), description: t('import.invalidReputation'), color: 'error' })
     return
   }
 
-  let jsonData: unknown
-  try {
-    jsonData = JSON.parse(importJsonText.value)
-  } catch {
-    toast.add({ title: t('common.error'), description: 'JSON invalide', color: 'error' })
-    return
+  // Si on a collé le payload complet du bookmarklet ({ reputation, chest, ... }), on le
+  // garde tel quel ; sinon le JSON collé EST la réputation -> on l'enveloppe.
+  const hasWrapper = 'reputation' in (repParsed as Record<string, unknown>)
+  const body: Record<string, unknown> = hasWrapper ? { ...(repParsed as Record<string, unknown>) } : { reputation: repParsed }
+
+  const chestRaw = chestText.value.trim()
+  if (chestRaw) {
+    const chestParsed = parseOrNull(chestRaw)
+    if (chestParsed === undefined || typeof chestParsed !== 'object' || chestParsed === null) {
+      toast.add({ title: t('common.error'), description: t('import.invalidChest'), color: 'error' })
+      return
+    }
+    body.chest = chestParsed
   }
 
   isImporting.value = true
@@ -35,12 +64,11 @@ async function handleImport() {
       body: {
         username: props.username,
         password: '',
-        jsonData
+        jsonData: body
       }
     })
     toast.add({ title: t('import.success'), description: t('import.successMessage', { count: '' }), color: 'success' })
     isOpen.value = false
-    importJsonText.value = ''
     emit('imported')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -50,10 +78,11 @@ async function handleImport() {
   }
 }
 
-// Reset le texte quand on ferme la modal
+// Reset des champs à la fermeture.
 watch(isOpen, (open) => {
   if (!open) {
-    importJsonText.value = ''
+    reputationText.value = ''
+    chestText.value = ''
   }
 })
 </script>
@@ -84,13 +113,51 @@ watch(isOpen, (open) => {
               - {{ $t('import.tipDescription') }}
             </template>
           </UAlert>
-          <UFormField :label="$t('import.jsonData')">
-            <UTextarea
-              v-model="importJsonText"
-              :placeholder="$t('import.jsonPlaceholder')"
-              :rows="10"
-              class="w-full"
-            />
+
+          <p class="text-sm text-muted">
+            {{ $t('import.manualHint') }}
+          </p>
+
+          <!-- Réputation (obligatoire) -->
+          <UFormField :label="$t('import.reputationLabel')">
+            <div class="flex flex-col gap-2">
+              <UButton
+                :label="$t('import.openReputation')"
+                icon="i-lucide-external-link"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                class="self-start"
+                @click="openSot('reputation')"
+              />
+              <UTextarea
+                v-model="reputationText"
+                :placeholder="$t('import.reputationPlaceholder')"
+                :rows="6"
+                class="w-full font-mono text-xs"
+              />
+            </div>
+          </UFormField>
+
+          <!-- Coffre (optionnel) -->
+          <UFormField :label="$t('import.chestLabel')">
+            <div class="flex flex-col gap-2">
+              <UButton
+                :label="$t('import.openChest')"
+                icon="i-lucide-external-link"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                class="self-start"
+                @click="openSot('chest')"
+              />
+              <UTextarea
+                v-model="chestText"
+                :placeholder="$t('import.chestPlaceholder')"
+                :rows="5"
+                class="w-full font-mono text-xs"
+              />
+            </div>
           </UFormField>
         </div>
         <template #footer>

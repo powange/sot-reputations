@@ -158,6 +158,11 @@
     },
     "manual": {
       "intro": "Este metodo es mas tecnico pero funciona en todos los navegadores.",
+      "mobileTitle": "En móvil (lo más sencillo)",
+      "mobile1": "En la ventana de importación, toca «Abrir mis reputaciones» (y «Abrir mi cofre»).",
+      "mobile2": "Inicia sesión en Sea of Thieves si se solicita: el JSON aparece en la pestaña.",
+      "mobile3": "Selecciona todo el texto y cópialo.",
+      "mobile4": "Vuelve al sitio, pégalo en el campo correspondiente y pulsa Importar.",
       "step1": "Ir a seaofthieves.com",
       "step1Description": "Ve a la pagina de reputacion e inicia sesion.",
       "step2": "Configurar el idioma del sitio",
@@ -185,7 +190,17 @@
     "jsonPlaceholder": "Pega aqui el JSON obtenido de seaofthieves.com...",
     "success": "Importacion exitosa",
     "successMessage": "{count} alabanzas importadas",
-    "error": "Error de importacion"
+    "error": "Error de importacion",
+    "manualHint": "En móvil o sin el bookmarklet: abre el enlace (conectado a Sea of Thieves), copia todo el texto mostrado y pégalo en el campo correspondiente.",
+    "reputationLabel": "Reputación",
+    "chestLabel": "Cofre (opcional)",
+    "openReputation": "Abrir mis reputaciones",
+    "openChest": "Abrir mi cofre",
+    "reputationPlaceholder": "Pega aquí el JSON de reputaciones…",
+    "chestPlaceholder": "Pega aquí el JSON del cofre…",
+    "reputationRequired": "Se requiere el JSON de reputación",
+    "invalidReputation": "JSON de reputación no válido",
+    "invalidChest": "JSON del cofre no válido"
   },
   "invite": {
     "welcome": "Bienvenido!",

@@ -235,6 +235,27 @@ onMounted(() => {
             </template>
           </UAlert>
 
+          <!-- Méthode mobile (la plus simple) -->
+          <UCard>
+            <template #header>
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-smartphone"
+                  class="w-5 h-5 text-primary"
+                />
+                <h3 class="font-semibold">
+                  {{ $t('tutorial.manual.mobileTitle') }}
+                </h3>
+              </div>
+            </template>
+            <ol class="space-y-2 text-sm list-decimal list-inside">
+              <li>{{ $t('tutorial.manual.mobile1') }}</li>
+              <li>{{ $t('tutorial.manual.mobile2') }}</li>
+              <li>{{ $t('tutorial.manual.mobile3') }}</li>
+              <li>{{ $t('tutorial.manual.mobile4') }}</li>
+            </ol>
+          </UCard>
+
           <UCard>
             <ol class="space-y-4">
               <li class="flex gap-3">
