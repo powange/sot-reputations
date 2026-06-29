@@ -49,6 +49,7 @@ export function getReputationDb(): Database.Database {
       image TEXT,
       max_grade INTEGER DEFAULT 5,
       sort_order INTEGER DEFAULT 0,
+      high_seas_only INTEGER DEFAULT 0,
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
       UNIQUE(campaign_id, key)
     );
@@ -349,6 +350,13 @@ export function getReputationDb(): Database.Database {
   if (!hasValidated) {
     db.exec('ALTER TABLE emblems ADD COLUMN validated INTEGER DEFAULT 0')
     db.exec('UPDATE emblems SET validated = 1') // Valider tous les emblèmes existants
+  }
+
+  // Migration: ajouter high_seas_only aux emblèmes (commendations jouables uniquement
+  // en Haute Mer / High Seas, d'après le wiki). Rempli par la synchro admin dédiée.
+  const emblemColumnsForHighSeas = db.prepare('PRAGMA table_info(emblems)').all() as Array<{ name: string }>
+  if (!emblemColumnsForHighSeas.some(col => col.name === 'high_seas_only')) {
+    db.exec('ALTER TABLE emblems ADD COLUMN high_seas_only INTEGER DEFAULT 0')
   }
 
   // Migration: ajouter distinction_level et progress à user_faction_levels
@@ -771,6 +779,8 @@ export interface EmblemInfo {
   campaignId: number
   factionKey: string
   campaignName: string
+  // Commendation jouable uniquement en Haute Mer (High Seas), d'après le wiki.
+  highSeasOnly: boolean
 }
 
 export interface UserEmblemProgress {
@@ -1611,6 +1621,106 @@ export function getUserFactionLevels(userId: number): Record<string, { level: nu
   return out
 }
 
+interface ReputationEmblemTranslation { name: string | null, description: string | null }
+export interface ReputationData {
+  user: UserInfo | null
+  factions: Array<FactionInfo & {
+    level?: number
+    translations: Record<string, FactionTranslation>
+    campaigns: Array<CampaignInfo & {
+      translations: Record<string, CampaignTranslation>
+      emblems: Array<EmblemInfo & {
+        progress: UserEmblemProgress | null
+        translations: Record<string, ReputationEmblemTranslation>
+      }>
+    }>
+  }>
+}
+
+/**
+ * Catalogue des réputations (factions / campagnes / emblèmes). Avec `userId` : inclut
+ * l'utilisateur, sa progression par emblème et les niveaux de faction. Sans (`null`) :
+ * catalogue public (user null, progress null). Décision public/privé faite côté serveur
+ * (à partir de la session), donc fiable en SSR — pas de dépendance au timing client.
+ */
+export function getReputationData(userId: number | null): ReputationData {
+  const db = getReputationDb()
+  const user = userId
+    ? ((db.prepare('SELECT id, username, last_import_at as lastImportAt FROM users WHERE id = ?').get(userId) as UserInfo | undefined) ?? null)
+    : null
+
+  const factions = getAllFactions()
+  const factionTranslations = getAllFactionTranslations()
+  const campaignTranslations = getAllCampaignTranslations()
+  const factionLevels = userId ? getUserFactionLevels(userId) : {}
+
+  const allTranslations = db.prepare(`
+    SELECT emblem_id, locale, name, description FROM emblem_translations
+  `).all() as Array<{ emblem_id: number, locale: string, name: string | null, description: string | null }>
+  const translationsByEmblem: Record<number, Record<string, ReputationEmblemTranslation>> = {}
+  for (const t of allTranslations) {
+    const byLocale = translationsByEmblem[t.emblem_id] ?? (translationsByEmblem[t.emblem_id] = {})
+    byLocale[t.locale] = { name: t.name, description: t.description }
+  }
+
+  const getProgress = userId
+    ? db.prepare('SELECT user_id as userId, value, threshold, grade, completed FROM user_emblems WHERE emblem_id = ? AND user_id = ?')
+    : null
+
+  const result: ReputationData = { user, factions: [] }
+
+  for (const faction of factions) {
+    const campaigns = getCampaignsByFaction(faction.id)
+    const factionWithCampaigns: ReputationData['factions'][number] = {
+      ...faction,
+      level: userId ? factionLevels[faction.key]?.level : undefined,
+      translations: factionTranslations[faction.id] || {},
+      campaigns: []
+    }
+
+    for (const campaign of campaigns) {
+      const emblemRows = db.prepare(`
+        SELECT
+          e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
+          e.campaign_id as campaignId,
+          e.high_seas_only as highSeasOnly,
+          (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
+        FROM emblems e
+        WHERE e.campaign_id = ? AND e.validated = 1
+        ORDER BY e.sort_order, e.id
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName' | 'highSeasOnly'> & { highSeasOnly: number }>
+
+      const emblemIds = emblemRows.map(e => e.id)
+      const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
+
+      const emblems = emblemRows.map((emblem) => {
+        const progress = (userId && getProgress)
+          ? ((getProgress.get(emblem.id, userId) as UserEmblemProgress | undefined) ?? null)
+          : null
+        return {
+          ...emblem,
+          factionKey: faction.key,
+          campaignName: campaign.name,
+          gradeThresholds: allGradeThresholds[emblem.id] || [],
+          progress,
+          translations: translationsByEmblem[emblem.id] || {},
+          highSeasOnly: !!emblem.highSeasOnly
+        }
+      })
+
+      factionWithCampaigns.campaigns.push({
+        ...campaign,
+        translations: campaignTranslations[campaign.id] || {},
+        emblems
+      })
+    }
+
+    result.factions.push(factionWithCampaigns)
+  }
+
+  return result
+}
+
 // Statut d'éligibilité d'un item vs la progression de l'utilisateur (commendations + factions).
 function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityContext): ChestItemEligibility | null {
   if (!prereqs) return null
@@ -2438,6 +2548,7 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
       e.image,
       e.max_grade as maxGrade,
       e.campaign_id as campaignId,
+      e.high_seas_only as highSeasOnly,
       f.key as factionKey,
       c.name as campaignName,
       (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
@@ -2446,7 +2557,7 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
     JOIN factions f ON c.faction_id = f.id
     WHERE f.key = ? AND e.validated = 1
     ORDER BY c.sort_order, c.id, e.sort_order, e.id
-  `).all(factionKey) as Array<Omit<EmblemInfo, 'gradeThresholds'>>
+  `).all(factionKey) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'highSeasOnly'> & { highSeasOnly: number }>
 
   // Récupérer tous les seuils de grades pour ces emblèmes
   const emblemIds = emblemRows.map(e => e.id)
@@ -2454,6 +2565,7 @@ export function getEmblemsByFaction(factionKey: string): EmblemInfo[] {
 
   return emblemRows.map(emblem => ({
     ...emblem,
+    highSeasOnly: !!emblem.highSeasOnly,
     gradeThresholds: allGradeThresholds[emblem.id] || []
   }))
 }
@@ -2481,6 +2593,7 @@ export interface EmblemDetail {
   description: string
   image: string | null
   maxGrade: number
+  highSeasOnly: boolean
   gradeThresholds: Array<{ grade: number, threshold: number }>
   progress: { value: number, threshold: number, grade: number, completed: boolean } | null
 }
@@ -2497,11 +2610,12 @@ export function getEmblemDetailForUser(emblemId: number, userId: number | null, 
       COALESCE(NULLIF(et.name, ''), e.name) as name,
       COALESCE(NULLIF(et.description, ''), e.description) as description,
       e.image as image,
-      e.max_grade as maxGrade
+      e.max_grade as maxGrade,
+      e.high_seas_only as highSeasOnly
     FROM emblems e
     LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = ?
     WHERE e.id = ?
-  `).get(locale, emblemId) as { id: number, name: string, description: string | null, image: string | null, maxGrade: number } | undefined
+  `).get(locale, emblemId) as { id: number, name: string, description: string | null, image: string | null, maxGrade: number, highSeasOnly: number } | undefined
   if (!row) return null
   const gradeThresholds = db.prepare(`
     SELECT grade, threshold FROM emblem_grade_thresholds WHERE emblem_id = ? ORDER BY grade
@@ -2513,7 +2627,7 @@ export function getEmblemDetailForUser(emblemId: number, userId: number | null, 
     `).get(emblemId, userId) as { value: number, threshold: number, grade: number, completed: number } | undefined
     if (p) progress = { value: p.value, threshold: p.threshold, grade: p.grade, completed: !!p.completed }
   }
-  return { id: row.id, name: row.name, description: row.description ?? '', image: row.image, maxGrade: row.maxGrade, gradeThresholds, progress }
+  return { id: row.id, name: row.name, description: row.description ?? '', image: row.image, maxGrade: row.maxGrade, highSeasOnly: !!row.highSeasOnly, gradeThresholds, progress }
 }
 
 // Marqueur de chemin commun aux URLs d'images d'emblèmes (le GUID/fichier suit).
@@ -2568,6 +2682,73 @@ export function refreshEmblemImagesToPrefix(targetPrefix: string, dryRun: boolea
   return { changed: updates.length, total: rows.length }
 }
 
+export interface HighSeasSyncReport {
+  totalEmblems: number
+  matched: number // emblèmes rapprochés d'une commendation du wiki
+  highSeasCount: number // parmi les rapprochés, ceux marqués High Seas only
+  changed: number // emblèmes dont la valeur change réellement
+  unmatched: number // emblèmes sans correspondance sur les pages wiki récupérées
+  unmatchedNames: string[] // échantillon des emblèmes non rapprochés (diagnostic)
+}
+
+/**
+ * Applique le flag « High Seas only » aux emblèmes à partir d'une map
+ * `nom de commendation normalisé -> highSeasOnly` (construite depuis le wiki).
+ * Rapproche par nom EN (ou nom de base) normalisé. Les emblèmes non rapprochés
+ * sont laissés inchangés (couverture partielle = pas d'écrasement). dryRun = aperçu.
+ */
+export function applyEmblemHighSeasOnly(hsMap: Map<string, boolean>, dryRun: boolean): HighSeasSyncReport {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT
+      e.id as id,
+      COALESCE(NULLIF(et.name, ''), e.name) as enName,
+      e.name as baseName,
+      e.high_seas_only as current
+    FROM emblems e
+    LEFT JOIN emblem_translations et ON et.emblem_id = e.id AND et.locale = 'en'
+  `).all() as Array<{ id: number, enName: string, baseName: string, current: number }>
+
+  let matched = 0
+  let highSeasCount = 0
+  const unmatchedNames: string[] = []
+  const updates: Array<{ id: number, value: number }> = []
+  for (const r of rows) {
+    let found: boolean | undefined
+    for (const k of new Set([normalizeName(r.enName), normalizeName(r.baseName)])) {
+      if (hsMap.has(k)) {
+        found = hsMap.get(k)
+        break
+      }
+    }
+    if (found === undefined) {
+      if (unmatchedNames.length < 50) unmatchedNames.push(r.enName)
+      continue
+    }
+    matched++
+    const value = found ? 1 : 0
+    if (value === 1) highSeasCount++
+    if (value !== (r.current ? 1 : 0)) updates.push({ id: r.id, value })
+  }
+
+  if (!dryRun && updates.length) {
+    const upd = db.prepare('UPDATE emblems SET high_seas_only = ? WHERE id = ?')
+    const tx = db.transaction(() => {
+      for (const u of updates) upd.run(u.value, u.id)
+    })
+    tx()
+  }
+
+  return {
+    totalEmblems: rows.length,
+    matched,
+    highSeasCount,
+    changed: updates.length,
+    unmatched: rows.length - matched,
+    unmatchedNames
+  }
+}
+
 export function getFullReputationData() {
   const db = getReputationDb()
 
@@ -2600,11 +2781,12 @@ export function getFullReputationData() {
         SELECT
           e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
           e.campaign_id as campaignId,
+          e.high_seas_only as highSeasOnly,
           (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
         FROM emblems e
         WHERE e.campaign_id = ? AND e.validated = 1
         ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName' | 'highSeasOnly'> & { highSeasOnly: number }>
 
       // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
       const emblemIds = emblemRows.map(e => e.id)
@@ -2621,7 +2803,8 @@ export function getFullReputationData() {
           factionKey: faction.key,
           campaignName: campaign.name,
           gradeThresholds: allGradeThresholds[emblem.id] || [],
-          userProgress
+          userProgress,
+          highSeasOnly: !!emblem.highSeasOnly
         }
       })
 
@@ -3142,11 +3325,12 @@ export function getGroupReputationData(groupId: number) {
         SELECT
           e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
           e.campaign_id as campaignId,
+          e.high_seas_only as highSeasOnly,
           (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
         FROM emblems e
         WHERE e.campaign_id = ? AND e.validated = 1
         ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName'>>
+      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName' | 'highSeasOnly'> & { highSeasOnly: number }>
 
       // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
       const emblemIds = emblemRows.map(e => e.id)
@@ -3178,7 +3362,8 @@ export function getGroupReputationData(groupId: number) {
           campaignName: campaign.name,
           gradeThresholds: allGradeThresholds[emblem.id] || [],
           userProgress,
-          translations: translationsByEmblem[emblem.id] || {}
+          translations: translationsByEmblem[emblem.id] || {},
+          highSeasOnly: !!emblem.highSeasOnly
         }
       })
 

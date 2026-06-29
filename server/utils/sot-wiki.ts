@@ -297,3 +297,115 @@ export async function fetchWikiItemCostsMulti(categories: string[]): Promise<Wik
   }
   return [...byTitle.values()]
 }
+
+// ---------------------------------------------------------------------------
+// « High Seas only » : commendations jouables uniquement en Haute Mer.
+// Sur chaque page de faction, le tableau des commendations marque les lignes
+// concernées par un <span title="High Seas only">. On parse le HTML rendu
+// (action=parse) plutôt que le wikitext : le marqueur vient de templates
+// transclus ({{list comms}} / {{Comm}}) absents du wikitext brut.
+// ---------------------------------------------------------------------------
+
+interface ParseTextResponse { parse?: { text?: string } }
+
+// Clé de faction du site -> titre de la page wiki portant le tableau des commendations.
+const FACTION_WIKI_PAGE: Record<string, string> = {
+  GoldHoarders: 'Gold Hoarders',
+  MerchantAlliance: 'Merchant Alliance',
+  OrderOfSouls: 'Order of Souls',
+  HuntersCall: 'The Hunter\'s Call',
+  SeaDogs: 'Sea Dogs',
+  ReapersBones: 'Reaper\'s Bones',
+  AthenasFortune: 'Athena\'s Fortune'
+}
+
+// Décode les entités HTML courantes (le rendu MediaWiki échappe ' & etc.).
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number.parseInt(d, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, '\'')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&') // en dernier, pour ne pas ré-décoder
+}
+
+/**
+ * Extrait, du HTML rendu d'une page de faction, la liste { nom de commendation,
+ * High Seas only }. Chaque ligne <tr> du tableau d'emblèmes a une cellule image
+ * (<th class="thumb">), une cellule nom (<th id="...">…</th>) et une description ;
+ * le marqueur `title="High Seas only"` est présent dans la ligne le cas échéant.
+ */
+function parseCommendationRestrictions(html: string): Array<{ name: string, highSeasOnly: boolean }> {
+  const out: Array<{ name: string, highSeasOnly: boolean }> = []
+  const rows = html.split(/<tr\b/i)
+  for (const row of rows) {
+    const thRe = /<th\b([^>]*)>([\s\S]*?)<\/th>/gi
+    let m: RegExpExecArray | null
+    let name: string | null = null
+    while ((m = thRe.exec(row)) !== null) {
+      const attrs = m[1] ?? ''
+      if (/class="[^"]*\bthumb\b[^"]*"/i.test(attrs)) continue // cellule image
+      if (!/\bid=/i.test(attrs)) continue // la cellule « nom » porte l'ancre id=
+      const text = decodeHtmlEntities((m[2] ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()
+      if (text) {
+        name = text
+        break
+      }
+    }
+    if (!name) continue
+    out.push({ name, highSeasOnly: /title="High Seas only"/i.test(row) })
+  }
+  return out
+}
+
+export interface HighSeasFactionResult {
+  factionKey: string
+  title: string
+  total: number
+  highSeas: number
+  error?: string
+}
+
+/**
+ * Récupère le flag « High Seas only » par commendation pour les factions demandées
+ * (toutes par défaut). Renvoie une map `nom normalisé -> highSeasOnly` (pour le
+ * rapprochement avec les emblèmes) + un récapitulatif par faction.
+ */
+export async function fetchHighSeasOnlyByName(factionKeys?: string[]): Promise<{
+  map: Map<string, boolean>
+  perFaction: HighSeasFactionResult[]
+}> {
+  const keys = factionKeys && factionKeys.length
+    ? factionKeys.filter(k => k in FACTION_WIKI_PAGE)
+    : Object.keys(FACTION_WIKI_PAGE)
+  const map = new Map<string, boolean>()
+  const perFaction: HighSeasFactionResult[] = []
+  for (const key of keys) {
+    const title = FACTION_WIKI_PAGE[key]!
+    try {
+      const res = await wikiApi<ParseTextResponse>({
+        action: 'parse', page: title, prop: 'text', formatversion: '2', redirects: '1'
+      })
+      const html = res?.parse?.text
+      if (!html) {
+        perFaction.push({ factionKey: key, title, total: 0, highSeas: 0, error: 'page vide' })
+        continue
+      }
+      const rows = parseCommendationRestrictions(html)
+      let hs = 0
+      for (const r of rows) {
+        const k = normalizeName(r.name)
+        // Flag intrinsèque à la commendation : si vue High Seas only quelque part, on garde true.
+        map.set(k, (map.get(k) ?? false) || r.highSeasOnly)
+        if (r.highSeasOnly) hs++
+      }
+      perFaction.push({ factionKey: key, title, total: rows.length, highSeas: hs })
+    } catch (e) {
+      perFaction.push({ factionKey: key, title, total: 0, highSeas: 0, error: (e as Error)?.message?.slice(0, 200) || 'erreur' })
+    }
+  }
+  return { map, perFaction }
+}

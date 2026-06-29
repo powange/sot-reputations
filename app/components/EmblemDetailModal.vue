@@ -5,6 +5,7 @@ interface EmblemDetail {
   description: string
   image: string | null
   maxGrade: number
+  highSeasOnly: boolean
   gradeThresholds: Array<{ grade: number, threshold: number }>
   progress: { value: number, threshold: number, grade: number, completed: boolean } | null
 }
@@ -83,6 +84,15 @@ function thresholdFor(grade: number): number | undefined {
           >
             {{ detail.description }}
           </p>
+
+          <UBadge
+            v-if="detail.highSeasOnly"
+            color="primary"
+            variant="subtle"
+            icon="i-lucide-waves"
+            class="mt-2"
+            :label="$t('reputations.highSeasOnly')"
+          />
 
           <!-- Progression de l'utilisateur -->
           <div class="mt-4 w-full max-w-sm border-t border-muted/20 pt-3">

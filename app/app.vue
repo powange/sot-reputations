@@ -69,10 +69,15 @@ if (import.meta.client) {
   let navTimer: ReturnType<typeof setTimeout> | null = null
   nuxtApp.hook('page:loading:start', () => {
     if (navTimer) clearTimeout(navTimer)
-    navTimer = setTimeout(() => { navLoading.value = true }, 350)
+    navTimer = setTimeout(() => {
+      navLoading.value = true
+    }, 350)
   })
   nuxtApp.hook('page:loading:end', () => {
-    if (navTimer) { clearTimeout(navTimer); navTimer = null }
+    if (navTimer) {
+      clearTimeout(navTimer)
+      navTimer = null
+    }
     navLoading.value = false
   })
 }

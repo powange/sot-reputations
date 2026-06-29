@@ -41,6 +41,9 @@ export function useEmblemFilters<C extends { id: number, key: string }>(options:
 
   const ignoreWithoutData = ref(route.query.ignoreEmpty === '1')
 
+  // N'afficher que les emblèmes « High Seas only » (jouables uniquement en Haute Mer).
+  const highSeasOnlyFilter = ref(route.query.highSeas === '1')
+
   // Computed
   const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
   const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
@@ -91,6 +94,9 @@ export function useEmblemFilters<C extends { id: number, key: string }>(options:
     if (ignoreWithoutData.value) {
       params.set('ignoreEmpty', '1')
     }
+    if (highSeasOnlyFilter.value) {
+      params.set('highSeas', '1')
+    }
 
     // Ajouter les paramètres supplémentaires
     if (options.extraUrlParams) {
@@ -108,7 +114,7 @@ export function useEmblemFilters<C extends { id: number, key: string }>(options:
   }
 
   watch(
-    [searchQuery, selectedFactionKeys, selectedCampaignIds, emblemCompletionFilter, ignoreWithoutData],
+    [searchQuery, selectedFactionKeys, selectedCampaignIds, emblemCompletionFilter, ignoreWithoutData, highSeasOnlyFilter],
     () => {
       if (urlUpdateTimeout) {
         clearTimeout(urlUpdateTimeout)
@@ -134,6 +140,7 @@ export function useEmblemFilters<C extends { id: number, key: string }>(options:
     selectedCampaignIds,
     emblemCompletionFilter,
     ignoreWithoutData,
+    highSeasOnlyFilter,
     // Computed
     isSearchActive,
     allFactionsSelected,

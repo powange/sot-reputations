@@ -33,6 +33,8 @@ export interface EmblemInfo {
   campaignId: number
   factionKey: string
   campaignName: string
+  // Commendation jouable uniquement en Haute Mer (High Seas), d'après le wiki.
+  highSeasOnly: boolean
 }
 
 export interface EmblemProgress {
@@ -102,6 +104,8 @@ export interface SingleUserTableRow extends BaseTableRow {
   value: number
   threshold: number
   grade: number
+  // Commendation jouable uniquement en Haute Mer (High Seas).
+  highSeasOnly: boolean
 }
 
 export interface MultiUserTableRow extends BaseTableRow {

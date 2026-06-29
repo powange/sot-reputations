@@ -126,6 +126,7 @@ const isScalar = computed(() => props.row.threshold > 0)
       :description="row.description"
       :image="row.image"
       :emblem-id="row.id"
+      :high-seas-only="row.highSeasOnly"
     />
   </div>
 </template>

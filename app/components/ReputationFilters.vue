@@ -27,6 +27,7 @@ const searchQuery = defineModel<string>('searchQuery', { default: '' })
 const selectedFactionKeys = defineModel<string[]>('selectedFactionKeys', { default: () => [] })
 const selectedCampaignIds = defineModel<number[]>('selectedCampaignIds', { default: () => [] })
 const emblemCompletionFilter = defineModel<'all' | 'incomplete' | 'complete'>('emblemCompletionFilter', { default: 'all' })
+const highSeasOnlyFilter = defineModel<boolean>('highSeasOnlyFilter', { default: false })
 
 const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
 const allFactionsSelected = computed(() => selectedFactionKeys.value.length === 0)
@@ -223,6 +224,24 @@ function onCampaignClick(campaignId: number, event: MouseEvent) {
 
         <!-- Slot pour options additionnelles du filtre completion -->
         <slot name="completion-extra" />
+      </div>
+
+      <!-- Filtre « High Seas only » (mode de jeu) -->
+      <div
+        v-if="!isSearchActive"
+        class="flex items-center gap-3 flex-wrap"
+      >
+        <span class="text-sm font-medium text-muted">{{ $t('reputations.modeFilter') }}</span>
+        <UButton
+          :color="highSeasOnlyFilter ? 'primary' : 'neutral'"
+          :variant="highSeasOnlyFilter ? 'solid' : 'outline'"
+          size="sm"
+          icon="i-lucide-waves"
+          :title="$t('reputations.highSeasOnlyHint')"
+          @click="highSeasOnlyFilter = !highSeasOnlyFilter"
+        >
+          {{ $t('reputations.highSeasOnly') }}
+        </UButton>
       </div>
     </div>
   </UCard>

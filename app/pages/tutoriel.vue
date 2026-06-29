@@ -235,7 +235,7 @@ onMounted(() => {
             </template>
           </UAlert>
 
-          <!-- Méthode mobile (la plus simple) -->
+          <!-- Méthode mobile (bookmarklet) -->
           <UCard>
             <template #header>
               <div class="flex items-center gap-2">
@@ -248,12 +248,14 @@ onMounted(() => {
                 </h3>
               </div>
             </template>
-            <ol class="space-y-2 text-sm list-decimal list-inside">
-              <li>{{ $t('tutorial.manual.mobile1') }}</li>
+            <p class="text-sm text-muted mb-3">
+              {{ $t('tutorial.manual.mobile1') }}
+            </p>
+            <ul class="space-y-1.5 text-sm list-disc list-inside">
               <li>{{ $t('tutorial.manual.mobile2') }}</li>
               <li>{{ $t('tutorial.manual.mobile3') }}</li>
               <li>{{ $t('tutorial.manual.mobile4') }}</li>
-            </ol>
+            </ul>
           </UCard>
 
           <UCard>

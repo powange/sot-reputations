@@ -12,12 +12,6 @@ const isOpen = defineModel<boolean>('open', { required: true })
 const { t } = useI18n()
 const toast = useToast()
 
-// URLs officielles SoT (forcées en /fr : l'import exige des données françaises).
-const SOT_BASE = 'https://www.seaofthieves.com/fr/api/profilev2'
-function openSot(path: 'reputation' | 'chest') {
-  window.open(`${SOT_BASE}/${path}`, '_blank', 'noopener')
-}
-
 const reputationText = ref('')
 const chestText = ref('')
 const isImporting = ref(false)
@@ -120,44 +114,22 @@ watch(isOpen, (open) => {
 
           <!-- Réputation (obligatoire) -->
           <UFormField :label="$t('import.reputationLabel')">
-            <div class="flex flex-col gap-2">
-              <UButton
-                :label="$t('import.openReputation')"
-                icon="i-lucide-external-link"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                class="self-start"
-                @click="openSot('reputation')"
-              />
-              <UTextarea
-                v-model="reputationText"
-                :placeholder="$t('import.reputationPlaceholder')"
-                :rows="6"
-                class="w-full font-mono text-xs"
-              />
-            </div>
+            <UTextarea
+              v-model="reputationText"
+              :placeholder="$t('import.reputationPlaceholder')"
+              :rows="6"
+              class="w-full font-mono text-xs"
+            />
           </UFormField>
 
           <!-- Coffre (optionnel) -->
           <UFormField :label="$t('import.chestLabel')">
-            <div class="flex flex-col gap-2">
-              <UButton
-                :label="$t('import.openChest')"
-                icon="i-lucide-external-link"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                class="self-start"
-                @click="openSot('chest')"
-              />
-              <UTextarea
-                v-model="chestText"
-                :placeholder="$t('import.chestPlaceholder')"
-                :rows="5"
-                class="w-full font-mono text-xs"
-              />
-            </div>
+            <UTextarea
+              v-model="chestText"
+              :placeholder="$t('import.chestPlaceholder')"
+              :rows="5"
+              class="w-full font-mono text-xs"
+            />
           </UFormField>
         </div>
         <template #footer>

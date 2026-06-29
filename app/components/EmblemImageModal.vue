@@ -4,6 +4,7 @@ const props = defineProps<{
   description?: string
   image?: string
   emblemId?: number
+  highSeasOnly?: boolean
 }>()
 const open = defineModel<boolean>('open', { default: false })
 
@@ -55,6 +56,15 @@ watch(open, async (isOpen) => {
         >
           {{ description }}
         </p>
+
+        <UBadge
+          v-if="highSeasOnly"
+          color="primary"
+          variant="subtle"
+          icon="i-lucide-waves"
+          class="mt-2"
+          :label="$t('reputations.highSeasOnly')"
+        />
 
         <!-- Objets du coffre que cet emblème débloque (prérequis) -->
         <div

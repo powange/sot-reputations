@@ -164,6 +164,28 @@ watchEffect(() => {
               </div>
             </UCard>
           </NuxtLink>
+
+          <!-- Synchro wiki des emblèmes (High Seas only) -->
+          <NuxtLink
+            v-if="isAdmin"
+            to="/admin/wiki-emblems"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-waves"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Synchro wiki des emblèmes</h3>
+                  <p class="text-sm text-muted">Récupérer le flag « High Seas only » des commendations depuis le wiki</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
         </div>
       </section>
 

@@ -1,14 +1,6 @@
 <script setup lang="ts">
 const { t, locale } = useI18n()
-const { isAuthenticated } = useAuth()
 const route = useRoute()
-// URL unique /chest : le mode public (catalogue « Le coffre », sans données ni
-// filtres liés à l'utilisateur) dépend de la connexion, pas de l'URL.
-const isPublic = computed(() => !isAuthenticated.value)
-
-useSeoMeta({
-  title: () => `${isPublic.value ? t('yourChest.publicTitle') : t('yourChest.title')} - SoT Reputations`
-})
 
 interface ChestItem {
   id: number
@@ -40,16 +32,23 @@ interface TaxonomyMap {
   subcategories: Record<string, Record<string, Record<string, string | null>>>
 }
 
-// La locale est passée au serveur pour résoudre les noms d'items (FR/EN/ES) ;
-// useFetch refait l'appel automatiquement au changement de langue.
-const { data, status, error } = await useFetch<ChestItem[]>(
-  () => (isPublic.value ? '/api/chest' : '/api/my-chest'),
+// Un seul endpoint : le serveur renvoie la possession si connecté, sinon le catalogue
+// public. On décide « public » d'après `authenticated` -> fiable en SSR. La locale est
+// passée au serveur pour résoudre les noms d'items ; useFetch refait l'appel au
+// changement de langue.
+const { data, status, error } = await useFetch<{ authenticated: boolean, items: ChestItem[] }>(
+  '/api/my-chest',
   { query: { locale } }
 )
+const isPublic = computed(() => !data.value?.authenticated)
 const { data: taxonomy } = await useFetch<TaxonomyMap>('/api/chest-taxonomy')
 const { data: palette } = await useFetch<Array<{ name: string, hex: string }>>('/api/chest-colors')
-const items = computed(() => data.value || [])
+const items = computed(() => data.value?.items ?? [])
 const isLoading = computed(() => status.value === 'pending')
+
+useSeoMeta({
+  title: () => `${isPublic.value ? t('yourChest.publicTitle') : t('yourChest.title')} - SoT Reputations`
+})
 // Nombre d'items que l'utilisateur possède réellement (le reste du catalogue
 // vient des imports d'autres utilisateurs).
 const ownedCount = computed(() => items.value.reduce((n, i) => n + (i.owned ? 1 : 0), 0))

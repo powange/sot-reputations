@@ -9,16 +9,18 @@ import type {
 import { formatLastImport } from '~/utils/format'
 
 interface MyReputationsData {
-  user: UserInfo
+  user: UserInfo | null
   factions: FactionWithCampaigns<EmblemProgress | null>[]
 }
 
 const { t, locale } = useI18n()
 const toast = useToast()
-const { isAuthenticated } = useAuth()
-// URL unique /reputations : le mode public (catalogue « Les réputations », sans
-// progression ni filtres user) dépend de la connexion, pas de l'URL.
-const isPublic = computed(() => !isAuthenticated.value)
+
+// Un seul endpoint : le serveur renvoie la progression si connecté, sinon le catalogue
+// public (user: null). On décide « public » d'après la réponse -> fiable en SSR.
+const { data, refresh, status } = await useFetch<MyReputationsData>('/api/my-reputations')
+const isPublic = computed(() => !data.value?.user)
+const isLoading = computed(() => status.value === 'pending')
 
 useSeoMeta({
   title: () => `${isPublic.value ? t('reputations.publicTitle') : t('reputations.title')} - SoT Reputations`
@@ -41,16 +43,6 @@ function getTranslatedText(
   }
   // Fallback vers le texte original (français)
   return emblem[field]
-}
-
-// Récupérer les données (catalogue public ou réputations de l'utilisateur)
-const { data, error, refresh, status } = await useFetch<MyReputationsData>(
-  () => (isPublic.value ? '/api/reputations' : '/api/my-reputations')
-)
-const isLoading = computed(() => status.value === 'pending')
-
-if (error.value && !isPublic.value) {
-  navigateTo('/')
 }
 
 // Modal Import
@@ -188,6 +180,7 @@ const {
   selectedCampaignIds,
   emblemCompletionFilter,
   ignoreWithoutData,
+  highSeasOnlyFilter,
   isSearchActive,
   filteredFactionsCampaigns
 } = useEmblemFilters({
@@ -224,9 +217,12 @@ const searchResults = computed(() => {
   return results
 })
 
-function filterEmblemsList<T extends { progress: EmblemProgress | null }>(emblems: T[]): T[] {
+function filterEmblemsList<T extends { progress: EmblemProgress | null, highSeasOnly?: boolean }>(emblems: T[]): T[] {
+  // Filtre « High Seas only » : indépendant de la complétion, donc appliqué en amont
+  // (s'applique aussi en mode public où le filtre de complétion ne tourne pas).
+  const base = highSeasOnlyFilter.value ? emblems.filter(e => e.highSeasOnly) : emblems
   return filterEmblems(
-    emblems,
+    base,
     {
       completionFilter: emblemCompletionFilter.value,
       ignoreWithoutData: ignoreWithoutData.value
@@ -268,7 +264,8 @@ function getTableData(emblems: Array<EmblemInfo & { progress: EmblemProgress | n
       hasProgress,
       value: progress?.value ?? 0,
       threshold: progress?.threshold ?? 0,
-      grade: progress?.grade ?? 0
+      grade: progress?.grade ?? 0,
+      highSeasOnly: emblem.highSeasOnly
     }
   })
 }
@@ -432,6 +429,7 @@ async function handleDelete() {
             v-model:selected-faction-keys="selectedFactionKeys"
             v-model:selected-campaign-ids="selectedCampaignIds"
             v-model:emblem-completion-filter="emblemCompletionFilter"
+            v-model:high-seas-only-filter="highSeasOnlyFilter"
             :factions="factions"
             :show-completion-filter="hasImportedData"
           >
