@@ -29,9 +29,9 @@ async function handleImport() {
       color: 'success'
     })
     importSuccess.value = true
-    // Rediriger vers mes réputations après 2 secondes
+    // Rediriger vers les réputations après 2 secondes
     setTimeout(() => {
-      navigateTo('/mes-reputations')
+      navigateTo('/reputations')
     }, 2000)
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }

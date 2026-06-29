@@ -34,8 +34,11 @@ export default defineNuxtConfig({
     }
   },
 
+  // Anciennes URLs (avant unification public/connecté) -> nouveaux slugs anglais uniques.
   routeRules: {
-    // SSR par défaut pour les pages dynamiques
+    '/mes-reputations': { redirect: { to: '/reputations', statusCode: 301 } },
+    '/your-chest': { redirect: { to: '/chest', statusCode: 301 } },
+    '/coffre': { redirect: { to: '/chest', statusCode: 301 } }
   },
 
   compatibilityDate: '2025-01-15',

@@ -16,11 +16,9 @@ interface MyReputationsData {
 const { t, locale } = useI18n()
 const toast = useToast()
 const { isAuthenticated } = useAuth()
-const route = useRoute()
-// Mode public (catalogue « Les réputations », sans progression ni filtres user).
-const isPublic = computed(() => route.path === '/reputations')
-
-definePageMeta({ alias: ['/reputations'] })
+// URL unique /reputations : le mode public (catalogue « Les réputations », sans
+// progression ni filtres user) dépend de la connexion, pas de l'URL.
+const isPublic = computed(() => !isAuthenticated.value)
 
 useSeoMeta({
   title: () => `${isPublic.value ? t('reputations.publicTitle') : t('reputations.title')} - SoT Reputations`
@@ -43,13 +41,6 @@ function getTranslatedText(
   }
   // Fallback vers le texte original (français)
   return emblem[field]
-}
-
-// Rediriger si non connecté (sauf en mode public, accessible à tous)
-const { saveRedirectUrl } = useAuth()
-if (!isPublic.value && !isAuthenticated.value) {
-  saveRedirectUrl()
-  navigateTo('/')
 }
 
 // Récupérer les données (catalogue public ou réputations de l'utilisateur)

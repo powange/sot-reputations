@@ -1,6 +1,6 @@
 /**
  * Utilitaires pour le filtrage des emblèmes
- * Utilisé par les pages mes-reputations et groupe
+ * Utilisé par les pages reputations et groupe
  */
 
 export type CompletionFilter = 'all' | 'incomplete' | 'complete'

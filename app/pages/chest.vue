@@ -1,21 +1,14 @@
 <script setup lang="ts">
 const { t, locale } = useI18n()
-const { isAuthenticated, saveRedirectUrl } = useAuth()
+const { isAuthenticated } = useAuth()
 const route = useRoute()
-// Mode public (catalogue « Le coffre », sans données ni filtres liés à l'utilisateur).
-const isPublic = computed(() => route.path === '/coffre')
-
-definePageMeta({ alias: ['/coffre'] })
+// URL unique /chest : le mode public (catalogue « Le coffre », sans données ni
+// filtres liés à l'utilisateur) dépend de la connexion, pas de l'URL.
+const isPublic = computed(() => !isAuthenticated.value)
 
 useSeoMeta({
   title: () => `${isPublic.value ? t('yourChest.publicTitle') : t('yourChest.title')} - SoT Reputations`
 })
-
-// Rediriger si non connecté (sauf en mode public, accessible à tous)
-if (!isPublic.value && !isAuthenticated.value) {
-  saveRedirectUrl()
-  navigateTo('/')
-}
 
 interface ChestItem {
   id: number
