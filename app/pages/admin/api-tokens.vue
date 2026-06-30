@@ -150,7 +150,8 @@ const origin = computed(() => useRequestURL().origin)
       </h1>
       <p class="text-muted mt-2">
         Générez des jetons d'accès pour les agents externes (IA). Chaque jeton donne un accès en
-        lecture seule aux notes de version et aux recommandations.
+        lecture seule au catalogue du coffre, aux recommandations et aux notes de version —
+        en JSON, ou en Markdown via <code class="px-1.5 py-0.5 rounded bg-elevated">?format=md</code>.
       </p>
     </div>
 
@@ -319,6 +320,13 @@ const origin = computed(() => useRequestURL().origin)
           ⚠️ Le paramètre d'URL est plus pratique mais moins sûr : le jeton apparaît dans les
           journaux d'accès et l'historique du navigateur. Préférez l'en-tête quand c'est possible.
         </p>
+        <p>
+          Réponse au format <strong>JSON</strong> par défaut. Ajoutez
+          <code class="px-1.5 py-0.5 rounded bg-elevated">?format=md</code> (ou
+          <code class="px-1.5 py-0.5 rounded bg-elevated">?format=markdown</code>) pour recevoir
+          du <strong>Markdown</strong> à la place — pratique pour un agent IA qui exploite mieux du
+          texte structuré. Cumulable avec le paramètre <code class="px-1.5 py-0.5 rounded bg-elevated">token</code>.
+        </p>
         <div>
           <p class="font-medium mb-1">
             Notes de version (patch notes)
@@ -348,6 +356,12 @@ const origin = computed(() => useRequestURL().origin)
             Exemple (URL)
           </p>
           <code class="block px-3 py-2 rounded bg-elevated break-all whitespace-pre-wrap">{{ origin }}/api/agent/recommendations?token=&lt;jeton&gt;</code>
+        </div>
+        <div>
+          <p class="font-medium mb-1">
+            Exemple (Markdown)
+          </p>
+          <code class="block px-3 py-2 rounded bg-elevated break-all whitespace-pre-wrap">curl -H "Authorization: Bearer &lt;jeton&gt;" "{{ origin }}/api/agent/recommendations?format=md"</code>
         </div>
       </div>
     </UCard>
