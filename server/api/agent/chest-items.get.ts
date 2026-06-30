@@ -4,26 +4,42 @@ import { wantsMarkdown, sendMarkdown, mdInline, pushMdHeading } from '../../util
 
 /**
  * Rendu Markdown du catalogue : titres par catégorie puis sous-catégorie, items
- * en puces « **Nom** (`clé`) — description ». Les items arrivent déjà triés
- * (catégorie, sous-catégorie, ordre), on émet un titre au changement.
+ * en puces « **Nom** (`clé`) — description ».
+ *
+ * On regroupe explicitement par catégorie → sous-catégorie (Map = ordre de
+ * première apparition). Sans ça, le tri d'origine (par set/thème) entrelace les
+ * sous-catégories et produit des titres fragmentés : la même « Wheel » répétée
+ * des dizaines de fois → arbre de titres trompeur pour une IA.
  */
 function renderChestItemsMarkdown(items: ChestCatalogItem[]): string {
   const lines: string[] = []
   pushMdHeading(lines, `# Catalogue du coffre (${items.length} items)`)
-  let category: string | null = null
-  let subcategory: string | null | undefined
+
+  const byCategory = new Map<string, Map<string, ChestCatalogItem[]>>()
   for (const item of items) {
-    if (item.category !== category) {
-      category = item.category
-      subcategory = undefined
-      pushMdHeading(lines, `## ${item.category}`)
+    let subs = byCategory.get(item.category)
+    if (!subs) {
+      subs = new Map()
+      byCategory.set(item.category, subs)
     }
-    if ((item.subcategory ?? null) !== subcategory) {
-      subcategory = item.subcategory ?? null
-      if (subcategory) pushMdHeading(lines, `### ${subcategory}`)
+    const sub = item.subcategory ?? ''
+    let bucket = subs.get(sub)
+    if (!bucket) {
+      bucket = []
+      subs.set(sub, bucket)
     }
-    const desc = mdInline(item.description)
-    lines.push(`- **${mdInline(item.name)}** (\`${item.key}\`)${desc ? ` — ${desc}` : ''}`)
+    bucket.push(item)
+  }
+
+  for (const [category, subs] of byCategory) {
+    pushMdHeading(lines, `## ${mdInline(category)}`)
+    for (const [sub, bucket] of subs) {
+      if (sub) pushMdHeading(lines, `### ${mdInline(sub)}`)
+      for (const item of bucket) {
+        const desc = mdInline(item.description)
+        lines.push(`- **${mdInline(item.name)}** (\`${item.key}\`)${desc ? ` — ${desc}` : ''}`)
+      }
+    }
   }
   lines.push('')
   return lines.join('\n')

@@ -41,3 +41,49 @@ export function pushMdHeading(lines: string[], heading: string): void {
   if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('')
   lines.push(heading, '')
 }
+
+/**
+ * Décale tous les titres d'un fragment Markdown pour qu'ils s'imbriquent sous un
+ * titre de niveau `parentLevel` : le titre le plus haut du fragment devient
+ * `parentLevel + 1`, les autres suivent le même décalage (plafonné à h6). Les
+ * titres dans les blocs de code (``` ou ~~~) sont ignorés.
+ *
+ * Sert à embarquer du Markdown externe (ex. patch notes, qui ont leurs propres
+ * h1/h2) sans casser la hiérarchie du document englobant — sinon une IA qui lit
+ * l'arbre des titres rattache mal les sections.
+ */
+export function demoteMdHeadings(markdown: string, parentLevel: number): string {
+  const lines = markdown.split('\n')
+  const headingRe = /^(#{1,6})(\s.*)$/
+  const fenceRe = /^\s*(`{3,}|~{3,})/
+
+  // 1re passe : niveau de titre le plus haut (hors blocs de code).
+  let inFence = false
+  let minLevel = Infinity
+  for (const line of lines) {
+    if (fenceRe.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const m = headingRe.exec(line)
+    if (m) minLevel = Math.min(minLevel, m[1]!.length)
+  }
+  if (!Number.isFinite(minLevel)) return markdown // aucun titre
+
+  const shift = (parentLevel + 1) - minLevel
+  if (shift <= 0) return markdown // déjà assez profond
+
+  // 2e passe : appliquer le décalage.
+  inFence = false
+  return lines.map((line) => {
+    if (fenceRe.test(line)) {
+      inFence = !inFence
+      return line
+    }
+    if (inFence) return line
+    const m = headingRe.exec(line)
+    if (!m) return line
+    return '#'.repeat(Math.min(6, m[1]!.length + shift)) + m[2]!
+  }).join('\n')
+}

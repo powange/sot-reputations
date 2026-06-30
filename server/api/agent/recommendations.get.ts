@@ -26,29 +26,43 @@ interface Recommendation {
 
 /**
  * Rendu Markdown : titres par faction puis campagne, emblèmes en puces avec
- * grade max, description et seuils de grades. Les emblèmes arrivent déjà triés
- * (faction, campagne, ordre), on émet un titre au changement de clé.
+ * grade max, description et seuils de grades.
+ *
+ * Regroupement explicite faction → campagne (Map = ordre de première apparition)
+ * pour des titres uniques, même si le tri d'origine venait à entrelacer les
+ * campagnes (cf. fragmentation observée sur le catalogue du coffre).
  */
 function renderRecommendationsMarkdown(recs: Recommendation[]): string {
   const lines: string[] = []
   pushMdHeading(lines, `# Recommandations d'emblèmes (${recs.length})`)
-  let factionKey: string | null = null
-  let campaignKey: string | null = null
+
+  const byFaction = new Map<string, { name: string, campaigns: Map<string, { name: string, items: Recommendation[] }> }>()
   for (const r of recs) {
-    if (r.faction.key !== factionKey) {
-      factionKey = r.faction.key
-      campaignKey = null
-      pushMdHeading(lines, `## ${r.faction.name}`)
+    let faction = byFaction.get(r.faction.key)
+    if (!faction) {
+      faction = { name: r.faction.name, campaigns: new Map() }
+      byFaction.set(r.faction.key, faction)
     }
-    if (r.campaign.key !== campaignKey) {
-      campaignKey = r.campaign.key
-      pushMdHeading(lines, `### ${r.campaign.name}`)
+    let campaign = faction.campaigns.get(r.campaign.key)
+    if (!campaign) {
+      campaign = { name: r.campaign.name, items: [] }
+      faction.campaigns.set(r.campaign.key, campaign)
     }
-    const desc = mdInline(r.descriptionFr)
-    lines.push(`- **${mdInline(r.nameFr)}** (grade max : ${r.maxGrade})${desc ? ` — ${desc}` : ''}`)
-    if (r.gradeThresholds.length) {
-      const seuils = r.gradeThresholds.map(t => `${t.grade} → ${t.threshold}`).join(', ')
-      lines.push(`  - Seuils : ${seuils}`)
+    campaign.items.push(r)
+  }
+
+  for (const [, faction] of byFaction) {
+    pushMdHeading(lines, `## ${mdInline(faction.name)}`)
+    for (const [, campaign] of faction.campaigns) {
+      pushMdHeading(lines, `### ${mdInline(campaign.name)}`)
+      for (const r of campaign.items) {
+        const desc = mdInline(r.descriptionFr)
+        lines.push(`- **${mdInline(r.nameFr)}** (grade max : ${r.maxGrade})${desc ? ` — ${desc}` : ''}`)
+        if (r.gradeThresholds.length) {
+          const seuils = r.gradeThresholds.map(t => `${t.grade} → ${t.threshold}`).join(', ')
+          lines.push(`  - Seuils : ${seuils}`)
+        }
+      }
     }
   }
   lines.push('')
