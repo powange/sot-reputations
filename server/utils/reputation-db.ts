@@ -2383,6 +2383,10 @@ export interface ChestCatalogItem {
   name: string
   description: string | null
   image: string | null
+  // Coût d'achat (or / doublons / pièces anciennes) et prérequis d'obtention,
+  // déduits du wiki. null si l'item n'est pas achetable / sans condition.
+  cost: ChestItemCost | null
+  prerequisites: ChestItemPrereqs | null
 }
 
 /**
@@ -2392,7 +2396,7 @@ export interface ChestCatalogItem {
 export function getChestCatalog(): ChestCatalogItem[] {
   const db = getReputationDb()
   const rows = db.prepare(`
-    SELECT uid, item_key, category, subcategory, name, description, image, sort_order as sortOrder
+    SELECT uid, item_key, category, subcategory, name, description, image, cost, prerequisites, sort_order as sortOrder
     FROM chest_items
   `).all() as Array<{
     uid: string
@@ -2402,6 +2406,8 @@ export function getChestCatalog(): ChestCatalogItem[] {
     name: string
     description: string | null
     image: string | null
+    cost: string | null
+    prerequisites: string | null
     sortOrder: number
   }>
 
@@ -2413,7 +2419,9 @@ export function getChestCatalog(): ChestCatalogItem[] {
     subcategory: r.subcategory,
     name: r.name,
     description: r.description,
-    image: r.image
+    image: r.image,
+    cost: parseChestItemCost(r.cost),
+    prerequisites: parseChestItemPrereqs(r.prerequisites)
   }))
 }
 

@@ -58,6 +58,7 @@ function renderRecommendationsMarkdown(recs: Recommendation[]): string {
       for (const r of campaign.items) {
         const desc = mdInline(r.descriptionFr)
         lines.push(`- **${mdInline(r.nameFr)}** (grade max : ${r.maxGrade})${desc ? ` — ${desc}` : ''}`)
+        if (r.image) lines.push(`  - Image : ${r.image}`)
         if (r.gradeThresholds.length) {
           const seuils = r.gradeThresholds.map(t => `${t.grade} → ${t.threshold}`).join(', ')
           lines.push(`  - Seuils : ${seuils}`)
