@@ -22,9 +22,15 @@ useSeoMeta({
 
 const { data: releaseNotes } = await useFetch<ReleaseNote[]>('/api/release-notes')
 
-const search = ref('')
-const debouncedSearch = ref('')
-const selectedVersion = ref<string | null>(null)
+const route = useRoute()
+const router = useRouter()
+
+// Filtres initialisés depuis l'URL (?version=… ou ?q=…) : partageable et
+// conservé au rechargement de la page.
+const initialQuery = typeof route.query.q === 'string' ? route.query.q : ''
+const search = ref(initialQuery)
+const debouncedSearch = ref(initialQuery)
+const selectedVersion = ref<string | null>(typeof route.query.version === 'string' ? route.query.version : null)
 const notesContainer = ref<HTMLElement | null>(null)
 const occurrenceCount = ref(0)
 const currentOccurrence = ref(0)
@@ -61,6 +67,19 @@ watch(search, (val) => {
   debounceTimer = setTimeout(() => {
     debouncedSearch.value = val
   }, 400)
+})
+
+// Persiste les filtres dans l'URL : ?version=… prioritaire (le champ de recherche
+// est désactivé quand une version est choisie), sinon ?q=…. replace() pour ne pas
+// empiler une entrée d'historique à chaque changement de filtre.
+watch([selectedVersion, debouncedSearch], ([version, q]) => {
+  const query: Record<string, string> = {}
+  if (version) {
+    query.version = version
+  } else if (q.trim()) {
+    query.q = q.trim()
+  }
+  router.replace({ query })
 })
 
 const filteredNotes = computed(() => {
