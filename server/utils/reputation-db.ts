@@ -1253,6 +1253,60 @@ export function mergeDuplicateChestItemGroups(): { groups: number, deleted: numb
   return { groups: groups.length, deleted }
 }
 
+export interface MergeEmblemResult {
+  // Joueurs migrés de la source vers la cible (aucun conflit).
+  migrated: number
+  // Joueurs qui avaient déjà une progression sur la cible : progression fusionnée
+  // (on garde la meilleure) et ligne source supprimée.
+  merged: number
+}
+
+/**
+ * Fusionne un emblème doublon (`sourceId`) dans un emblème cible (`targetId`) :
+ * migre les progressions joueurs (user_emblems) de la source vers la cible, puis
+ * supprime la source et ses données propres (seuils de grades, traductions).
+ *
+ * Conflit = un joueur possède déjà une progression sur la cible. On conserve
+ * alors la meilleure progression (value la plus élevée) et on supprime la ligne
+ * source. Les IDs sont supposés valides et distincts (vérifié par l'endpoint).
+ */
+export function mergeEmblem(sourceId: number, targetId: number): MergeEmblemResult {
+  const db = getReputationDb()
+
+  const sourceRows = db.prepare(
+    'SELECT id, user_id as userId, value, threshold, grade, completed FROM user_emblems WHERE emblem_id = ?'
+  ).all(sourceId) as Array<{ id: number, userId: number, value: number, threshold: number, grade: number, completed: number }>
+
+  const getTarget = db.prepare('SELECT id, value FROM user_emblems WHERE emblem_id = ? AND user_id = ?')
+  const moveRow = db.prepare('UPDATE user_emblems SET emblem_id = ? WHERE id = ?')
+  const updateTarget = db.prepare('UPDATE user_emblems SET value = ?, threshold = ?, grade = ?, completed = ? WHERE id = ?')
+  const delRow = db.prepare('DELETE FROM user_emblems WHERE id = ?')
+
+  let migrated = 0
+  let merged = 0
+  const tx = db.transaction(() => {
+    for (const s of sourceRows) {
+      const t = getTarget.get(targetId, s.userId) as { id: number, value: number } | undefined
+      if (!t) {
+        moveRow.run(targetId, s.id)
+        migrated++
+      } else {
+        // Le joueur a déjà la cible : garder la meilleure progression.
+        if (s.value > t.value) updateTarget.run(s.value, s.threshold, s.grade, s.completed, t.id)
+        delRow.run(s.id)
+        merged++
+      }
+    }
+    // Supprimer le doublon et ses données propres (mêmes tables que la suppression).
+    db.prepare('DELETE FROM emblem_grade_thresholds WHERE emblem_id = ?').run(sourceId)
+    db.prepare('DELETE FROM emblem_translations WHERE emblem_id = ?').run(sourceId)
+    db.prepare('DELETE FROM emblems WHERE id = ?').run(sourceId)
+  })
+  tx()
+
+  return { migrated, merged }
+}
+
 function parseChestItem(raw: unknown): ParsedChestItem | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>

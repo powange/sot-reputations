@@ -172,6 +172,85 @@ async function deleteEmblem(emblem: Emblem) {
   }
 }
 
+// Fusion / dédoublonnage : migrer les joueurs d'un emblème doublon vers un
+// emblème cible, puis supprimer le doublon.
+interface EmblemWithContext extends Emblem {
+  factionName: string
+  campaignName: string
+}
+
+// Liste plate de tous les emblèmes (avec faction/campagne) pour choisir la cible.
+const allEmblems = computed<EmblemWithContext[]>(() => {
+  const out: EmblemWithContext[] = []
+  for (const faction of factions.value ?? []) {
+    for (const campaign of faction.campaigns) {
+      for (const emblem of campaign.emblems) {
+        out.push({ ...emblem, factionName: faction.name, campaignName: campaign.name })
+      }
+    }
+  }
+  return out
+})
+
+const mergingEmblem = ref<Emblem | null>(null)
+const mergeTargetId = ref<number | undefined>(undefined)
+const isMerging = ref(false)
+
+const isMergeModalOpen = computed({
+  get: () => mergingEmblem.value !== null,
+  set: (value) => {
+    if (!value) {
+      mergingEmblem.value = null
+      mergeTargetId.value = undefined
+    }
+  }
+})
+
+function openMergeModal(emblem: Emblem) {
+  mergingEmblem.value = emblem
+  mergeTargetId.value = undefined
+}
+
+// Options de cible : tous les emblèmes sauf la source. Les emblèmes de même nom
+// (doublons probables) sont remontés en tête.
+const mergeTargetOptions = computed(() => {
+  const source = mergingEmblem.value
+  if (!source) return []
+  const sourceName = source.name.trim().toLowerCase()
+  return allEmblems.value
+    .filter(e => e.id !== source.id)
+    .map(e => ({
+      value: e.id,
+      label: `${e.name} · ${e.factionName} / ${e.campaignName}${e.userCount > 0 ? ` · ${e.userCount} j.` : ''}`,
+      sameName: e.name.trim().toLowerCase() === sourceName
+    }))
+    .sort((a, b) => {
+      if (a.sameName !== b.sameName) return a.sameName ? -1 : 1
+      return a.label.localeCompare(b.label)
+    })
+})
+
+async function confirmMerge() {
+  const source = mergingEmblem.value
+  if (!source || !mergeTargetId.value) return
+  isMerging.value = true
+  try {
+    const res = await $fetch<{ message: string }>(`/api/admin/emblems/${source.id}/merge`, {
+      method: 'POST',
+      body: { targetId: mergeTargetId.value }
+    })
+    toast.add({ title: 'Accomplissements fusionnés', description: res.message, color: 'success' })
+    mergingEmblem.value = null
+    mergeTargetId.value = undefined
+    await refresh()
+  } catch (err) {
+    const message = (err as { data?: { message?: string } })?.data?.message || 'Impossible de fusionner l\'accomplissement'
+    toast.add({ title: 'Erreur', description: message, color: 'error' })
+  } finally {
+    isMerging.value = false
+  }
+}
+
 // Filtre emblèmes non validés
 const showOnlyUnvalidated = ref(false)
 
@@ -572,6 +651,14 @@ watch(showOnlyIncompleteGrades, (value) => {
                           @click.stop="editEmblemGrades(emblem)"
                         />
                         <UButton
+                          icon="i-lucide-git-merge"
+                          size="xs"
+                          variant="ghost"
+                          color="warning"
+                          title="Fusionner (dédoublonner)"
+                          @click.stop="openMergeModal(emblem)"
+                        />
+                        <UButton
                           icon="i-lucide-trash-2"
                           size="xs"
                           variant="ghost"
@@ -625,6 +712,83 @@ watch(showOnlyIncompleteGrades, (value) => {
             @close="editingEmblem = null"
             @saved="onGradesSaved"
           />
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Modal fusion / dédoublonnage -->
+    <UModal v-model:open="isMergeModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h3 class="font-semibold">
+              Fusionner un accomplissement (dédoublonnage)
+            </h3>
+          </template>
+          <div
+            v-if="mergingEmblem"
+            class="space-y-4"
+          >
+            <!-- Emblème source -->
+            <div class="flex items-center gap-3 p-3 rounded-lg bg-muted/10">
+              <img
+                v-if="mergingEmblem.image"
+                :src="mergingEmblem.image"
+                :alt="mergingEmblem.name"
+                class="w-10 h-10 rounded"
+              >
+              <div>
+                <div class="text-xs text-muted mb-0.5">
+                  Doublon à fusionner
+                </div>
+                <div class="font-medium">
+                  {{ mergingEmblem.name }}
+                </div>
+                <div class="text-xs text-muted">
+                  <code class="bg-muted/30 px-1 rounded">{{ mergingEmblem.key }}</code>
+                  · {{ mergingEmblem.userCount }} joueur(s)
+                </div>
+              </div>
+            </div>
+
+            <UFormField
+              label="Accomplissement cible"
+              hint="Les joueurs et données seront migrés vers cet accomplissement"
+            >
+              <USelectMenu
+                v-model="mergeTargetId"
+                :items="mergeTargetOptions"
+                value-key="value"
+                placeholder="Choisir l'accomplissement cible…"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UAlert
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              title="Action irréversible"
+              :description="`Les ${mergingEmblem.userCount} joueur(s) de « ${mergingEmblem.name} » seront migrés vers la cible (meilleure progression conservée en cas de doublon), puis « ${mergingEmblem.name} » sera supprimé.`"
+            />
+
+            <div class="flex justify-end gap-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                label="Annuler"
+                @click="isMergeModalOpen = false"
+              />
+              <UButton
+                color="warning"
+                icon="i-lucide-git-merge"
+                label="Fusionner"
+                :loading="isMerging"
+                :disabled="!mergeTargetId"
+                @click="confirmMerge"
+              />
+            </div>
+          </div>
         </UCard>
       </template>
     </UModal>
