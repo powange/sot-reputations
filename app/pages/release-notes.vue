@@ -13,7 +13,8 @@ DOMPurify.addHook('uponSanitizeElement', (node, data) => {
   }
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const toast = useToast()
 
 useSeoMeta({
   title: () => t('releaseNotes.title'),
@@ -190,7 +191,9 @@ watch(filteredNotes, () => {
   }
 })
 
-function renderMarkdown(content: string): string {
+// Rendu Markdown -> HTML assaini (sans surbrillance). Sert aussi de base à la
+// traduction (on traduit les nœuds texte de ce HTML pour préserver la structure).
+function renderMarkdownBase(content: string): string {
   let html = marked.parse(content, { async: false }) as string
   // Sanitiser le HTML (anti-XSS) en conservant les iframes YouTube
   html = DOMPurify.sanitize(html, {
@@ -199,6 +202,11 @@ function renderMarkdown(content: string): string {
   })
   // Ouvrir tous les liens dans un nouvel onglet
   html = html.replace(/<a /g, '<a target="_blank" rel="noopener" ')
+  return html
+}
+
+function renderMarkdown(content: string): string {
+  const html = renderMarkdownBase(content)
   if (!debouncedSearch.value.trim()) return html
   return highlightHtml(html, debouncedSearch.value.trim())
 }
@@ -220,6 +228,147 @@ function formatDate(dateStr: string): string {
   } catch {
     return dateStr
   }
+}
+
+// --- Traduction côté client via l'API Translator intégrée (Chrome/Edge) ---
+// Le contenu des notes est en anglais ; on le traduit sur l'appareil vers la
+// langue de l'interface, à la demande. Aucun serveur, aucune clé, illimité.
+interface BrowserTranslator {
+  translate: (input: string) => Promise<string>
+}
+interface TranslatorFactory {
+  availability: (opts: { sourceLanguage: string, targetLanguage: string })
+  => Promise<'unavailable' | 'downloadable' | 'downloading' | 'available'>
+  create: (opts: {
+    sourceLanguage: string
+    targetLanguage: string
+    monitor?: (m: EventTarget) => void
+  }) => Promise<BrowserTranslator>
+}
+
+const translateApiPresent = ref(false)
+const translated = ref(false)
+const translating = ref(false)
+const downloadPct = ref<number | null>(null)
+const translatedHtml = ref<Record<number, string>>({})
+let translator: BrowserTranslator | null = null
+
+// Source = anglais, cible = langue de l'interface (bouton masqué si déjà en anglais).
+const targetLang = computed(() => locale.value)
+const canTranslate = computed(() =>
+  translateApiPresent.value && targetLang.value !== 'en' && filteredNotes.value.length > 0
+)
+const translateButtonLabel = computed(() => {
+  if (translating.value) {
+    return downloadPct.value !== null ? `Téléchargement ${downloadPct.value}%` : 'Traduction…'
+  }
+  return translated.value ? 'Voir l\'original' : 'Traduire'
+})
+
+onMounted(() => {
+  translateApiPresent.value = 'Translator' in globalThis
+})
+
+// Nouveau filtrage : revenir à l'affichage original (le cache par note est conservé).
+watch(filteredNotes, () => {
+  translated.value = false
+})
+
+// Changement de langue d'interface : cache et traducteur ciblent l'ancienne langue.
+watch(targetLang, () => {
+  translated.value = false
+  translatedHtml.value = {}
+  translator = null
+})
+
+// Nœuds texte à traduire (on saute code/pre pour ne pas abîmer le code).
+function collectTextNodes(root: HTMLElement): Text[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT
+      const parent = (node as Text).parentElement
+      if (parent && parent.closest('code, pre, script, style')) return NodeFilter.FILTER_REJECT
+      return NodeFilter.FILTER_ACCEPT
+    }
+  })
+  const nodes: Text[] = []
+  let n: Node | null
+  while ((n = walker.nextNode())) nodes.push(n as Text)
+  return nodes
+}
+
+async function ensureTranslator(): Promise<BrowserTranslator> {
+  if (translator) return translator
+  const factory = (globalThis as unknown as { Translator?: TranslatorFactory }).Translator
+  if (!factory) throw new Error('unsupported')
+  const availability = await factory.availability({ sourceLanguage: 'en', targetLanguage: targetLang.value })
+  if (availability === 'unavailable') throw new Error('unsupported')
+  translator = await factory.create({
+    sourceLanguage: 'en',
+    targetLanguage: targetLang.value,
+    monitor(m) {
+      m.addEventListener('downloadprogress', (e) => {
+        const loaded = (e as unknown as { loaded?: number }).loaded
+        downloadPct.value = loaded != null ? Math.round(loaded * 100) : null
+      })
+    }
+  })
+  downloadPct.value = null
+  return translator
+}
+
+// Traduit les nœuds texte du HTML rendu (structure préservée) et renvoie le HTML.
+async function buildTranslatedHtml(note: ReleaseNote): Promise<string> {
+  const doc = new DOMParser().parseFromString(renderMarkdownBase(note.content ?? ''), 'text/html')
+  const nodes = collectTextNodes(doc.body)
+  const active = translator!
+  // Concurrence limitée : l'API est locale mais on évite des centaines d'appels d'un coup.
+  let cursor = 0
+  async function worker() {
+    while (cursor < nodes.length) {
+      const node = nodes[cursor++]
+      if (!node || !node.nodeValue) continue
+      try {
+        node.nodeValue = await active.translate(node.nodeValue)
+      } catch {
+        // échec ponctuel : on garde le texte d'origine pour ce fragment
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker))
+  return doc.body.innerHTML
+}
+
+async function toggleTranslation() {
+  if (translated.value) {
+    translated.value = false
+    return
+  }
+  translating.value = true
+  try {
+    await ensureTranslator()
+    for (const note of filteredNotes.value) {
+      if (!translatedHtml.value[note.id]) {
+        translatedHtml.value[note.id] = await buildTranslatedHtml(note)
+      }
+    }
+    translated.value = true
+  } catch {
+    toast.add({
+      title: 'Traduction indisponible',
+      description: 'La traduction intégrée nécessite un navigateur récent (Chrome ou Edge).',
+      color: 'error'
+    })
+  } finally {
+    translating.value = false
+    downloadPct.value = null
+  }
+}
+
+// HTML affiché pour une note : version traduite si active et disponible, sinon l'original.
+function noteHtml(note: ReleaseNote): string {
+  if (translated.value && translatedHtml.value[note.id]) return translatedHtml.value[note.id]!
+  return renderMarkdown(note.content ?? '')
 }
 </script>
 
@@ -259,6 +408,16 @@ function formatDate(dateStr: string): string {
         icon="i-lucide-x"
         variant="ghost"
         @click="clearSelection(); search = ''"
+      />
+      <UButton
+        v-if="canTranslate"
+        :icon="translated ? 'i-lucide-rotate-ccw' : 'i-lucide-languages'"
+        :color="translated ? 'neutral' : 'primary'"
+        variant="soft"
+        class="shrink-0"
+        :loading="translating"
+        :label="translateButtonLabel"
+        @click="toggleTranslation"
       />
     </div>
 
@@ -335,7 +494,7 @@ function formatDate(dateStr: string): string {
         </div>
         <div
           class="prose prose-sm dark:prose-invert max-w-none p-5"
-          v-html="renderMarkdown(note.content ?? '')"
+          v-html="noteHtml(note)"
         />
       </div>
     </div>
