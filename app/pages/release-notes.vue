@@ -251,6 +251,8 @@ const translated = ref(false)
 const translating = ref(false)
 const downloadPct = ref<number | null>(null)
 const translatedHtml = ref<Record<number, string>>({})
+// Notes en cours de traduction (pour afficher un loader par note dans l'entête).
+const translatingIds = ref<Set<number>>(new Set())
 let translator: BrowserTranslator | null = null
 
 // Source = anglais, cible = langue de l'interface (bouton masqué si déjà en anglais).
@@ -269,17 +271,52 @@ onMounted(() => {
   translateApiPresent.value = 'Translator' in globalThis
 })
 
-// Nouveau filtrage : revenir à l'affichage original (le cache par note est conservé).
+// Nouveau filtrage en mode traduit : on reste traduit et on traduit les notes
+// nouvellement visibles (celles déjà en cache sont réutilisées instantanément).
 watch(filteredNotes, () => {
-  translated.value = false
+  if (translated.value) translateVisibleNotes()
 })
 
-// Changement de langue d'interface : cache et traducteur ciblent l'ancienne langue.
+// Changement de langue d'interface : le cache mémoire et le traducteur ciblent
+// l'ancienne langue → on réinitialise (le cache localStorage, lui, est par langue).
 watch(targetLang, () => {
   translated.value = false
   translatedHtml.value = {}
   translator = null
 })
+
+// --- Cache persistant des traductions (localStorage), par langue + note ---
+// Invalidé si le contenu de la note change (hash), tolérant au quota dépassé.
+const CACHE_PREFIX = 'rn-tr'
+
+function contentHash(s: string): string {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+function cacheKey(noteId: number): string {
+  return `${CACHE_PREFIX}:${targetLang.value}:${noteId}`
+}
+
+function loadTranslation(noteId: number, content: string): string | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(noteId))
+    if (!raw) return null
+    const obj = JSON.parse(raw) as { h: string, html: string }
+    return obj.h === contentHash(content) ? obj.html : null
+  } catch {
+    return null
+  }
+}
+
+function persistTranslation(noteId: number, content: string, html: string): void {
+  try {
+    localStorage.setItem(cacheKey(noteId), JSON.stringify({ h: contentHash(content), html }))
+  } catch {
+    // quota dépassé ou localStorage indisponible : le cache mémoire suffit
+  }
+}
 
 // Nœuds texte à traduire (on saute code/pre pour ne pas abîmer le code).
 function collectTextNodes(root: HTMLElement): Text[] {
@@ -339,30 +376,65 @@ async function buildTranslatedHtml(note: ReleaseNote): Promise<string> {
   return doc.body.innerHTML
 }
 
-async function toggleTranslation() {
-  if (translated.value) {
-    translated.value = false
-    return
+// Traduit les notes visibles : d'abord le cache mémoire, puis localStorage, et
+// seulement les restantes via l'API. Renvoie false si l'API est indisponible.
+async function translateVisibleNotes(): Promise<boolean> {
+  const todo: ReleaseNote[] = []
+  for (const note of filteredNotes.value) {
+    if (translatedHtml.value[note.id]) continue
+    const cached = loadTranslation(note.id, note.content ?? '')
+    if (cached) {
+      translatedHtml.value[note.id] = cached
+      continue
+    }
+    todo.push(note)
   }
+  // Tout est déjà en cache : rien à traduire (instantané, sans traducteur).
+  if (todo.length === 0) return true
+
+  // Marquer toutes les notes à traduire (loader dans leur entête), puis traduire
+  // une par une : chaque note bascule en français dès qu'elle est prête.
+  todo.forEach(n => translatingIds.value.add(n.id))
   translating.value = true
   try {
     await ensureTranslator()
-    for (const note of filteredNotes.value) {
-      if (!translatedHtml.value[note.id]) {
-        translatedHtml.value[note.id] = await buildTranslatedHtml(note)
+    for (const note of todo) {
+      try {
+        const html = await buildTranslatedHtml(note)
+        translatedHtml.value[note.id] = html
+        persistTranslation(note.id, note.content ?? '', html)
+      } finally {
+        translatingIds.value.delete(note.id)
       }
     }
-    translated.value = true
+    return true
   } catch {
     toast.add({
       title: 'Traduction indisponible',
       description: 'La traduction intégrée nécessite un navigateur récent (Chrome ou Edge).',
       color: 'error'
     })
+    return false
   } finally {
     translating.value = false
     downloadPct.value = null
+    translatingIds.value.clear()
   }
+}
+
+async function toggleTranslation() {
+  if (translated.value) {
+    translated.value = false
+    return
+  }
+  // Basculer en mode traduit tout de suite : chaque note passe en français dès
+  // qu'elle est prête (affichage progressif). Revenir en arrière si l'API échoue.
+  translated.value = true
+  if (!(await translateVisibleNotes())) translated.value = false
+}
+
+function isNoteTranslating(id: number): boolean {
+  return translatingIds.value.has(id)
 }
 
 // HTML affiché pour une note : version traduite si active et disponible, sinon l'original.
@@ -481,6 +553,16 @@ function noteHtml(note: ReleaseNote): string {
               </UBadge>
               <span class="text-muted text-sm">
                 {{ formatDate(note.date) }}
+              </span>
+              <span
+                v-if="isNoteTranslating(note.id)"
+                class="flex items-center gap-1.5 text-xs text-primary"
+              >
+                <UIcon
+                  name="i-lucide-loader-2"
+                  class="w-3.5 h-3.5 animate-spin"
+                />
+                Traduction…
               </span>
             </div>
             <UButton
