@@ -95,6 +95,8 @@ const filteredNotes = computed(() => {
     return releaseNotes.value.filter(n =>
       n.version.includes(q)
       || (n.content && n.content.toLowerCase().includes(q))
+      // Aussi dans la traduction si la note a déjà été traduite (cache).
+      || (translatedText.value[n.id]?.includes(q) ?? false)
     )
   }
 
@@ -251,6 +253,9 @@ const translated = ref(false)
 const translating = ref(false)
 const downloadPct = ref<number | null>(null)
 const translatedHtml = ref<Record<number, string>>({})
+// Texte brut (minuscule) des traductions, pour que la recherche trouve aussi
+// dans les notes déjà traduites.
+const translatedText = ref<Record<number, string>>({})
 // Notes en cours de traduction (pour afficher un loader par note dans l'entête).
 const translatingIds = ref<Set<number>>(new Set())
 let translator: BrowserTranslator | null = null
@@ -282,7 +287,14 @@ watch(filteredNotes, () => {
 watch(targetLang, () => {
   translated.value = false
   translatedHtml.value = {}
+  translatedText.value = {}
   translator = null
+})
+
+// Recherche active : recompter les occurrences quand on bascule original/traduit
+// (le texte affiché change, donc les surbrillances aussi).
+watch(translated, () => {
+  if (debouncedSearch.value.trim() && !selectedVersion.value) updateOccurrences()
 })
 
 // --- Cache persistant des traductions (localStorage), par langue + note ---
@@ -376,6 +388,11 @@ async function buildTranslatedHtml(note: ReleaseNote): Promise<string> {
   return doc.body.innerHTML
 }
 
+// Texte brut minuscule d'un HTML (pour l'indexer côté recherche).
+function htmlToText(html: string): string {
+  return (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').toLowerCase()
+}
+
 // Traduit les notes visibles : d'abord le cache mémoire, puis localStorage, et
 // seulement les restantes via l'API. Renvoie false si l'API est indisponible.
 async function translateVisibleNotes(): Promise<boolean> {
@@ -385,6 +402,7 @@ async function translateVisibleNotes(): Promise<boolean> {
     const cached = loadTranslation(note.id, note.content ?? '')
     if (cached) {
       translatedHtml.value[note.id] = cached
+      translatedText.value[note.id] = htmlToText(cached)
       continue
     }
     todo.push(note)
@@ -402,6 +420,7 @@ async function translateVisibleNotes(): Promise<boolean> {
       try {
         const html = await buildTranslatedHtml(note)
         translatedHtml.value[note.id] = html
+        translatedText.value[note.id] = htmlToText(html)
         persistTranslation(note.id, note.content ?? '', html)
       } finally {
         translatingIds.value.delete(note.id)
@@ -437,9 +456,14 @@ function isNoteTranslating(id: number): boolean {
   return translatingIds.value.has(id)
 }
 
-// HTML affiché pour une note : version traduite si active et disponible, sinon l'original.
+// HTML affiché pour une note : version traduite si active et disponible, sinon
+// l'original. En recherche, on surligne aussi les correspondances dans le traduit.
 function noteHtml(note: ReleaseNote): string {
-  if (translated.value && translatedHtml.value[note.id]) return translatedHtml.value[note.id]!
+  if (translated.value && translatedHtml.value[note.id]) {
+    const html = translatedHtml.value[note.id]!
+    const q = debouncedSearch.value.trim()
+    return q ? highlightHtml(html, q) : html
+  }
   return renderMarkdown(note.content ?? '')
 }
 </script>
