@@ -36,6 +36,10 @@ const notesContainer = ref<HTMLElement | null>(null)
 const occurrenceCount = ref(0)
 const currentOccurrence = ref(0)
 const visibleNote = ref<ReleaseNote | null>(null)
+// Texte brut (minuscule) des traductions en cache. Déclaré ici (avant
+// filteredNotes) car la recherche s'en sert : sinon TDZ en SSR quand ?q= est
+// présent (filteredNotes est évalué au setup et lit translatedText).
+const translatedText = ref<Record<number, string>>({})
 
 onMounted(() => {
   const observer = new IntersectionObserver((entries) => {
@@ -253,9 +257,6 @@ const translated = ref(false)
 const translating = ref(false)
 const downloadPct = ref<number | null>(null)
 const translatedHtml = ref<Record<number, string>>({})
-// Texte brut (minuscule) des traductions, pour que la recherche trouve aussi
-// dans les notes déjà traduites.
-const translatedText = ref<Record<number, string>>({})
 // Notes en cours de traduction (pour afficher un loader par note dans l'entête).
 const translatingIds = ref<Set<number>>(new Set())
 let translator: BrowserTranslator | null = null
