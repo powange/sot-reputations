@@ -256,6 +256,8 @@ const translateApiPresent = ref(false)
 const translated = ref(false)
 const translating = ref(false)
 const downloadPct = ref<number | null>(null)
+// Progression de « Tout traduire » (toutes les versions) : { fait, total } ou null.
+const translateAllProgress = ref<{ done: number, total: number } | null>(null)
 const translatedHtml = ref<Record<number, string>>({})
 // Notes en cours de traduction (pour afficher un loader par note dans l'entête).
 const translatingIds = ref<Set<number>>(new Set())
@@ -266,11 +268,20 @@ const targetLang = computed(() => locale.value)
 const canTranslate = computed(() =>
   translateApiPresent.value && targetLang.value !== 'en' && filteredNotes.value.length > 0
 )
+// « Tout traduire » est proposé même sans filtre, dès qu'il y a des notes.
+const canTranslateAll = computed(() =>
+  translateApiPresent.value && targetLang.value !== 'en' && (releaseNotes.value?.length ?? 0) > 0
+)
 const translateButtonLabel = computed(() => {
-  if (translating.value) {
+  if (translating.value && translateAllProgress.value === null) {
     return downloadPct.value !== null ? `Téléchargement ${downloadPct.value}%` : 'Traduction…'
   }
   return translated.value ? 'Voir l\'original' : 'Traduire'
+})
+const translateAllLabel = computed(() => {
+  if (translateAllProgress.value) return `Traduction ${translateAllProgress.value.done}/${translateAllProgress.value.total}`
+  if (downloadPct.value !== null) return `Téléchargement ${downloadPct.value}%`
+  return 'Tout traduire'
 })
 
 onMounted(() => {
@@ -394,11 +405,12 @@ function htmlToText(html: string): string {
   return (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').toLowerCase()
 }
 
-// Traduit les notes visibles : d'abord le cache mémoire, puis localStorage, et
-// seulement les restantes via l'API. Renvoie false si l'API est indisponible.
-async function translateVisibleNotes(): Promise<boolean> {
+// Traduit une liste de notes : d'abord le cache mémoire, puis localStorage, et
+// seulement les restantes via l'API. `trackProgress` alimente translateAllProgress
+// (barre X/total pour « Tout traduire »). Renvoie false si l'API est indisponible.
+async function translateNotes(notes: ReleaseNote[], trackProgress = false): Promise<boolean> {
   const todo: ReleaseNote[] = []
-  for (const note of filteredNotes.value) {
+  for (const note of notes) {
     if (translatedHtml.value[note.id]) continue
     const cached = loadTranslation(note.id, note.content ?? '')
     if (cached) {
@@ -411,8 +423,9 @@ async function translateVisibleNotes(): Promise<boolean> {
   // Tout est déjà en cache : rien à traduire (instantané, sans traducteur).
   if (todo.length === 0) return true
 
-  // Marquer toutes les notes à traduire (loader dans leur entête), puis traduire
-  // une par une : chaque note bascule en français dès qu'elle est prête.
+  if (trackProgress) translateAllProgress.value = { done: notes.length - todo.length, total: notes.length }
+  // Marquer les notes à traduire (loader dans leur entête), puis traduire une par
+  // une : chaque note bascule en français dès qu'elle est prête.
   todo.forEach(n => translatingIds.value.add(n.id))
   translating.value = true
   try {
@@ -425,6 +438,7 @@ async function translateVisibleNotes(): Promise<boolean> {
         persistTranslation(note.id, note.content ?? '', html)
       } finally {
         translatingIds.value.delete(note.id)
+        if (trackProgress && translateAllProgress.value) translateAllProgress.value.done++
       }
     }
     return true
@@ -438,8 +452,13 @@ async function translateVisibleNotes(): Promise<boolean> {
   } finally {
     translating.value = false
     downloadPct.value = null
+    translateAllProgress.value = null
     translatingIds.value.clear()
   }
+}
+
+function translateVisibleNotes(): Promise<boolean> {
+  return translateNotes(filteredNotes.value)
 }
 
 async function toggleTranslation() {
@@ -451,6 +470,22 @@ async function toggleTranslation() {
   // qu'elle est prête (affichage progressif). Revenir en arrière si l'API échoue.
   translated.value = true
   if (!(await translateVisibleNotes())) translated.value = false
+}
+
+// Traduit TOUTES les versions (même sans filtre) pour que la recherche couvre
+// ensuite l'intégralité des notes. Les notes visibles sont priorisées.
+async function translateAll() {
+  const all = releaseNotes.value ?? []
+  if (all.length === 0) return
+  const visibleIds = new Set(filteredNotes.value.map(n => n.id))
+  const ordered = [...all].sort((a, b) => (visibleIds.has(b.id) ? 1 : 0) - (visibleIds.has(a.id) ? 1 : 0))
+  translated.value = true
+  const ok = await translateNotes(ordered, true)
+  if (!ok) {
+    translated.value = false
+  } else {
+    toast.add({ title: 'Toutes les versions sont traduites', color: 'success' })
+  }
 }
 
 function isNoteTranslating(id: number): boolean {
@@ -512,9 +547,21 @@ function noteHtml(note: ReleaseNote): string {
         :color="translated ? 'neutral' : 'primary'"
         variant="soft"
         class="shrink-0"
-        :loading="translating"
+        :loading="translating && !translateAllProgress"
+        :disabled="translating"
         :label="translateButtonLabel"
         @click="toggleTranslation"
+      />
+      <UButton
+        v-if="canTranslateAll"
+        icon="i-lucide-globe"
+        color="primary"
+        variant="subtle"
+        class="shrink-0"
+        :loading="!!translateAllProgress"
+        :disabled="translating"
+        :label="translateAllLabel"
+        @click="translateAll"
       />
     </div>
 
