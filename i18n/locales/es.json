@@ -766,7 +766,11 @@
         },
         "paste": "Pegar imagen",
         "clipboardEmpty": "No hay ninguna imagen en el portapapeles.",
-        "clipboardDenied": "Acceso al portapapeles denegado: usa Ctrl+V en la página."
+        "clipboardDenied": "Acceso al portapapeles denegado: usa Ctrl+V en la página.",
+        "delete": "Eliminar la lista",
+        "deleteConfirm": "¿Eliminar definitivamente esta lista? El enlace dejará de funcionar para todos.",
+        "deleted": "Lista eliminada.",
+        "deletedByOther": "Un miembro de la tripulación ha eliminado esta lista."
       }
     }
   }

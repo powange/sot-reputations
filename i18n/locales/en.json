@@ -766,7 +766,11 @@
         },
         "paste": "Paste image",
         "clipboardEmpty": "No image in the clipboard.",
-        "clipboardDenied": "Clipboard access denied: use Ctrl+V on the page."
+        "clipboardDenied": "Clipboard access denied: use Ctrl+V on the page.",
+        "delete": "Delete the list",
+        "deleteConfirm": "Permanently delete this list? The link will stop working for everyone.",
+        "deleted": "List deleted.",
+        "deletedByOther": "This list was deleted by a crew member."
       }
     }
   }

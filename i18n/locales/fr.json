@@ -767,7 +767,11 @@
         },
         "paste": "Coller l'image",
         "clipboardEmpty": "Aucune image dans le presse-papier.",
-        "clipboardDenied": "Accès au presse-papier refusé : utilisez Ctrl+V sur la page."
+        "clipboardDenied": "Accès au presse-papier refusé : utilisez Ctrl+V sur la page.",
+        "delete": "Supprimer la liste",
+        "deleteConfirm": "Supprimer définitivement cette liste ? Le lien ne fonctionnera plus pour personne.",
+        "deleted": "Liste supprimée.",
+        "deletedByOther": "Cette liste a été supprimée par un membre de l'équipage."
       }
     }
   }

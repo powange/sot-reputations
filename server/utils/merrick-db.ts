@@ -168,3 +168,17 @@ export function stepMerrickItem(token: string, itemId: number, delta: 1 | -1): {
   d.prepare('UPDATE merrick_quests SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(questId)
   return row
 }
+
+// Suppression autorisée uniquement une fois tous les ingrédients livrés.
+export function deleteCompletedMerrickQuest(token: string): 'deleted' | 'not-found' | 'incomplete' {
+  const d = db()
+  const questId = getQuestId(token)
+  if (!questId) return 'not-found'
+  const { remaining } = d.prepare('SELECT COUNT(*) AS remaining FROM merrick_quest_items WHERE quest_id = ? AND delivered < quantity').get(questId) as { remaining: number }
+  if (remaining > 0) return 'incomplete'
+  d.transaction(() => {
+    d.prepare('DELETE FROM merrick_quest_items WHERE quest_id = ?').run(questId)
+    d.prepare('DELETE FROM merrick_quests WHERE id = ?').run(questId)
+  })()
+  return 'deleted'
+}

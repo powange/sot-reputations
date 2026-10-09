@@ -4,7 +4,7 @@ const toast = useToast()
 const route = useRoute()
 const token = route.params.token as string
 const { itemLabel } = useMerrickLabels()
-const { remember } = useMerrickRecent()
+const { remember, forget } = useMerrickRecent()
 
 const { data: quest, error, refresh } = await useFetch<MerrickQuest>(`/api/merrick-quests/${token}`, {
   key: `merrick-${token}`,
@@ -97,6 +97,13 @@ function connect() {
   eventSource.addEventListener('quest', (event) => {
     if (!editing.value) quest.value = JSON.parse(event.data)
   })
+  eventSource.addEventListener('deleted', () => {
+    closed = true
+    eventSource?.close()
+    forget(token)
+    toast.add({ title: t('tools.fishing.merrick.deletedByOther'), color: 'info' })
+    navigateTo('/tools/fishing/merrick')
+  })
   eventSource.addEventListener('error', () => {
     live.value = false
     eventSource?.close()
@@ -122,6 +129,29 @@ onBeforeUnmount(() => {
   if (reconnectTimer) clearTimeout(reconnectTimer)
   eventSource?.close()
 })
+
+// --- Suppression (seulement une fois tout livré) ---
+const deleting = ref(false)
+
+async function deleteQuest() {
+  if (!confirm(t('tools.fishing.merrick.deleteConfirm'))) return
+  deleting.value = true
+  // Notre propre événement 'deleted' ne doit pas déclencher une seconde redirection
+  closed = true
+  eventSource?.close()
+  try {
+    await $fetch(`/api/merrick-quests/${token}`, { method: 'DELETE' })
+    forget(token)
+    toast.add({ title: t('tools.fishing.merrick.deleted'), color: 'success' })
+    await navigateTo('/tools/fishing/merrick')
+  } catch {
+    toast.add({ title: t('tools.fishing.merrick.errorSave'), color: 'error' })
+    closed = false
+    connect()
+  } finally {
+    deleting.value = false
+  }
+}
 
 // --- Modification de la liste ---
 const editing = ref(false)
@@ -258,7 +288,18 @@ async function saveEdit() {
           color="success"
           :title="$t('tools.fishing.merrick.allDone')"
           class="mb-6"
-        />
+        >
+          <template #actions>
+            <UButton
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="solid"
+              :label="$t('tools.fishing.merrick.delete')"
+              :loading="deleting"
+              @click="deleteQuest"
+            />
+          </template>
+        </UAlert>
         <UCard
           v-else
           class="mb-6"

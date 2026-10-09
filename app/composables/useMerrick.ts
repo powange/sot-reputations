@@ -194,5 +194,14 @@ export function useMerrickRecent() {
     }
   }
 
-  return { recent, remember }
+  function forget(token: string) {
+    recent.value = recent.value.filter(r => r.token !== token)
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recent.value))
+    } catch {
+      // Stockage indisponible : tant pis
+    }
+  }
+
+  return { recent, remember, forget }
 }
