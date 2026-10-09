@@ -6,6 +6,7 @@
     "myGroups": "Mis Grupos",
     "tutorial": "Tutorial",
     "admin": "Admin",
+    "tools": "Herramientas",
     "releaseNotes": "Notas de version",
     "logout": "Cerrar sesion"
   },
@@ -485,5 +486,285 @@
     "search": "Buscar en las notas...",
     "results": "{count} / {total} notas",
     "noResults": "Sin resultados para esta busqueda."
+  },
+  "tools": {
+    "title": "Herramientas",
+    "subtitle": "Herramientas prácticas para tus aventuras en Sea of Thieves",
+    "empty": "Todavía no hay herramientas disponibles.",
+    "emptyHint": "¡Pronto llegarán nuevas herramientas, vuelve más tarde!",
+    "fishing": {
+      "title": "Guía de pesca",
+      "description": "Peces, cebos, cocina y distinciones de la Llamada del Cazador.",
+      "sourcePrefix": "Información recopilada de la",
+      "sourceLink": "guía de pesca y caza de SotFR",
+      "toc": {
+        "basics": "Lo básico",
+        "bait": "Cebos",
+        "species": "Especies",
+        "cooking": "Cocina",
+        "commendations": "Distinciones",
+        "junk": "Botín furtivo",
+        "tips": "Consejos"
+      },
+      "basics": {
+        "equip": "Saca la caña de pescar desde la 2.ª página de la rueda de objetos (se puede asignar un atajo en las opciones).",
+        "cast": "Lanza el corcho al mar o a una laguna: tras unos segundos un pez pica y empieza a luchar.",
+        "tension": "Tira del ratón o del joystick en la dirección opuesta al pez para no romper el sedal.",
+        "reel": "Cuando se canse, recoge (clic izquierdo / gatillo derecho). Los trofeos suelen necesitar varios intentos.",
+        "cancel": "Antes de que pique, clic derecho (o B en el mando) recoge el sedal si no quieres ese pez.",
+        "tiredTitle": "¿Cómo saber si está cansado?",
+        "tired": "El sedal se afloja y el pez se queda quieto, dejan de oírse los ruidos de lucha y el mando deja de vibrar."
+      },
+      "bait": {
+        "intro": "Un cebo nunca garantiza una especie, solo aumenta sus probabilidades de aparecer.",
+        "earthworms": "Lombrices",
+        "grubs": "Larvas",
+        "leeches": "Sanguijuelas",
+        "none": "Sin cebo",
+        "whereEarthworms": "Cava en la tierra de las zonas con hierba.",
+        "whereGrubs": "Cava en la arena.",
+        "whereLeeches": "Cava donde el agua se junta con la arena.",
+        "barrels": "Todos los cebos se encuentran también en barriles y cajas.",
+        "storageTitle": "Almacenamiento",
+        "storage": "10 cebos por espacio, más 1 puesto en la caña (11 en total).",
+        "buyTitle": "Comprar",
+        "buyShipwright": "Barco capitaneado: la carpintera vende 10 cebos de cada tipo por 3.500 de oro.",
+        "buyCrate": "Llamada del Cazador y Alianza Mercante: caja de 50 cebos de cada tipo por 5.000 de oro.",
+        "raw": "Comer cebo crudo te marea y apenas recupera vida."
+      },
+      "species": {
+        "intro": "Cada especie tiene 5 variedades (3 comunes, 1 nocturna, 1 rara), en tamaño normal o trofeo. Los trofeos dan más oro y reputación. Los nombres se muestran en inglés.",
+        "search": "Buscar un pez o una isla…",
+        "all": "Todos",
+        "bait": "Cebo",
+        "noResult": "Ningún pez coincide.",
+        "kind": {
+          "common": "Común",
+          "night": "Noche",
+          "rare": "Rara"
+        },
+        "islands": "Islas",
+        "splashtail": {
+          "name": "Splashtail",
+          "location": "En todas partes salvo agua dulce y el Mar de los Condenados",
+          "one": "Splashtail"
+        },
+        "plentifin": {
+          "name": "Plentifin",
+          "location": "Shores of Plenty",
+          "one": "Plentifin"
+        },
+        "ancientscale": {
+          "name": "Ancientscale",
+          "location": "Ancient Isles",
+          "one": "Ancientscale"
+        },
+        "wildsplash": {
+          "name": "Wildsplash",
+          "location": "The Wilds",
+          "one": "Wildsplash"
+        },
+        "devilfish": {
+          "name": "Devilfish",
+          "location": "Devil's Roar",
+          "one": "Devilfish"
+        },
+        "islehopper": {
+          "name": "Islehopper",
+          "location": "Alrededor de las islas grandes (la variedad depende de la isla)",
+          "one": "Islehopper"
+        },
+        "pondie": {
+          "name": "Pondie",
+          "location": "Estanques y lagunas (p. ej. Mermaid's Hideaway)",
+          "one": "Pondie"
+        },
+        "battlegill": {
+          "name": "Battlegill",
+          "location": "Cerca de fuertes y barcos esqueleto en combate",
+          "one": "Battlegill"
+        },
+        "wrecker": {
+          "name": "Wrecker",
+          "location": "Cerca de naufragios",
+          "one": "Wrecker"
+        },
+        "stormfish": {
+          "name": "Stormfish",
+          "location": "Bajo la tormenta",
+          "one": "Stormfish"
+        }
+      },
+      "variantNotes": {
+        "wreckInStorm": "Naufragio en una tormenta",
+        "ancientIsles": "Ancient Isles",
+        "shoresOfPlenty": "Shores of Plenty",
+        "wilds": "The Wilds"
+      },
+      "cooking": {
+        "normal": "Pez normal",
+        "trophy": "Pez trofeo",
+        "normalTime": "45 a 80 s",
+        "trophyTime": "80 a 180 s",
+        "heal": "El pescado cocinado da una reserva de vida que regenera tu salud tras 8 a 10 s sin recibir daño. Evita el pescado crudo.",
+        "found": "También hay peces (crudos, cocinados o quemados) en naufragios, barriles flotantes, botes y cajas: el estado solo cambia el precio de venta."
+      },
+      "commendations": {
+        "perVariant": "Una distinción «Cazador de …» por variedad, más una por especie completa.",
+        "trophy25": "Cazador de peces trofeo: 25 trofeos entregados",
+        "trophy50": "Maestro cazador de peces trofeo: 50 trofeos",
+        "trophy100": "Cazador legendario de peces trofeo: 100 trofeos",
+        "legendary": "Cazador legendario de Sea of Thieves: todas las distinciones de la Llamada del Cazador en grado V.",
+        "athena": "Fortuna de Atenea – Leyenda de las profundidades: entregar 50 peces como Leyenda Pirata.",
+        "sellTitle": "¿Dónde vender?",
+        "sell": "A la Llamada del Cazador, a la Alianza Mercante o a los Barones a bordo de un barco capitaneado."
+      },
+      "junk": {
+        "intro": "Pescando sin cebo a veces salen objetos: sombrero viejo, bota vieja, calavera vieja, espinas… e incluso tablones o llaves de ceniza.",
+        "value": "Valen poco, pero son necesarios para la distinción de botín furtivo.",
+        "spots": "Buenos sitios: Cursewater Shore (Y13) y Mermaid's Hideaway (B13)."
+      },
+      "tips": {
+        "trophy": "Ningún cebo ni truco fuerza la aparición de un trofeo, y relanzar con un pez enganchado no cambia nada.",
+        "skeletons": "Para pescar tranquilo, quédate cerca de un puesto avanzado, un bazar o un fuerte esqueleto inactivo, o aléjate nadando (cuidado con los tiburones).",
+        "shadowStorm": "Tormenta de sombra: espera a que pase la tormenta cerca de la Taberna del Glorioso Lobo de Mar (K12).",
+        "storm": "Para localizar la tormenta, usa el rastreador en tiempo real de Merfolk's Lullaby.",
+        "volcano": "En el Devil's Roar, las erupciones pueden romper el sedal y dañar el barco."
+      },
+      "variants": {
+        "splashtail": {
+          "ruby": "Ruby",
+          "sunny": "Sunny",
+          "indigo": "Indigo",
+          "seafoam": "Seafoam",
+          "umber": "Umber"
+        },
+        "plentifin": {
+          "olive": "Olive",
+          "amber": "Amber",
+          "cloudy": "Cloudy",
+          "watery": "Watery",
+          "bonedust": "Bonedust"
+        },
+        "ancientscale": {
+          "almond": "Almond",
+          "sapphire": "Sapphire",
+          "smoke": "Smoke",
+          "starshine": "Starshine",
+          "bone": "Bone"
+        },
+        "wildsplash": {
+          "russet": "Russet",
+          "sandy": "Sandy",
+          "ocean": "Ocean",
+          "coral": "Coral",
+          "muddy": "Muddy"
+        },
+        "devilfish": {
+          "ashen": "Ashen",
+          "seashell": "Seashell",
+          "lava": "Lava",
+          "firelight": "Firelight",
+          "forsaken": "Forsaken"
+        },
+        "islehopper": {
+          "stone": "Stone",
+          "moss": "Moss",
+          "honey": "Honey",
+          "amethyst": "Amethyst",
+          "raven": "Raven"
+        },
+        "pondie": {
+          "charcoal": "Charcoal",
+          "orchid": "Orchid",
+          "bronze": "Bronze",
+          "moonsky": "Moonsky",
+          "bright": "Bright"
+        },
+        "battlegill": {
+          "jade": "Jade",
+          "sky": "Sky",
+          "rum": "Rum",
+          "bittersweet": "Bittersweet",
+          "sand": "Sand"
+        },
+        "wrecker": {
+          "rose": "Rose",
+          "sun": "Sun",
+          "moon": "Moon",
+          "snow": "Snow",
+          "blackcloud": "Blackcloud"
+        },
+        "stormfish": {
+          "ancient": "Ancient",
+          "shores": "Shores",
+          "wild": "Wild",
+          "twilight": "Twilight",
+          "shadow": "Shadow"
+        }
+      },
+      "merrick": {
+        "title": "Misiones de Merrick",
+        "description": "Una lista compartida de los peces y carnes a entregar, para marcar entre todos en directo.",
+        "guideCta": "Organizar una misión de Merrick",
+        "intro": "Crea la lista del menú que pide Merrick y comparte el enlace con tu tripulación: cada uno marca lo que pesca o caza, y la lista se actualiza en directo para todos.",
+        "fishVariantName": "{variant} {species}",
+        "ocrTitle": "Importar desde una captura",
+        "ocrHint": "Sube una captura del menú: la lista se rellena automáticamente. Revísala antes de crearla.",
+        "ocrLanguage": "Idioma del juego",
+        "ocrButton": "Elegir una imagen",
+        "ocrLoading": "Cargando el motor de lectura…",
+        "ocrRunning": "Leyendo la imagen… {progress} %",
+        "ocrDone": "{count} ingrediente(s) reconocido(s), revisa la lista de abajo.",
+        "ocrNothing": "No se reconoció ningún ingrediente. Prueba con una captura más nítida o rellena la lista a mano.",
+        "ocrError": "La lectura de la imagen falló.",
+        "listTitle": "Menú a entregar",
+        "course": {
+          "starter": "Entrante",
+          "main": "Plato principal",
+          "special": "Plato del día"
+        },
+        "dishName": "Nombre del plato (opcional)",
+        "addDish": "Añadir un plato",
+        "removeDish": "Quitar el plato",
+        "addIngredient": "Añadir un ingrediente",
+        "removeIngredient": "Quitar",
+        "item": "Pez o carne",
+        "anyVariant": "cualquier variedad",
+        "meatGroup": "Carnes",
+        "quantity": "Cantidad",
+        "state": {
+          "cooked": "Cocinado",
+          "raw": "Crudo"
+        },
+        "create": "Crear la lista",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "edit": "Editar la lista",
+        "invalid": "Cada plato debe contener al menos un ingrediente.",
+        "errorSave": "No se pudo guardar.",
+        "shareTitle": "Enlace para compartir",
+        "shareHint": "Cualquiera con este enlace puede ver y marcar la lista.",
+        "copy": "Copiar",
+        "copied": "¡Enlace copiado!",
+        "progress": "{done} / {total} entregados",
+        "remaining": "Falta encontrar",
+        "allDone": "¡Todo listo, rumbo a Merrick!",
+        "notFound": "Esta lista no existe o ha caducado.",
+        "expiry": "Las listas inactivas durante 14 días se eliminan automáticamente.",
+        "recent": "Mis listas recientes",
+        "newList": "Nueva lista",
+        "live": "En directo",
+        "reconnecting": "Reconectando…",
+        "meats": {
+          "chicken": "Pollo",
+          "pork": "Cerdo",
+          "snake": "Serpiente",
+          "shark": "Tiburón",
+          "kraken": "Kraken",
+          "megalodon": "Megalodón"
+        }
+      }
+    }
   }
 }

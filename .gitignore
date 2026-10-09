@@ -30,3 +30,4 @@ data/reputation.db
 reputation.json
 reputations.json
 data/
+*.traineddata

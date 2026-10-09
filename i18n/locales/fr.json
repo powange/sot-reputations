@@ -6,6 +6,7 @@
     "myGroups": "Mes groupes",
     "tutorial": "Tutoriel",
     "admin": "Admin",
+    "tools": "Outils",
     "releaseNotes": "Notes de version",
     "logout": "Déconnexion"
   },
@@ -486,5 +487,285 @@
     "search": "Rechercher dans les notes...",
     "results": "{count} / {total} notes",
     "noResults": "Aucun résultat pour cette recherche."
+  },
+  "tools": {
+    "title": "Outils",
+    "subtitle": "Des outils pratiques pour vos aventures sur Sea of Thieves",
+    "empty": "Aucun outil disponible pour le moment.",
+    "emptyHint": "De nouveaux outils arrivent bientôt, revenez plus tard !",
+    "fishing": {
+      "title": "Guide de la pêche",
+      "description": "Poissons, appâts, cuisson et promotions de l'Appel du chasseur.",
+      "sourcePrefix": "Informations compilées à partir du",
+      "sourceLink": "guide pêche & chasse de SotFR",
+      "toc": {
+        "basics": "Les bases",
+        "bait": "Appâts",
+        "species": "Espèces",
+        "cooking": "Cuisson",
+        "commendations": "Promotions",
+        "junk": "Butins sournois",
+        "tips": "Astuces"
+      },
+      "basics": {
+        "equip": "Sortez la canne à pêche depuis la 2e page de la roue d'objets (un raccourci peut être assigné dans les options).",
+        "cast": "Lancez le bouchon en mer ou dans un lagon : après quelques secondes, un poisson mord et se débat.",
+        "tension": "Tirez la souris ou le joystick dans la direction opposée à celle où nage le poisson pour ne pas casser la ligne.",
+        "reel": "Quand il fatigue, moulinez (clic gauche / gâchette droite). Un trophée demande souvent plusieurs reprises.",
+        "cancel": "Avant la morsure, clic droit (ou B à la manette) pour rembobiner si le poisson ne vous intéresse pas.",
+        "tiredTitle": "Comment savoir qu'il est fatigué ?",
+        "tired": "La ligne se détend et le poisson s'immobilise, les bruits de lutte s'arrêtent et la manette cesse de vibrer."
+      },
+      "bait": {
+        "intro": "Un appât n'assure jamais une espèce, il augmente seulement ses chances d'apparition.",
+        "earthworms": "Vers de terre",
+        "grubs": "Larves",
+        "leeches": "Sangsues",
+        "none": "Sans appât",
+        "whereEarthworms": "Creusez dans la terre des zones herbeuses.",
+        "whereGrubs": "Creusez dans le sable.",
+        "whereLeeches": "Creusez à la limite entre l'eau et le sable.",
+        "barrels": "Tous les appâts se trouvent aussi dans les tonneaux et les caisses.",
+        "storageTitle": "Stockage",
+        "storage": "10 appâts par emplacement, plus 1 fixé sur la canne (11 au total).",
+        "buyTitle": "Acheter",
+        "buyShipwright": "Navire dirigé : la charpentière vend 10 appâts de chaque type pour 3 500 pièces.",
+        "buyCrate": "Appel du chasseur et Alliance des marchands : caisse de 50 appâts de chaque type pour 5 000 pièces.",
+        "raw": "Manger un appât cru donne la nausée et ne rend presque pas de vie."
+      },
+      "species": {
+        "intro": "Chaque espèce compte 5 variétés (3 communes, 1 de nuit, 1 rare), chacune en taille normale ou trophée. Le trophée rapporte plus d'or et de réputation.",
+        "search": "Rechercher un poisson ou une île…",
+        "all": "Tous",
+        "bait": "Appât",
+        "noResult": "Aucun poisson ne correspond.",
+        "kind": {
+          "common": "Commune",
+          "night": "Nuit",
+          "rare": "Rare"
+        },
+        "islands": "Îles",
+        "splashtail": {
+          "name": "Queues éclaboussantes",
+          "location": "Partout, sauf eaux douces et Mer des Damnés",
+          "one": "Queue éclaboussante"
+        },
+        "plentifin": {
+          "name": "Nageoires d'abondance",
+          "location": "Shores of Plenty",
+          "one": "Nageoire d'abondance"
+        },
+        "ancientscale": {
+          "name": "Écailles anciennes",
+          "location": "Ancient Isles",
+          "one": "Écaille ancienne"
+        },
+        "wildsplash": {
+          "name": "Déferlantes",
+          "location": "The Wilds",
+          "one": "Déferlante"
+        },
+        "devilfish": {
+          "name": "Poissons-diable",
+          "location": "Devil's Roar",
+          "one": "Poisson-diable"
+        },
+        "islehopper": {
+          "name": "Écumeurs des îles",
+          "location": "Autour des grandes îles (variété selon l'île)",
+          "one": "Écumeur des îles"
+        },
+        "pondie": {
+          "name": "Houles",
+          "location": "Étangs et lagons (ex. Mermaid's Hideaway)",
+          "one": "Houle"
+        },
+        "battlegill": {
+          "name": "Branchies belliqueuses",
+          "location": "Près des forts et navires squelettes en combat",
+          "one": "Branchie belliqueuse"
+        },
+        "wrecker": {
+          "name": "Naufrageurs",
+          "location": "Près des épaves",
+          "one": "Naufrageur"
+        },
+        "stormfish": {
+          "name": "Tempêtes de mer",
+          "location": "Sous la tempête",
+          "one": "Tempête de mer"
+        }
+      },
+      "variantNotes": {
+        "wreckInStorm": "Épave dans une tempête",
+        "ancientIsles": "Ancient Isles",
+        "shoresOfPlenty": "Shores of Plenty",
+        "wilds": "The Wilds"
+      },
+      "cooking": {
+        "normal": "Poisson normal",
+        "trophy": "Poisson trophée",
+        "normalTime": "45 à 80 s",
+        "trophyTime": "80 à 180 s",
+        "heal": "Un poisson cuit donne une réserve de vie qui régénère votre santé après 8 à 10 s sans subir de dégâts. Évitez le poisson cru.",
+        "found": "On trouve aussi des poissons (crus, cuits ou carbonisés) dans les épaves, barils flottants, chaloupes et caisses : l'état ne change que le prix de vente."
+      },
+      "commendations": {
+        "perVariant": "Une promotion « Chasseur de … » par variété, plus une par espèce complète.",
+        "trophy25": "Chasseur de poissons trophées : 25 trophées livrés",
+        "trophy50": "Maître chasseur de poissons trophées : 50 trophées",
+        "trophy100": "Chasseur légendaire de poissons trophées : 100 trophées",
+        "legendary": "Chasseur légendaire de Sea of Thieves : toutes les promotions de l'Appel du chasseur au grade V.",
+        "athena": "Fortune d'Athéna – Légende des profondeurs : livrer 50 poissons en tant que Légende Pirate.",
+        "sellTitle": "Où vendre ?",
+        "sell": "À l'Appel du chasseur, à l'Alliance des marchands, ou aux Barons à bord d'un navire dirigé."
+      },
+      "junk": {
+        "intro": "En pêchant sans appât, on remonte parfois des objets : vieux chapeau, vieille botte, vieux crâne, arêtes… voire des planches ou des clés des cendres.",
+        "value": "Peu rentables à la vente, mais nécessaires pour la promotion « Chasseur de butin sournois ».",
+        "spots": "Bons spots : Cursewater Shore (Y13) et Mermaid's Hideaway (B13)."
+      },
+      "tips": {
+        "trophy": "Aucun appât ni technique ne force l'apparition d'un trophée, et relancer avec un poisson accroché n'y change rien.",
+        "skeletons": "Pour pêcher tranquille, restez près d'un avant-poste, d'un bazar ou d'un fort squelette inactif, ou éloignez-vous dans l'eau (attention aux requins).",
+        "shadowStorm": "Tempête d'ombre : attendez le passage de la tempête près de la Taverne Splendide des Loups de Mer (K12).",
+        "storm": "Pour savoir où est la tempête, utilisez le traqueur en temps réel de Merfolk's Lullaby.",
+        "volcano": "Dans le Devil's Roar, les éruptions peuvent casser la ligne et endommager le navire."
+      },
+      "variants": {
+        "splashtail": {
+          "ruby": "Rubis",
+          "sunny": "Ensoleillée",
+          "indigo": "Indigo",
+          "seafoam": "Mousseuse",
+          "umber": "Ocrée"
+        },
+        "plentifin": {
+          "olive": "D'olive",
+          "amber": "Ambrée",
+          "cloudy": "Nuageuse",
+          "watery": "Aqueuse",
+          "bonedust": "Os broyés"
+        },
+        "ancientscale": {
+          "almond": "Amande",
+          "sapphire": "Saphir",
+          "smoke": "De fumée",
+          "starshine": "Étoilée",
+          "bone": "Osseuse"
+        },
+        "wildsplash": {
+          "russet": "Mordorée",
+          "sandy": "Sablonneuse",
+          "ocean": "Océanique",
+          "coral": "Coralienne",
+          "muddy": "Vaseuse"
+        },
+        "devilfish": {
+          "ashen": "Cendreux",
+          "seashell": "Des coquillages",
+          "lava": "De lave",
+          "firelight": "Embrasé",
+          "forsaken": "De Forsaken"
+        },
+        "islehopper": {
+          "stone": "De pierre",
+          "moss": "De mousse",
+          "honey": "De miel",
+          "amethyst": "D'améthyste",
+          "raven": "De jais"
+        },
+        "pondie": {
+          "charcoal": "Charbonneuse",
+          "orchid": "Orchidée",
+          "bronze": "Bronze",
+          "moonsky": "Lunaire",
+          "bright": "Brillante"
+        },
+        "battlegill": {
+          "jade": "De jade",
+          "sky": "Des cieux",
+          "rum": "De rhum",
+          "bittersweet": "Aigre-douce",
+          "sand": "Sablonneuse"
+        },
+        "wrecker": {
+          "rose": "De rose",
+          "sun": "Ensoleillé",
+          "moon": "Lunaire",
+          "snow": "Enneigé",
+          "blackcloud": "Des cieux funestes"
+        },
+        "stormfish": {
+          "ancient": "Ancienne",
+          "shores": "Côtière",
+          "wild": "Sauvage",
+          "twilight": "Du crépuscule",
+          "shadow": "D'ombre"
+        }
+      },
+      "merrick": {
+        "title": "Quêtes de Merrick",
+        "description": "Une liste partagée des poissons et viandes à livrer, à cocher à plusieurs en direct.",
+        "guideCta": "Organiser une quête de Merrick",
+        "intro": "Créez la liste du menu demandé par Merrick, puis partagez le lien avec votre équipage : chacun coche ce qu'il pêche ou chasse, et tout le monde voit la liste se mettre à jour en direct.",
+        "fishVariantName": "{species} {variant}",
+        "ocrTitle": "Importer depuis une capture",
+        "ocrHint": "Envoyez une capture d'écran du menu : la liste est préremplie automatiquement. Vérifiez-la avant de la créer.",
+        "ocrLanguage": "Langue du jeu",
+        "ocrButton": "Choisir une image",
+        "ocrLoading": "Chargement du moteur de lecture…",
+        "ocrRunning": "Lecture de l'image… {progress} %",
+        "ocrDone": "{count} ingrédient(s) reconnu(s), vérifiez la liste ci-dessous.",
+        "ocrNothing": "Aucun ingrédient reconnu. Essayez une capture plus nette, ou remplissez la liste à la main.",
+        "ocrError": "La lecture de l'image a échoué.",
+        "listTitle": "Menu à livrer",
+        "course": {
+          "starter": "Entrée",
+          "main": "Plat principal",
+          "special": "Plat du jour"
+        },
+        "dishName": "Nom du plat (facultatif)",
+        "addDish": "Ajouter un plat",
+        "removeDish": "Retirer le plat",
+        "addIngredient": "Ajouter un ingrédient",
+        "removeIngredient": "Retirer",
+        "item": "Poisson ou viande",
+        "anyVariant": "toutes variétés",
+        "meatGroup": "Viandes",
+        "quantity": "Quantité",
+        "state": {
+          "cooked": "Cuit",
+          "raw": "Cru"
+        },
+        "create": "Créer la liste",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "edit": "Modifier la liste",
+        "invalid": "Chaque plat doit contenir au moins un ingrédient.",
+        "errorSave": "L'enregistrement a échoué.",
+        "shareTitle": "Lien de partage",
+        "shareHint": "Toute personne qui a ce lien peut voir et cocher la liste.",
+        "copy": "Copier",
+        "copied": "Lien copié !",
+        "progress": "{done} / {total} livrés",
+        "remaining": "Reste à trouver",
+        "allDone": "Tout est prêt, direction Merrick !",
+        "notFound": "Cette liste n'existe pas ou a expiré.",
+        "expiry": "Les listes inactives depuis 14 jours sont supprimées automatiquement.",
+        "recent": "Mes listes récentes",
+        "newList": "Nouvelle liste",
+        "live": "En direct",
+        "reconnecting": "Reconnexion…",
+        "meats": {
+          "chicken": "Poulet",
+          "pork": "Porc",
+          "snake": "Serpent",
+          "shark": "Requin",
+          "kraken": "Kraken",
+          "megalodon": "Mégalodon"
+        }
+      }
+    }
   }
 }

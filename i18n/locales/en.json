@@ -6,6 +6,7 @@
     "myGroups": "My Groups",
     "tutorial": "Tutorial",
     "admin": "Admin",
+    "tools": "Tools",
     "releaseNotes": "Release Notes",
     "logout": "Logout"
   },
@@ -485,5 +486,285 @@
     "search": "Search in notes...",
     "results": "{count} / {total} notes",
     "noResults": "No results for this search."
+  },
+  "tools": {
+    "title": "Tools",
+    "subtitle": "Handy tools for your Sea of Thieves adventures",
+    "empty": "No tools available yet.",
+    "emptyHint": "New tools are coming soon, check back later!",
+    "fishing": {
+      "title": "Fishing guide",
+      "description": "Fish, bait, cooking and Hunter's Call commendations.",
+      "sourcePrefix": "Information compiled from the",
+      "sourceLink": "SotFR fishing & hunting guide",
+      "toc": {
+        "basics": "Basics",
+        "bait": "Bait",
+        "species": "Species",
+        "cooking": "Cooking",
+        "commendations": "Commendations",
+        "junk": "Sneaky loot",
+        "tips": "Tips"
+      },
+      "basics": {
+        "equip": "Take out the fishing rod from the 2nd page of the item wheel (a shortcut can be bound in the options).",
+        "cast": "Cast the bobber into the sea or a lagoon: after a few seconds a fish bites and starts fighting.",
+        "tension": "Pull the mouse or stick in the opposite direction to the fish to avoid snapping the line.",
+        "reel": "Once it tires, reel in (left click / right trigger). Trophy fish often take several rounds.",
+        "cancel": "Before a bite, right click (or B on controller) reels the line back if you don't want that fish.",
+        "tiredTitle": "How to tell it's tired?",
+        "tired": "The line goes slack and the fish stops moving, the struggling sounds stop and the controller stops vibrating."
+      },
+      "bait": {
+        "intro": "Bait never guarantees a species, it only increases its chances to show up.",
+        "earthworms": "Earthworms",
+        "grubs": "Grubs",
+        "leeches": "Leeches",
+        "none": "No bait",
+        "whereEarthworms": "Dig in the dirt of grassy areas.",
+        "whereGrubs": "Dig in the sand.",
+        "whereLeeches": "Dig where the water meets the sand.",
+        "barrels": "All bait can also be found in barrels and crates.",
+        "storageTitle": "Storage",
+        "storage": "10 bait per slot, plus 1 attached to the rod (11 in total).",
+        "buyTitle": "Buying",
+        "buyShipwright": "Captained ship: the shipwright sells 10 of each bait for 3,500 gold.",
+        "buyCrate": "Hunter's Call and Merchant Alliance: crate of 50 of each bait for 5,000 gold.",
+        "raw": "Eating raw bait makes you sick and barely restores any health."
+      },
+      "species": {
+        "intro": "Each species has 5 varieties (3 common, 1 night, 1 rare), each in normal or trophy size. Trophies give more gold and reputation.",
+        "search": "Search a fish or an island…",
+        "all": "All",
+        "bait": "Bait",
+        "noResult": "No fish matches.",
+        "kind": {
+          "common": "Common",
+          "night": "Night",
+          "rare": "Rare"
+        },
+        "islands": "Islands",
+        "splashtail": {
+          "name": "Splashtail",
+          "location": "Everywhere except fresh water and the Sea of the Damned",
+          "one": "Splashtail"
+        },
+        "plentifin": {
+          "name": "Plentifin",
+          "location": "Shores of Plenty",
+          "one": "Plentifin"
+        },
+        "ancientscale": {
+          "name": "Ancientscale",
+          "location": "Ancient Isles",
+          "one": "Ancientscale"
+        },
+        "wildsplash": {
+          "name": "Wildsplash",
+          "location": "The Wilds",
+          "one": "Wildsplash"
+        },
+        "devilfish": {
+          "name": "Devilfish",
+          "location": "Devil's Roar",
+          "one": "Devilfish"
+        },
+        "islehopper": {
+          "name": "Islehopper",
+          "location": "Around large islands (variety depends on the island)",
+          "one": "Islehopper"
+        },
+        "pondie": {
+          "name": "Pondie",
+          "location": "Ponds and lagoons (e.g. Mermaid's Hideaway)",
+          "one": "Pondie"
+        },
+        "battlegill": {
+          "name": "Battlegill",
+          "location": "Near active skeleton forts and skeleton ships",
+          "one": "Battlegill"
+        },
+        "wrecker": {
+          "name": "Wrecker",
+          "location": "Near shipwrecks",
+          "one": "Wrecker"
+        },
+        "stormfish": {
+          "name": "Stormfish",
+          "location": "Under the storm",
+          "one": "Stormfish"
+        }
+      },
+      "variantNotes": {
+        "wreckInStorm": "Shipwreck in a storm",
+        "ancientIsles": "Ancient Isles",
+        "shoresOfPlenty": "Shores of Plenty",
+        "wilds": "The Wilds"
+      },
+      "cooking": {
+        "normal": "Normal fish",
+        "trophy": "Trophy fish",
+        "normalTime": "45 to 80 s",
+        "trophyTime": "80 to 180 s",
+        "heal": "Cooked fish grants a health reserve that regenerates your health after 8 to 10 s without taking damage. Avoid raw fish.",
+        "found": "Fish (raw, cooked or burnt) can also be found in shipwrecks, floating barrels, rowboats and crates: the state only affects the sell price."
+      },
+      "commendations": {
+        "perVariant": "One \"… Hunter\" commendation per variety, plus one per complete species.",
+        "trophy25": "Hunter of Trophy Fish: 25 trophies delivered",
+        "trophy50": "Master Hunter of Trophy Fish: 50 trophies",
+        "trophy100": "Legendary Hunter of Trophy Fish: 100 trophies",
+        "legendary": "Legendary Hunter of the Sea of Thieves: every Hunter's Call commendation at grade V.",
+        "athena": "Athena's Fortune – Legend of the Deep: deliver 50 fish as a Pirate Legend.",
+        "sellTitle": "Where to sell?",
+        "sell": "To the Hunter's Call, the Merchant Alliance, or the Barons aboard a captained ship."
+      },
+      "junk": {
+        "intro": "Fishing without bait sometimes brings up items: old hat, old boot, old skull, fish bones… even planks or Ashen Keys.",
+        "value": "Not worth much, but required for the \"Hunter of Sneaky Loot\" commendation.",
+        "spots": "Good spots: Cursewater Shore (Y13) and Mermaid's Hideaway (B13)."
+      },
+      "tips": {
+        "trophy": "No bait or trick forces a trophy to appear, and recasting with a fish hooked changes nothing.",
+        "skeletons": "To fish in peace, stay near an outpost, a seapost or an inactive skeleton fort, or swim away from shore (watch out for sharks).",
+        "shadowStorm": "Shadow Stormfish: wait for the storm to pass near the Glorious Sea Dog Tavern (K12).",
+        "storm": "To find the storm, use the Merfolk's Lullaby live tracker.",
+        "volcano": "In the Devil's Roar, eruptions can snap the line and damage the ship."
+      },
+      "variants": {
+        "splashtail": {
+          "ruby": "Ruby",
+          "sunny": "Sunny",
+          "indigo": "Indigo",
+          "seafoam": "Seafoam",
+          "umber": "Umber"
+        },
+        "plentifin": {
+          "olive": "Olive",
+          "amber": "Amber",
+          "cloudy": "Cloudy",
+          "watery": "Watery",
+          "bonedust": "Bonedust"
+        },
+        "ancientscale": {
+          "almond": "Almond",
+          "sapphire": "Sapphire",
+          "smoke": "Smoke",
+          "starshine": "Starshine",
+          "bone": "Bone"
+        },
+        "wildsplash": {
+          "russet": "Russet",
+          "sandy": "Sandy",
+          "ocean": "Ocean",
+          "coral": "Coral",
+          "muddy": "Muddy"
+        },
+        "devilfish": {
+          "ashen": "Ashen",
+          "seashell": "Seashell",
+          "lava": "Lava",
+          "firelight": "Firelight",
+          "forsaken": "Forsaken"
+        },
+        "islehopper": {
+          "stone": "Stone",
+          "moss": "Moss",
+          "honey": "Honey",
+          "amethyst": "Amethyst",
+          "raven": "Raven"
+        },
+        "pondie": {
+          "charcoal": "Charcoal",
+          "orchid": "Orchid",
+          "bronze": "Bronze",
+          "moonsky": "Moonsky",
+          "bright": "Bright"
+        },
+        "battlegill": {
+          "jade": "Jade",
+          "sky": "Sky",
+          "rum": "Rum",
+          "bittersweet": "Bittersweet",
+          "sand": "Sand"
+        },
+        "wrecker": {
+          "rose": "Rose",
+          "sun": "Sun",
+          "moon": "Moon",
+          "snow": "Snow",
+          "blackcloud": "Blackcloud"
+        },
+        "stormfish": {
+          "ancient": "Ancient",
+          "shores": "Shores",
+          "wild": "Wild",
+          "twilight": "Twilight",
+          "shadow": "Shadow"
+        }
+      },
+      "merrick": {
+        "title": "Merrick quests",
+        "description": "A shared list of the fish and meat to deliver, ticked off together in real time.",
+        "guideCta": "Organize a Merrick quest",
+        "intro": "Create the list of the menu Merrick asks for, then share the link with your crew: everyone ticks off what they catch or hunt, and the list updates live for everyone.",
+        "fishVariantName": "{variant} {species}",
+        "ocrTitle": "Import from a screenshot",
+        "ocrHint": "Upload a screenshot of the menu: the list is filled in automatically. Check it before creating it.",
+        "ocrLanguage": "Game language",
+        "ocrButton": "Choose an image",
+        "ocrLoading": "Loading the reading engine…",
+        "ocrRunning": "Reading the image… {progress} %",
+        "ocrDone": "{count} ingredient(s) recognized, check the list below.",
+        "ocrNothing": "No ingredient recognized. Try a sharper screenshot, or fill in the list by hand.",
+        "ocrError": "Reading the image failed.",
+        "listTitle": "Menu to deliver",
+        "course": {
+          "starter": "Starter",
+          "main": "Main course",
+          "special": "Dish of the day"
+        },
+        "dishName": "Dish name (optional)",
+        "addDish": "Add a dish",
+        "removeDish": "Remove dish",
+        "addIngredient": "Add an ingredient",
+        "removeIngredient": "Remove",
+        "item": "Fish or meat",
+        "anyVariant": "any variety",
+        "meatGroup": "Meat",
+        "quantity": "Quantity",
+        "state": {
+          "cooked": "Cooked",
+          "raw": "Raw"
+        },
+        "create": "Create the list",
+        "save": "Save",
+        "cancel": "Cancel",
+        "edit": "Edit the list",
+        "invalid": "Each dish must contain at least one ingredient.",
+        "errorSave": "Saving failed.",
+        "shareTitle": "Share link",
+        "shareHint": "Anyone with this link can view and tick off the list.",
+        "copy": "Copy",
+        "copied": "Link copied!",
+        "progress": "{done} / {total} delivered",
+        "remaining": "Still to find",
+        "allDone": "All set, head to Merrick!",
+        "notFound": "This list does not exist or has expired.",
+        "expiry": "Lists inactive for 14 days are deleted automatically.",
+        "recent": "My recent lists",
+        "newList": "New list",
+        "live": "Live",
+        "reconnecting": "Reconnecting…",
+        "meats": {
+          "chicken": "Chicken",
+          "pork": "Pork",
+          "snake": "Snake",
+          "shark": "Shark",
+          "kraken": "Kraken",
+          "megalodon": "Megalodon"
+        }
+      }
+    }
   }
 }

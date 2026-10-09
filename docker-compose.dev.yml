@@ -15,7 +15,8 @@ services:
       - NODE_ENV=development
       - HOST=0.0.0.0
       - TZ=Europe/Paris
-    command: sh -c "npm install && npm run build && node .output/server/index.mjs"
+    # Même correctif que le Dockerfile : sharp (IPX) ne trouve pas libvips dans .output sur Alpine
+    command: sh -c "npm install && npm run build && mkdir -p /tmp/vips-libs && find /app/.output -name 'libvips*.so*' -exec ln -sf {} /tmp/vips-libs/ \\; && LD_LIBRARY_PATH=/tmp/vips-libs node .output/server/index.mjs"
 
 volumes:
   node_modules_dev:
