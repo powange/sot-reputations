@@ -603,12 +603,44 @@
         "wilds": "The Wilds"
       },
       "cooking": {
-        "normal": "Poisson normal",
-        "trophy": "Poisson trophée",
-        "normalTime": "45 à 80 s",
-        "trophyTime": "80 à 180 s",
         "heal": "Un poisson cuit donne une réserve de vie qui régénère votre santé après 8 à 10 s sans subir de dégâts. Évitez le poisson cru.",
-        "found": "On trouve aussi des poissons (crus, cuits ou carbonisés) dans les épaves, barils flottants, chaloupes et caisses : l'état ne change que le prix de vente."
+        "found": "On trouve aussi des poissons (crus, cuits ou carbonisés) dans les épaves, barils flottants, chaloupes et caisses : l'état ne change que le prix de vente.",
+        "stage": {
+          "raw": "Cru",
+          "undercooked": "Pas assez cuit",
+          "cooked": "Cuit",
+          "burnt": "Brûlé"
+        },
+        "timesSource": "Secondes depuis la pose sur le feu (fourneau ou feu de camp), d'après le wiki Sea of Thieves.",
+        "timers": {
+          "title": "Minuteurs de cuisson",
+          "intro": "Lancez un minuteur au moment où vous posez la nourriture sur le feu : un signal sonne quand c'est cuit, puis quand ça commence à brûler. Un minuteur par fourneau, ils restent actifs si vous rechargez la page.",
+          "food": {
+            "fish": "Poisson",
+            "trophy": "Poisson trophée",
+            "meat": "Viande",
+            "monster": "Viande de monstre"
+          },
+          "foodHint": {
+            "fish": "Taille normale",
+            "trophy": "Grand poisson",
+            "meat": "Poulet, porc, serpent, requin",
+            "monster": "Kraken, mégalodon"
+          },
+          "cookedIn": "Cuit dans {time}",
+          "burnsIn": "Retirez-le ! Brûle dans {time}",
+          "burntSince": "Brûlé depuis {time}",
+          "restart": "Relancer",
+          "remove": "Retirer",
+          "clear": "Tout effacer",
+          "sound": "Son",
+          "notifications": "Activer les notifications",
+          "empty": "Aucun minuteur en cours.",
+          "notif": {
+            "cooked": "{food} : c'est cuit !",
+            "burnt": "{food} : ça brûle !"
+          }
+        }
       },
       "commendations": {
         "perVariant": "Une promotion « Chasseur de … » par variété, plus une par espèce complète.",

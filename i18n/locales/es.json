@@ -602,12 +602,44 @@
         "wilds": "The Wilds"
       },
       "cooking": {
-        "normal": "Pez normal",
-        "trophy": "Pez trofeo",
-        "normalTime": "45 a 80 s",
-        "trophyTime": "80 a 180 s",
         "heal": "El pescado cocinado da una reserva de vida que regenera tu salud tras 8 a 10 s sin recibir daño. Evita el pescado crudo.",
-        "found": "También hay peces (crudos, cocinados o quemados) en naufragios, barriles flotantes, botes y cajas: el estado solo cambia el precio de venta."
+        "found": "También hay peces (crudos, cocinados o quemados) en naufragios, barriles flotantes, botes y cajas: el estado solo cambia el precio de venta.",
+        "stage": {
+          "raw": "Crudo",
+          "undercooked": "Poco hecho",
+          "cooked": "Cocinado",
+          "burnt": "Quemado"
+        },
+        "timesSource": "Segundos desde que se pone al fuego (fogón u hoguera), según la wiki de Sea of Thieves.",
+        "timers": {
+          "title": "Temporizadores de cocina",
+          "intro": "Inicia un temporizador al poner la comida al fuego: suena una señal cuando está cocinada y otra cuando empieza a quemarse. Un temporizador por fogón; siguen activos si recargas la página.",
+          "food": {
+            "fish": "Pez",
+            "trophy": "Pez trofeo",
+            "meat": "Carne",
+            "monster": "Carne de monstruo"
+          },
+          "foodHint": {
+            "fish": "Tamaño normal",
+            "trophy": "Pez grande",
+            "meat": "Pollo, cerdo, serpiente, tiburón",
+            "monster": "Kraken, megalodón"
+          },
+          "cookedIn": "Cocinado en {time}",
+          "burnsIn": "¡Retíralo! Se quema en {time}",
+          "burntSince": "Quemado desde hace {time}",
+          "restart": "Reiniciar",
+          "remove": "Quitar",
+          "clear": "Borrar todo",
+          "sound": "Sonido",
+          "notifications": "Activar notificaciones",
+          "empty": "Ningún temporizador en marcha.",
+          "notif": {
+            "cooked": "{food}: ¡está cocinado!",
+            "burnt": "{food}: ¡se está quemando!"
+          }
+        }
       },
       "commendations": {
         "perVariant": "Una distinción «Cazador de …» por variedad, más una por especie completa.",

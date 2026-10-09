@@ -195,3 +195,17 @@ export function isValidMerrickItem(i: Pick<MerrickIngredient, 'type' | 'key' | '
   if (!species) return false
   return !i.variant || species.variants.some(v => v.key === i.variant)
 }
+
+// --- Cuisson (wiki Sea of Thieves, page « Cooking ») : secondes depuis la pose sur le feu ---
+export type CookingFood = 'fish' | 'trophy' | 'meat' | 'monster'
+
+export const COOKING_TIMES: Record<CookingFood, { undercooked: number, cooked: number, burnt: number }> = {
+  fish: { undercooked: 30, cooked: 40, burnt: 80 },
+  trophy: { undercooked: 80, cooked: 90, burnt: 180 },
+  // Poulet, porc, serpent, requin
+  meat: { undercooked: 50, cooked: 60, burnt: 120 },
+  // Kraken, mégalodon
+  monster: { undercooked: 100, cooked: 120, burnt: 240 }
+}
+
+export const COOKING_FOODS = Object.keys(COOKING_TIMES) as CookingFood[]

@@ -309,39 +309,50 @@ const filteredSpecies = computed(() => {
         <h2 class="text-2xl font-pirate mb-4">
           {{ $t('tools.fishing.toc.cooking') }}
         </h2>
-        <div class="grid gap-4 sm:grid-cols-2 mb-4">
-          <UCard>
-            <div class="flex items-center gap-3">
-              <UIcon
-                name="i-lucide-flame"
-                class="size-8 text-primary"
-              />
-              <div>
-                <p class="text-sm text-muted">
-                  {{ $t('tools.fishing.cooking.normal') }}
-                </p>
-                <p class="text-xl font-semibold">
-                  {{ $t('tools.fishing.cooking.normalTime') }}
-                </p>
-              </div>
-            </div>
-          </UCard>
-          <UCard>
-            <div class="flex items-center gap-3">
-              <UIcon
-                name="i-lucide-trophy"
-                class="size-8 text-primary"
-              />
-              <div>
-                <p class="text-sm text-muted">
-                  {{ $t('tools.fishing.cooking.trophy') }}
-                </p>
-                <p class="text-xl font-semibold">
-                  {{ $t('tools.fishing.cooking.trophyTime') }}
-                </p>
-              </div>
-            </div>
-          </UCard>
+        <CookingTimers class="mb-4" />
+
+        <!-- Durées exactes (wiki Sea of Thieves) -->
+        <div class="overflow-x-auto mb-4">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-muted border-b border-default">
+                <th class="py-2 pr-3 font-medium" />
+                <th class="py-2 px-3 font-medium text-pink-600 dark:text-pink-400">
+                  {{ $t('tools.fishing.cooking.stage.undercooked') }}
+                </th>
+                <th class="py-2 px-3 font-medium text-success">
+                  {{ $t('tools.fishing.cooking.stage.cooked') }}
+                </th>
+                <th class="py-2 px-3 font-medium text-error">
+                  {{ $t('tools.fishing.cooking.stage.burnt') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="food in COOKING_FOODS"
+                :key="food"
+                class="border-b border-default last:border-0"
+              >
+                <td class="py-2 pr-3">
+                  <span class="font-semibold">{{ $t(`tools.fishing.cooking.timers.food.${food}`) }}</span>
+                  <span class="block text-xs text-muted">{{ $t(`tools.fishing.cooking.timers.foodHint.${food}`) }}</span>
+                </td>
+                <td class="py-2 px-3 tabular-nums">
+                  {{ COOKING_TIMES[food].undercooked }} s
+                </td>
+                <td class="py-2 px-3 tabular-nums font-semibold">
+                  {{ COOKING_TIMES[food].cooked }} s
+                </td>
+                <td class="py-2 px-3 tabular-nums">
+                  {{ COOKING_TIMES[food].burnt }} s
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="text-xs text-muted mt-1">
+            {{ $t('tools.fishing.cooking.timesSource') }}
+          </p>
         </div>
         <p class="text-sm mb-2">
           {{ $t('tools.fishing.cooking.heal') }}

@@ -602,12 +602,44 @@
         "wilds": "The Wilds"
       },
       "cooking": {
-        "normal": "Normal fish",
-        "trophy": "Trophy fish",
-        "normalTime": "45 to 80 s",
-        "trophyTime": "80 to 180 s",
         "heal": "Cooked fish grants a health reserve that regenerates your health after 8 to 10 s without taking damage. Avoid raw fish.",
-        "found": "Fish (raw, cooked or burnt) can also be found in shipwrecks, floating barrels, rowboats and crates: the state only affects the sell price."
+        "found": "Fish (raw, cooked or burnt) can also be found in shipwrecks, floating barrels, rowboats and crates: the state only affects the sell price.",
+        "stage": {
+          "raw": "Raw",
+          "undercooked": "Undercooked",
+          "cooked": "Cooked",
+          "burnt": "Burnt"
+        },
+        "timesSource": "Seconds since placing on the fire (stove or campfire), from the Sea of Thieves wiki.",
+        "timers": {
+          "title": "Cooking timers",
+          "intro": "Start a timer when you put the food on the fire: a signal plays when it's cooked, then when it starts burning. One timer per stove; they keep running if you reload the page.",
+          "food": {
+            "fish": "Fish",
+            "trophy": "Trophy fish",
+            "meat": "Meat",
+            "monster": "Monster meat"
+          },
+          "foodHint": {
+            "fish": "Normal size",
+            "trophy": "Big fish",
+            "meat": "Chicken, pork, snake, shark",
+            "monster": "Kraken, megalodon"
+          },
+          "cookedIn": "Cooked in {time}",
+          "burnsIn": "Take it off! Burns in {time}",
+          "burntSince": "Burnt for {time}",
+          "restart": "Restart",
+          "remove": "Remove",
+          "clear": "Clear all",
+          "sound": "Sound",
+          "notifications": "Enable notifications",
+          "empty": "No timer running.",
+          "notif": {
+            "cooked": "{food}: it's cooked!",
+            "burnt": "{food}: it's burning!"
+          }
+        }
       },
       "commendations": {
         "perVariant": "One \"… Hunter\" commendation per variety, plus one per complete species.",
