@@ -99,20 +99,38 @@ function matchItem(text: string, vocab: MerrickVocabEntry[]): MerrickVocabEntry 
   return bestSim >= 0.72 ? best : null
 }
 
-// "1REQUIN", "2 NAGEOIRES…", "I SERPENT" (1 lu comme I/l), ou pas de quantité du tout.
-function splitQuantity(line: string): { quantity: number, rest: string } {
-  const m = line.match(/^([0-9]{1,2}|[il])\s*(.*)$/)
-  if (m && m[2]!.length >= 3) {
-    const q = /^[0-9]+$/.test(m[1]!) ? Number(m[1]) : 1
-    return { quantity: Math.min(Math.max(q, 1), MERRICK_LIMITS.quantity), rest: m[2]! }
-  }
-  return { quantity: 1, rest: line }
+// Lettres que l'OCR lit souvent à la place du chiffre de quantité (retirées avant le rapprochement)
+const DIGIT_LOOKALIKES: Record<string, number> = { i: 1, l: 1, j: 1, t: 1, z: 2 }
+
+const clampQuantity = (q: number) => Math.min(Math.max(q, 1), MERRICK_LIMITS.quantity)
+
+// "1REQUIN", "2 NAGEOIRES…", "I SERPENT" / "Z NAGEOIRES" (chiffre lu comme une lettre).
+// quantity = null si aucune quantité n'a pu être lue.
+function splitQuantity(line: string): { quantity: number | null, rest: string } {
+  let m = line.match(/^(\d{1,2})\s*([a-z].{2,})$/)
+  if (m) return { quantity: clampQuantity(Number(m[1])), rest: m[2]! }
+  m = line.match(/^([a-z])\s*(.{3,})$/)
+  if (m && m[1]! in DIGIT_LOOKALIKES) return { quantity: DIGIT_LOOKALIKES[m[1]!]!, rest: m[2]! }
+  return { quantity: null, rest: line }
+}
+
+// "NAGEOIRES D'ABONDANCE" vs "nageoire d abondance" : le jeu met le nom au pluriel
+// dès qu'il en faut plusieurs, ce qui rattrape un chiffre illisible ou perdu.
+function looksPlural(text: string, entry: string): boolean {
+  const entryWords = entry.split(' ')
+  // Mot à mot, sans exiger le même découpage (l'OCR colle ou coupe parfois les mots)
+  return text.split(' ').some((w) => {
+    if (w.length <= 3 || !/[sx]$/.test(w)) return false
+    const stem = w.slice(0, -1)
+    return entryWords.some(e => !/[sx]$/.test(e) && levenshtein(stem, e) <= 1 && levenshtein(stem, e) < levenshtein(w, e))
+  })
 }
 
 export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[]): MerrickDish[] {
   const dishes: MerrickDish[] = []
   let current: MerrickDish | null = null
   let pendingCourse: MerrickCourse | null = null
+  let pendingQuantity: number | null = null
 
   const nextCourse = (): MerrickCourse => MERRICK_COURSES[Math.min(dishes.length, MERRICK_COURSES.length - 1)]!
   const startDish = (course: MerrickCourse, name = '') => {
@@ -123,6 +141,11 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
 
   for (const raw of rawLines) {
     const line = normalizeOcr(raw)
+    // Quantité isolée sur sa propre ligne : s'applique à l'ingrédient suivant
+    if (/^\d{1,2}$/.test(line)) {
+      pendingQuantity = clampQuantity(Number(line))
+      continue
+    }
     if (line.replace(/[^a-z]/g, '').length < 3) continue
 
     // En-tête de plat (ENTRÉE / PLAT PRINCIPAL / PLAT DU JOUR)
@@ -141,11 +164,22 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
       continue
     }
 
-    const { quantity, rest } = splitQuantity(line)
-    const match = matchItem(rest, vocab) ?? matchItem(line, vocab)
+    const split = splitQuantity(line)
+    let text = split.rest
+    let match = matchItem(text, vocab)
+    if (!match) {
+      text = line
+      match = matchItem(text, vocab)
+    }
     if (match) {
       const dish: MerrickDish = current ?? startDish(pendingCourse ?? nextCourse())
       pendingCourse = null
+      // Le chiffre stylisé du jeu est mal lu (le « 1 » à crochet sort en 2, 7, Z…) :
+      // c'est l'accord du nom qui décide. Singulier = 1 ; pluriel = le chiffre lu s'il
+      // est plausible, sinon 2.
+      const read = (text === line ? null : split.quantity) ?? pendingQuantity
+      const quantity = looksPlural(text, match.text) ? Math.max(2, read ?? 2) : 1
+      pendingQuantity = null
       dish.ingredients.push({ ...match.item, state: 'cooked', quantity })
       continue
     }
