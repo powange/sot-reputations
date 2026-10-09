@@ -711,7 +711,7 @@
         "intro": "Créez la liste du menu demandé par Merrick, puis partagez le lien avec votre équipage : chacun coche ce qu'il pêche ou chasse, et tout le monde voit la liste se mettre à jour en direct.",
         "fishVariantName": "{species} {variant}",
         "ocrTitle": "Importer depuis une capture",
-        "ocrHint": "Envoyez une capture d'écran du menu : la liste est préremplie automatiquement. Vérifiez-la avant de la créer.",
+        "ocrHint": "Envoyez une capture d'écran du menu, ou collez-la directement avec Ctrl+V : la liste est préremplie automatiquement. Vérifiez-la avant de la créer.",
         "ocrLanguage": "Langue du jeu",
         "ocrButton": "Choisir une image",
         "ocrLoading": "Chargement du moteur de lecture…",
@@ -764,7 +764,10 @@
           "shark": "Requin",
           "kraken": "Kraken",
           "megalodon": "Mégalodon"
-        }
+        },
+        "paste": "Coller l'image",
+        "clipboardEmpty": "Aucune image dans le presse-papier.",
+        "clipboardDenied": "Accès au presse-papier refusé : utilisez Ctrl+V sur la page."
       }
     }
   }

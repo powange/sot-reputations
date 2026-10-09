@@ -710,7 +710,7 @@
         "intro": "Create the list of the menu Merrick asks for, then share the link with your crew: everyone ticks off what they catch or hunt, and the list updates live for everyone.",
         "fishVariantName": "{variant} {species}",
         "ocrTitle": "Import from a screenshot",
-        "ocrHint": "Upload a screenshot of the menu: the list is filled in automatically. Check it before creating it.",
+        "ocrHint": "Upload a screenshot of the menu, or paste it directly with Ctrl+V: the list is filled in automatically. Check it before creating it.",
         "ocrLanguage": "Game language",
         "ocrButton": "Choose an image",
         "ocrLoading": "Loading the reading engine…",
@@ -763,7 +763,10 @@
           "shark": "Shark",
           "kraken": "Kraken",
           "megalodon": "Megalodon"
-        }
+        },
+        "paste": "Paste image",
+        "clipboardEmpty": "No image in the clipboard.",
+        "clipboardDenied": "Clipboard access denied: use Ctrl+V on the page."
       }
     }
   }

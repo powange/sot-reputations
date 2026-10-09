@@ -26,11 +26,42 @@ const ocrRunning = ref(false)
 const ocrProgress = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
-async function onFile(event: Event) {
+function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
+  if (file) runOcr(file)
+}
+
+// Capture d'écran dans le presse-papier : Ctrl+V n'importe où sur la page…
+function onPaste(event: ClipboardEvent) {
+  const file = [...(event.clipboardData?.files ?? [])].find(f => f.type.startsWith('image/'))
   if (!file) return
+  event.preventDefault()
+  runOcr(file)
+}
+onMounted(() => window.addEventListener('paste', onPaste))
+onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
+
+// … ou bouton (API Clipboard : peut demander une autorisation, absente de certains navigateurs)
+async function pasteFromClipboard() {
+  try {
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find(t => t.startsWith('image/'))
+      if (type) {
+        const blob = await item.getType(type)
+        runOcr(new File([blob], 'clipboard', { type }))
+        return
+      }
+    }
+    toast.add({ title: t('tools.fishing.merrick.clipboardEmpty'), color: 'warning' })
+  } catch {
+    toast.add({ title: t('tools.fishing.merrick.clipboardDenied'), color: 'warning' })
+  }
+}
+
+async function runOcr(file: File) {
+  if (ocrRunning.value) return
   ocrRunning.value = true
   ocrProgress.value = null
   try {
@@ -143,6 +174,13 @@ async function create() {
           :label="$t('tools.fishing.merrick.ocrButton')"
           :loading="ocrRunning"
           @click="fileInput?.click()"
+        />
+        <UButton
+          icon="i-lucide-clipboard-paste"
+          variant="soft"
+          :label="$t('tools.fishing.merrick.paste')"
+          :disabled="ocrRunning"
+          @click="pasteFromClipboard"
         />
         <input
           ref="fileInput"

@@ -710,7 +710,7 @@
         "intro": "Crea la lista del menú que pide Merrick y comparte el enlace con tu tripulación: cada uno marca lo que pesca o caza, y la lista se actualiza en directo para todos.",
         "fishVariantName": "{variant} {species}",
         "ocrTitle": "Importar desde una captura",
-        "ocrHint": "Sube una captura del menú: la lista se rellena automáticamente. Revísala antes de crearla.",
+        "ocrHint": "Sube una captura del menú o pégala directamente con Ctrl+V: la lista se rellena automáticamente. Revísala antes de crearla.",
         "ocrLanguage": "Idioma del juego",
         "ocrButton": "Elegir una imagen",
         "ocrLoading": "Cargando el motor de lectura…",
@@ -763,7 +763,10 @@
           "shark": "Tiburón",
           "kraken": "Kraken",
           "megalodon": "Megalodón"
-        }
+        },
+        "paste": "Pegar imagen",
+        "clipboardEmpty": "No hay ninguna imagen en el portapapeles.",
+        "clipboardDenied": "Acceso al portapapeles denegado: usa Ctrl+V en la página."
       }
     }
   }
