@@ -495,7 +495,7 @@
     "fishing": {
       "title": "Guía de pesca",
       "description": "Peces, cebos, cocina y distinciones de la Llamada del Cazador.",
-      "sourcePrefix": "Información recopilada de la",
+      "sourcePrefix": "Información e imágenes de la",
       "sourceLink": "guía de pesca y caza de SotFR",
       "toc": {
         "basics": "Lo básico",

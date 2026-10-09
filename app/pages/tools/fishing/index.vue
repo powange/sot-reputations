@@ -132,11 +132,13 @@ const filteredSpecies = computed(() => {
           <UCard
             v-for="b in (['earthworms', 'grubs', 'leeches'] as const)"
             :key="b"
+            :class="FISH_BAIT_CLASSES[b].soft"
           >
             <div class="flex items-center gap-2 font-semibold mb-2">
               <UIcon
                 :name="FISH_BAIT_ICONS[b]"
-                class="size-5 text-primary"
+                class="size-5"
+                :class="FISH_BAIT_CLASSES[b].icon"
               />
               {{ $t(`tools.fishing.bait.${b}`) }}
             </div>
@@ -204,6 +206,7 @@ const filteredSpecies = computed(() => {
               size="sm"
               :icon="FISH_BAIT_ICONS[b]"
               :variant="baitFilter === b ? 'solid' : 'soft'"
+              :class="baitFilter === b ? FISH_BAIT_CLASSES[b].solid : FISH_BAIT_CLASSES[b].soft"
               :label="$t(`tools.fishing.bait.${b}`)"
               @click="baitFilter = baitFilter === b ? null : b"
             />
@@ -220,7 +223,15 @@ const filteredSpecies = computed(() => {
           >
             <template #header>
               <div class="flex items-start justify-between gap-2">
-                <div>
+                <img
+                  :src="merrickItemImage({ type: 'fish', key: species.key, variant: null })"
+                  alt=""
+                  width="56"
+                  height="56"
+                  loading="lazy"
+                  class="size-14 shrink-0 -my-2"
+                >
+                <div class="flex-1">
                   <h3 class="font-semibold text-lg">
                     {{ $t(`tools.fishing.species.${species.key}.name`) }}
                   </h3>
@@ -234,10 +245,11 @@ const filteredSpecies = computed(() => {
                 </div>
                 <UBadge
                   :icon="FISH_BAIT_ICONS[species.bait]"
-                  :color="species.bait === 'none' ? 'neutral' : 'primary'"
+                  color="neutral"
                   variant="subtle"
                   :label="$t(`tools.fishing.bait.${species.bait}`)"
                   class="shrink-0"
+                  :class="FISH_BAIT_CLASSES[species.bait].soft"
                 />
               </div>
             </template>
@@ -248,6 +260,14 @@ const filteredSpecies = computed(() => {
                 :key="variant.key"
               >
                 <div class="flex items-center gap-2">
+                  <img
+                    :src="merrickItemImage({ type: 'fish', key: species.key, variant: variant.key })"
+                    :alt="$t(`tools.fishing.variants.${species.key}.${variant.key}`)"
+                    width="36"
+                    height="36"
+                    loading="lazy"
+                    class="size-9 shrink-0"
+                  >
                   <UBadge
                     :color="FISH_KIND_COLORS[variant.kind]"
                     variant="soft"
@@ -265,7 +285,7 @@ const filteredSpecies = computed(() => {
                 </div>
                 <p
                   v-if="variant.islands"
-                  class="text-xs text-muted ml-18 mt-0.5"
+                  class="text-xs text-muted ml-29 mt-0.5"
                 >
                   {{ variant.islands.join(', ') }}
                 </p>

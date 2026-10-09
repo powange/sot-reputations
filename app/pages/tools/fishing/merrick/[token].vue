@@ -274,6 +274,13 @@ async function saveEdit() {
               color="neutral"
               size="lg"
             >
+              <img
+                :src="merrickItemImage(r.ing)"
+                alt=""
+                width="24"
+                height="24"
+                class="size-6"
+              >
               {{ r.count }} × {{ itemLabel(r.ing) }}
               <span class="text-muted">({{ $t(`tools.fishing.merrick.state.${r.ing.state}`).toLowerCase() }})</span>
             </UBadge>
@@ -341,6 +348,15 @@ async function saveEdit() {
                     @click="step(ing, 1)"
                   />
                 </div>
+                <img
+                  :src="merrickItemImage(ing)"
+                  alt=""
+                  width="48"
+                  height="48"
+                  loading="lazy"
+                  class="size-12 shrink-0"
+                  :class="{ 'opacity-40 grayscale': ing.delivered === ing.quantity }"
+                >
                 <div class="flex-1 min-w-0">
                   <span :class="{ 'line-through text-muted': ing.delivered === ing.quantity }">
                     <template v-if="ing.quantity > 1">{{ ing.quantity }} × </template>{{ itemLabel(ing) }}
@@ -364,13 +380,14 @@ async function saveEdit() {
                       />
                       {{ fishInfo.get(ing.id!)!.place }}
                     </span>
-                    <span class="flex items-center gap-1">
-                      <UIcon
-                        :name="FISH_BAIT_ICONS[fishInfo.get(ing.id!)!.bait]"
-                        class="size-3.5 shrink-0"
-                      />
-                      {{ $t(`tools.fishing.bait.${fishInfo.get(ing.id!)!.bait}`) }}
-                    </span>
+                    <UBadge
+                      :icon="FISH_BAIT_ICONS[fishInfo.get(ing.id!)!.bait]"
+                      color="neutral"
+                      variant="subtle"
+                      size="sm"
+                      :class="FISH_BAIT_CLASSES[fishInfo.get(ing.id!)!.bait].soft"
+                      :label="$t(`tools.fishing.bait.${fishInfo.get(ing.id!)!.bait}`)"
+                    />
                   </div>
                 </div>
                 <UBadge

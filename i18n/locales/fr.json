@@ -496,7 +496,7 @@
     "fishing": {
       "title": "Guide de la pêche",
       "description": "Poissons, appâts, cuisson et promotions de l'Appel du chasseur.",
-      "sourcePrefix": "Informations compilées à partir du",
+      "sourcePrefix": "Informations et images issues du",
       "sourceLink": "guide pêche & chasse de SotFR",
       "toc": {
         "basics": "Les bases",

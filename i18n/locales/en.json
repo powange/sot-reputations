@@ -495,7 +495,7 @@
     "fishing": {
       "title": "Fishing guide",
       "description": "Fish, bait, cooking and Hunter's Call commendations.",
-      "sourcePrefix": "Information compiled from the",
+      "sourcePrefix": "Information and images from the",
       "sourceLink": "SotFR fishing & hunting guide",
       "toc": {
         "basics": "Basics",
