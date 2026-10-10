@@ -25,6 +25,7 @@ const ocrLang = ref<MerrickOcrLanguage>(locale.value === 'en' ? 'eng' : locale.v
 const ocrRunning = ref(false)
 const ocrProgress = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const cameraInput = ref<HTMLInputElement | null>(null)
 
 function onFile(event: Event) {
   const input = event.target as HTMLInputElement
@@ -175,6 +176,14 @@ async function create() {
           :loading="ocrRunning"
           @click="fileInput?.click()"
         />
+        <!-- Sur mobile : photo de l'écran directement avec l'appareil photo arrière -->
+        <UButton
+          icon="i-lucide-camera"
+          :label="$t('tools.fishing.merrick.takePhoto')"
+          :disabled="ocrRunning"
+          class="hidden pointer-coarse:inline-flex"
+          @click="cameraInput?.click()"
+        />
         <UButton
           icon="i-lucide-clipboard-paste"
           variant="soft"
@@ -186,6 +195,14 @@ async function create() {
           ref="fileInput"
           type="file"
           accept="image/*"
+          class="hidden"
+          @change="onFile"
+        >
+        <input
+          ref="cameraInput"
+          type="file"
+          accept="image/*"
+          capture="environment"
           class="hidden"
           @change="onFile"
         >

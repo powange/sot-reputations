@@ -125,11 +125,13 @@ export async function recognizeMerrickMenu(
   }
 }
 
-// Agrandit, passe en niveaux de gris et étire le contraste : les captures in-game
-// sont souvent sombres (parchemin à l'ombre) et le texte fin.
+// Met à l'échelle, passe en niveaux de gris et étire le contraste : les captures in-game
+// sont souvent sombres (parchemin à l'ombre) et le texte fin. Les petites captures sont
+// agrandies ; les photos de téléphone (souvent ~4000 px) réduites pour garder l'OCR rapide.
 async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.max(1, 1500 / bitmap.width)
+  // from-image : applique l'orientation EXIF des photos prises en portrait
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const scale = Math.min(Math.max(1, 1500 / bitmap.width), 2000 / bitmap.width)
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(bitmap.width * scale)
   canvas.height = Math.round(bitmap.height * scale)

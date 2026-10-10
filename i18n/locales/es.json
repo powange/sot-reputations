@@ -742,7 +742,7 @@
         "intro": "Crea la lista del menú que pide Merrick y comparte el enlace con tu tripulación: cada uno marca lo que pesca o caza, y la lista se actualiza en directo para todos.",
         "fishVariantName": "{variant} {species}",
         "ocrTitle": "Importar desde una captura",
-        "ocrHint": "Sube una captura del menú o pégala directamente con Ctrl+V: la lista se rellena automáticamente. Revísala antes de crearla.",
+        "ocrHint": "Sube una captura del menú, pégala con Ctrl+V o haz una foto de la pantalla con tu móvil: la lista se rellena automáticamente. Revísala antes de crearla.",
         "ocrLanguage": "Idioma del juego",
         "ocrButton": "Elegir una imagen",
         "ocrLoading": "Cargando el motor de lectura…",
@@ -802,7 +802,8 @@
         "delete": "Eliminar la lista",
         "deleteConfirm": "¿Eliminar definitivamente esta lista? El enlace dejará de funcionar para todos.",
         "deleted": "Lista eliminada.",
-        "deletedByOther": "Un miembro de la tripulación ha eliminado esta lista."
+        "deletedByOther": "Un miembro de la tripulación ha eliminado esta lista.",
+        "takePhoto": "Hacer una foto"
       }
     }
   }

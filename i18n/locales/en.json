@@ -742,7 +742,7 @@
         "intro": "Create the list of the menu Merrick asks for, then share the link with your crew: everyone ticks off what they catch or hunt, and the list updates live for everyone.",
         "fishVariantName": "{variant} {species}",
         "ocrTitle": "Import from a screenshot",
-        "ocrHint": "Upload a screenshot of the menu, or paste it directly with Ctrl+V: the list is filled in automatically. Check it before creating it.",
+        "ocrHint": "Upload a screenshot of the menu, paste it with Ctrl+V, or take a photo of your screen with your phone: the list is filled in automatically. Check it before creating it.",
         "ocrLanguage": "Game language",
         "ocrButton": "Choose an image",
         "ocrLoading": "Loading the reading engine…",
@@ -802,7 +802,8 @@
         "delete": "Delete the list",
         "deleteConfirm": "Permanently delete this list? The link will stop working for everyone.",
         "deleted": "List deleted.",
-        "deletedByOther": "This list was deleted by a crew member."
+        "deletedByOther": "This list was deleted by a crew member.",
+        "takePhoto": "Take a photo"
       }
     }
   }
