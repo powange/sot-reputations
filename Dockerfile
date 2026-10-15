@@ -12,6 +12,8 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Le build Nuxt frôle les 2 Go de tas (limite par défaut de Node ici) : on laisse de la marge
+ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN npm run build
 
 # Production image

@@ -43,6 +43,10 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2025-01-15',
 
+  // Pas de sourcemaps en production : le build Docker dépassait ~2 Go de tas Node
+  // (heap out of memory) ; elles ne servent pas en prod
+  sourcemap: { server: false, client: false },
+
   nitro: {
     experimental: {
       tasks: true
