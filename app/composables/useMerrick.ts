@@ -103,7 +103,7 @@ export async function recognizeMerrickMenu(
   lang: MerrickOcrLanguage,
   onProgress: (progress: number | null) => void
 ): Promise<MerrickDish[]> {
-  const [{ createWorker }, fr, en, es] = await Promise.all([
+  const [{ createWorker, PSM }, fr, en, es] = await Promise.all([
     import('tesseract.js'),
     // ?raw : @nuxtjs/i18n compile les imports de locales en fonctions de message
     import('~~/i18n/locales/fr.json?raw'),
@@ -118,12 +118,16 @@ export async function recognizeMerrickMenu(
     }
   })
   try {
-    // 1re lecture : niveaux de gris contrastés. Si le menu semble incomplet (un menu de
-    // Merrick a 3 plats de 2 ingrédients), 2e lecture en noir et blanc pur, qui efface
-    // mieux l'emblème en fond du parchemin ; on garde la plus complète.
+    // 1re lecture : niveaux de gris contrastés, découpage « colonne de texte de tailles
+    // variables » (PSM 4) — nettement plus fiable que l'automatique sur le parchemin.
+    // Si le menu semble incomplet (un menu de Merrick a 3 plats de 2 ingrédients),
+    // 2e lecture en noir et blanc pur, découpage en bloc uniforme (PSM 6) ; on garde la
+    // plus complète.
     const gray = await preprocessImage(file)
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_COLUMN })
     const first = parseMerrickMenu((await worker.recognize(gray)).data.text.split('\n'), vocab)
     if (isCompleteMenu(first)) return first
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK })
     const second = parseMerrickMenu((await worker.recognize(binarize(gray))).data.text.split('\n'), vocab)
     if (countIngredients(second) <= countIngredients(first)) return first
     // Le noir et blanc perd souvent les « (CUIT) / (CRU) » gris clair : on reprend ceux de la 1re lecture
@@ -181,12 +185,13 @@ function binarize(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 // Met à l'échelle, passe en niveaux de gris et étire le contraste : les captures in-game
-// sont souvent sombres (parchemin à l'ombre) et le texte fin. Les petites captures sont
-// agrandies ; les photos de téléphone (souvent ~4000 px) réduites pour garder l'OCR rapide.
+// sont souvent sombres (parchemin à l'ombre) et le texte fin. Les captures sont agrandies
+// (~2200 px : les petites lignes « 1 POULE » deviennent lisibles) ; les photos de
+// téléphone (souvent ~4000 px) réduites pour garder l'OCR rapide.
 async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
   // from-image : applique l'orientation EXIF des photos prises en portrait
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const scale = Math.min(Math.max(1, 1500 / bitmap.width), 2000 / bitmap.width)
+  const scale = Math.min(Math.max(1, 2200 / bitmap.width), 2600 / bitmap.width)
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(bitmap.width * scale)
   canvas.height = Math.round(bitmap.height * scale)
