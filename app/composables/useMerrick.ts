@@ -99,13 +99,22 @@ export function useMerrickLabels() {
 
 export type MerrickOcrLanguage = 'fra' | 'eng' | 'spa'
 
+// Une lecture de l'image : largeur de travail, découpage Tesseract et libellés affichés
+// (tools.fishing.merrick.ocrSteps.<step> / ocrLayouts.<layout>)
+export interface OcrAttempt {
+  width: number
+  psm: TesseractPSM
+  step: 'enlarged' | 'reduced' | 'reducedMore'
+  layout: 'block' | 'column'
+}
+
 // Lecture d'une capture du menu, entièrement dans le navigateur (tesseract.js chargé à la demande).
 export async function recognizeMerrickMenu(
   file: File,
   lang: MerrickOcrLanguage,
   onProgress: (progress: number | null) => void,
-  // Lecture n sur total (plusieurs lectures fusionnées)
-  onPass: (pass: number, total: number) => void = () => {}
+  // Lecture n sur total (plusieurs lectures fusionnées) et ce qu'elle fait
+  onPass: (pass: number, total: number, attempt: OcrAttempt) => void = () => {}
 ): Promise<MerrickDish[]> {
   const [{ createWorker, PSM }, fr, en, es] = await Promise.all([
     import('tesseract.js'),
@@ -128,50 +137,47 @@ export async function recognizeMerrickMenu(
     // menu complet (3 plats de 2 ingrédients).
     // from-image : applique l'orientation EXIF des photos prises en portrait
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    const full = preprocessImage(bitmap, FULL)
-    // Image déjà recadrée sur le parchemin (plus haute que large) : pas de zone centrale
-    const wide = bitmap.width > bitmap.height * 0.9
-    let center: Prepared | null = null
-    const zoom = () => center ??= preprocessImage(bitmap, CENTER)
-    const bw = (p: Prepared): Prepared => ({ ...p, canvas: binarize(p.canvas) })
-    // Pas de découpage automatique (PSM 3) : le plus lent sur une photo et le moins fiable
-    // dans nos tests. Secours : la zone centrale agrandie (capture plein écran, photo
-    // d'écran), puis le noir et blanc.
-    const attempts: Array<{ psm: TesseractPSM, image: () => Prepared }> = [
-      { psm: PSM.SINGLE_COLUMN, image: () => full },
-      { psm: PSM.SINGLE_BLOCK, image: () => full },
-      ...(wide
-        ? [
-            { psm: PSM.SINGLE_BLOCK, image: zoom },
-            { psm: PSM.SINGLE_COLUMN, image: zoom },
-            { psm: PSM.SINGLE_BLOCK, image: () => bw(zoom()) }
-          ]
-        : [
-            { psm: PSM.SINGLE_BLOCK, image: () => bw(full) },
-            { psm: PSM.SINGLE_COLUMN, image: () => bw(full) }
-          ])
-    ]
+    // Le texte ne se lit bien qu'à une certaine taille, et les photos d'écran ont du moiré.
+    // Mesuré sur de vraies captures et photos d'écran OLED : une capture (petite image) se
+    // lit mieux agrandie (~2200 px de large), une photo mieux réduite (1100-1300 px : la
+    // réduction lisse le moiré). Les lectures à plusieurs échelles sont fusionnées.
+    // Pas de découpage automatique (PSM 3) : le plus lent et le moins fiable.
+    const isPhoto = bitmap.width >= 1600
+    const attempts: OcrAttempt[] = isPhoto
+      ? [
+          { width: 1300, psm: PSM.SINGLE_BLOCK, step: 'reduced', layout: 'block' },
+          { width: 1100, psm: PSM.SINGLE_BLOCK, step: 'reducedMore', layout: 'block' },
+          // Grande capture plein écran (pas une photo) : le petit texte veut de l'agrandissement
+          { width: 2200, psm: PSM.SINGLE_BLOCK, step: 'enlarged', layout: 'block' },
+          { width: 1300, psm: PSM.SINGLE_COLUMN, step: 'reduced', layout: 'column' },
+          { width: 1100, psm: PSM.SINGLE_COLUMN, step: 'reducedMore', layout: 'column' }
+        ]
+      : [
+          { width: 2200, psm: PSM.SINGLE_BLOCK, step: 'enlarged', layout: 'block' },
+          { width: 2200, psm: PSM.SINGLE_COLUMN, step: 'enlarged', layout: 'column' },
+          { width: 1300, psm: PSM.SINGLE_BLOCK, step: 'reduced', layout: 'block' },
+          { width: 1300, psm: PSM.SINGLE_COLUMN, step: 'reduced', layout: 'column' }
+        ]
+    const prepared = new Map<number, Prepared>()
     const passes: OcrLine[][] = []
     let best: MerrickDish[] = []
     try {
       for (const [index, attempt] of attempts.entries()) {
-        onPass(index + 1, attempts.length)
+        onPass(index + 1, attempts.length, attempt)
         onProgress(0)
         // Laisse le navigateur afficher la progression entre deux lectures
         await new Promise(resolve => setTimeout(resolve))
         await worker.setParameters({ tessedit_pageseg_mode: attempt.psm })
-        const prepared = attempt.image()
+        let image = prepared.get(attempt.width)
+        if (!image) prepared.set(attempt.width, image = preprocessImage(bitmap, attempt.width))
         // Sortie TSV (lignes + positions) plutôt que l'arbre complet mots/caractères,
         // bien plus lourd en mémoire sur mobile. Une lecture bloquée (téléphone à court de
         // mémoire…) ne doit pas figer l'import : on garde alors le meilleur résultat obtenu.
-        const result = await withTimeout(worker.recognize(prepared.canvas, {}, { tsv: true, text: false }), PASS_TIMEOUT_MS)
+        const result = await withTimeout(worker.recognize(image.canvas, {}, { tsv: true, text: false }), PASS_TIMEOUT_MS)
         if (!result) break
-        // Positions ramenées à l'image d'origine pour fusionner lectures entières et zoomées
-        passes.push(linesFromTsv(result.data.tsv ?? '').map(l => ({
-          text: l.text,
-          y0: prepared.offsetY + l.y0 / prepared.scale,
-          y1: prepared.offsetY + l.y1 / prepared.scale
-        })))
+        // Positions ramenées à l'image d'origine pour fusionner les lectures à différentes échelles
+        const scale = image.scale
+        passes.push(linesFromTsv(result.data.tsv ?? '').map(l => ({ text: l.text, y0: l.y0 / scale, y1: l.y1 / scale })))
         const merged = parseMerrickMenu(mergeOcrPasses(passes, vocab), vocab)
         if (countIngredients(merged) >= countIngredients(best)) best = merged
         // Deux lectures au minimum : une seule peut paraître complète en ayant mal rangé les plats
@@ -222,74 +228,39 @@ export function isCompleteMenu(dishes: MerrickDish[]): boolean {
   return dishes.length >= 3 && dishes.every(d => d.ingredients.length >= 2)
 }
 
-// Seuil d'Otsu : sépare au mieux encre et parchemin d'après l'histogramme
-function binarize(source: HTMLCanvasElement): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = source.width
-  canvas.height = source.height
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(source, 0, 0)
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const px = img.data
-  const histogram = new Array<number>(256).fill(0)
-  for (let i = 0; i < px.length; i += 4) histogram[px[i]!]!++
-  const total = px.length / 4
-  let sum = 0
-  for (let v = 0; v < 256; v++) sum += v * histogram[v]!
-  let sumB = 0
-  let weightB = 0
-  let best = 0
-  let threshold = 128
-  for (let v = 0; v < 256; v++) {
-    weightB += histogram[v]!
-    if (!weightB) continue
-    const weightF = total - weightB
-    if (!weightF) break
-    sumB += v * histogram[v]!
-    const between = weightB * weightF * (sumB / weightB - (sum - sumB) / weightF) ** 2
-    if (between > best) {
-      best = between
-      threshold = v
-    }
-  }
-  for (let i = 0; i < px.length; i += 4) {
-    const v = px[i]! > threshold ? 255 : 0
-    px[i] = px[i + 1] = px[i + 2] = v
-  }
-  ctx.putImageData(img, 0, 0)
-  return canvas
-}
-
-// Zone de l'image d'origine à lire, en fractions (0-1)
-interface Region { x: number, y: number, w: number, h: number }
-const FULL: Region = { x: 0, y: 0, w: 1, h: 1 }
-// Le joueur tient toujours le parchemin au centre de l'écran : sur une capture plein écran
-// ou une photo d'écran, relire cette zone agrandie rend le petit texte lisible
-const CENTER: Region = { x: 0.22, y: 0.04, w: 0.56, h: 0.92 }
-
 interface Prepared {
   canvas: HTMLCanvasElement
   // Pour ramener les lignes lues aux coordonnées de l'image d'origine
-  offsetY: number
   scale: number
 }
 
-// Met à l'échelle, passe en niveaux de gris et étire le contraste : les captures in-game
-// sont souvent sombres (parchemin à l'ombre) et le texte fin. La zone est agrandie
-// (~2200 px : les petites lignes « 1 POULE » deviennent lisibles) ; les photos de
-// téléphone (souvent ~4000 px) réduites pour garder l'OCR rapide.
-function preprocessImage(bitmap: ImageBitmap, region: Region): Prepared {
-  const sx = Math.round(bitmap.width * region.x)
-  const sy = Math.round(bitmap.height * region.y)
-  const sw = Math.round(bitmap.width * region.w)
-  const sh = Math.round(bitmap.height * region.h)
-  // ~2200 px de large, mais 6 Mpx au plus (photo de téléphone en portrait : mémoire limitée)
-  const scale = Math.min(Math.max(1, 2200 / sw), 2600 / sw, Math.sqrt(6_000_000 / (sw * sh)))
+// Met l'image à la largeur demandée, en niveaux de gris, contraste étiré : les captures
+// in-game sont souvent sombres (parchemin à l'ombre) et le texte fin.
+function preprocessImage(bitmap: ImageBitmap, width: number): Prepared {
+  const scale = width / bitmap.width
+  // Réduction par paliers (au plus ÷2 à chaque fois) avec lissage de qualité : le
+  // redimensionnement par défaut du canvas « saute » des pixels et garde le moiré des
+  // photos d'écran, que la réduction doit justement effacer
+  let source: CanvasImageSource = bitmap
+  let sw = bitmap.width
+  let sh = bitmap.height
+  while (sw / 2 > width) {
+    const step = document.createElement('canvas')
+    step.width = Math.round(sw / 2)
+    step.height = Math.round(sh / 2)
+    const sctx = step.getContext('2d')!
+    sctx.imageSmoothingQuality = 'high'
+    sctx.drawImage(source, 0, 0, step.width, step.height)
+    source = step
+    sw = step.width
+    sh = step.height
+  }
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(sw * scale)
-  canvas.height = Math.round(sh * scale)
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
   const ctx = canvas.getContext('2d')!
-  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
 
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const px = img.data
@@ -315,7 +286,7 @@ function preprocessImage(bitmap: ImageBitmap, region: Region): Prepared {
     px[i] = px[i + 1] = px[i + 2] = v
   }
   ctx.putImageData(img, 0, 0)
-  return { canvas, offsetY: sy, scale }
+  return { canvas, scale }
 }
 
 // Listes ouvertes récemment sur cet appareil (simple confort, pas de compte).

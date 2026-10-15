@@ -746,7 +746,7 @@
         "ocrLanguage": "Game language",
         "ocrButton": "Choose an image",
         "ocrLoading": "Loading the reading engine…",
-        "ocrRunning": "Reading the image ({pass}/{total})… {progress} %",
+        "ocrRunning": "Reading {pass}/{total} ({step})… {progress} %",
         "ocrDone": "{count} ingredient(s) recognized, check the list below.",
         "ocrNothing": "No ingredient recognized. Try a sharper screenshot, or fill in the list by hand.",
         "ocrError": "Reading the image failed.",
@@ -810,7 +810,19 @@
         "trophyHint": "Fish caught in trophy size: cooking takes 90 s. Visible to the whole crew.",
         "ocrPartial": "{count} ingredient(s) recognized: some are probably missing (a menu has 3 dishes of 2 ingredients). Complete the list below.",
         "dragHint": "Drag to move (within this dish or to another one)",
-        "dropHere": "Drop an ingredient here"
+        "dropHere": "Drop an ingredient here",
+        "browseFiles": "Browse files",
+        "notAnImage": "This file is not an image.",
+        "ocrSteps": {
+          "enlarged": "enlarged image",
+          "reduced": "image reduced against moiré",
+          "reducedMore": "image reduced further",
+          "medium": "medium-size image"
+        },
+        "ocrLayouts": {
+          "block": "block reading",
+          "column": "line-by-line reading"
+        }
       }
     }
   }

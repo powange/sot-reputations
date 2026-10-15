@@ -193,7 +193,10 @@ function computeMatch(text: string, vocab: MerrickVocabEntry[], allowWindows: bo
         if (i === 0 && j === words.length) continue
         const found = bestEntry(words.slice(i, j).join(' '), vocab)
         if (!found || found.sim < MATCH_THRESHOLD) continue
-        const onlyNoiseAround = [...words.slice(0, i), ...words.slice(j)].every(w => w.length < 3)
+        // Bruit autour : au plus 3 lettres en tout (« v | POULE | PR ») ; un titre abîmé
+        // (« CU RY DE DÉFERLANTE ») en laisse davantage et n'est donc pas pris pour un ingrédient
+        const outside = [...words.slice(0, i), ...words.slice(j)]
+        const onlyNoiseAround = outside.every(w => w.length < 3) && outside.join('').length <= 3
         const closeVariant = !!found.entry.item.variant && found.sim >= 0.8
         if (!onlyNoiseAround && !closeVariant) continue
         // À score égal, la variété précise (libellé plus long) l'emporte sur l'espèce seule
@@ -380,7 +383,41 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
     }
   }
 
-  return dishes.filter(d => d.ingredients.length > 0).slice(0, MERRICK_LIMITS.dishes)
+  return rebalanceMenu(dishes.filter(d => d.ingredients.length > 0).slice(0, MERRICK_LIMITS.dishes))
+}
+
+// Un menu de Merrick compte toujours 3 plats de 2 ingrédients. Sur une photo d'écran, la
+// fusion de lectures à plusieurs échelles peut produire des doublons pas tout à fait
+// voisins, et les petits en-têtes gris (« PLAT PRINCIPAL »…) sont souvent illisibles, ce qui
+// mélange les plats. Les lignes restent dans l'ordre du parchemin, donc :
+//  1. un ingrédient de la même espèce que l'un des deux précédents, variété compatible
+//     (identique ou non précisée), est un doublon : fusionné en gardant la variété précise ;
+//  2. avec alors exactement 6 ingrédients mal répartis, on les redistribue 2 par 2.
+function rebalanceMenu(dishes: MerrickDish[]): MerrickDish[] {
+  const kept: MerrickIngredient[] = []
+  for (const dish of dishes) {
+    dish.ingredients = dish.ingredients.filter((ing) => {
+      const twin = kept.slice(-2).find(k => k.type === ing.type && k.key === ing.key
+        && (!k.variant || !ing.variant || k.variant === ing.variant))
+      if (!twin) {
+        kept.push(ing)
+        return true
+      }
+      twin.variant ??= ing.variant
+      twin.quantity = Math.max(twin.quantity, ing.quantity)
+      return false
+    })
+  }
+  dishes = dishes.filter(d => d.ingredients.length > 0)
+  const isComplete = dishes.length === 3 && dishes.every(d => d.ingredients.length === 2)
+  if (kept.length !== 6 || isComplete) return dishes
+  // Titres lisibles conservés dans l'ordre ; s'il en manque, le plat reste sans titre
+  const names = dishes.map(d => d.name).filter(Boolean)
+  return MERRICK_COURSES.map((course, i) => ({
+    course,
+    name: dishes.length === 3 ? dishes[i]!.name : names.length === 3 ? names[i]! : '',
+    ingredients: kept.slice(i * 2, i * 2 + 2)
+  }))
 }
 
 // --- Fusion de plusieurs lectures OCR ---

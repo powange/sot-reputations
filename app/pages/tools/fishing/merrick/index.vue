@@ -24,15 +24,22 @@ const ocrLanguages: Array<{ label: string, value: MerrickOcrLanguage }> = [
 const ocrLang = ref<MerrickOcrLanguage>(locale.value === 'en' ? 'eng' : locale.value === 'es' ? 'spa' : 'fra')
 const ocrRunning = ref(false)
 const ocrProgress = ref<number | null>(null)
-const ocrPass = ref({ pass: 1, total: 1 })
+const ocrPass = ref({ pass: 1, total: 1, step: '' })
 const fileInput = ref<HTMLInputElement | null>(null)
 const cameraInput = ref<HTMLInputElement | null>(null)
+const browseInput = ref<HTMLInputElement | null>(null)
 
 function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (file) runOcr(file)
+  if (!file) return
+  // « Parcourir les fichiers » accepte tout type (voir le champ) : on vérifie ici
+  if (!file.type.startsWith('image/')) {
+    toast.add({ title: t('tools.fishing.merrick.notAnImage'), color: 'warning' })
+    return
+  }
+  runOcr(file)
 }
 
 // Capture d'écran dans le presse-papier : Ctrl+V n'importe où sur la page…
@@ -69,8 +76,12 @@ async function runOcr(file: File) {
   try {
     const result = await recognizeMerrickMenu(file, ocrLang.value, (p) => {
       ocrProgress.value = p
-    }, (pass, total) => {
-      ocrPass.value = { pass, total }
+    }, (pass, total, attempt) => {
+      ocrPass.value = {
+        pass,
+        total,
+        step: `${t(`tools.fishing.merrick.ocrSteps.${attempt.step}`)}, ${t(`tools.fishing.merrick.ocrLayouts.${attempt.layout}`)}`
+      }
     })
     const count = result.reduce((n, d) => n + d.ingredients.length, 0)
     if (count === 0) {
@@ -189,6 +200,16 @@ async function create() {
           class="hidden pointer-coarse:inline-flex"
           @click="cameraInput?.click()"
         />
+        <!-- Sur mobile, « Choisir une image » ouvre le sélecteur de photos d'Android (Google
+             Photos) ; ce bouton ouvre le gestionnaire de fichiers (dossiers du téléphone) -->
+        <UButton
+          icon="i-lucide-folder-open"
+          variant="soft"
+          :label="$t('tools.fishing.merrick.browseFiles')"
+          :disabled="ocrRunning"
+          class="hidden pointer-coarse:inline-flex"
+          @click="browseInput?.click()"
+        />
         <UButton
           icon="i-lucide-clipboard-paste"
           variant="soft"
@@ -200,6 +221,14 @@ async function create() {
           ref="fileInput"
           type="file"
           accept="image/*"
+          class="hidden"
+          @change="onFile"
+        >
+        <!-- Sans filtre de type : Chrome Android n'ouvre le sélecteur de photos que si seules
+             des images sont demandées ; ici il ouvre le gestionnaire de fichiers classique -->
+        <input
+          ref="browseInput"
+          type="file"
           class="hidden"
           @change="onFile"
         >

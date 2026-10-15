@@ -746,7 +746,7 @@
         "ocrLanguage": "Idioma del juego",
         "ocrButton": "Elegir una imagen",
         "ocrLoading": "Cargando el motor de lectura…",
-        "ocrRunning": "Leyendo la imagen ({pass}/{total})… {progress} %",
+        "ocrRunning": "Lectura {pass}/{total} ({step})… {progress} %",
         "ocrDone": "{count} ingrediente(s) reconocido(s), revisa la lista de abajo.",
         "ocrNothing": "No se reconoció ningún ingrediente. Prueba con una captura más nítida o rellena la lista a mano.",
         "ocrError": "La lectura de la imagen falló.",
@@ -810,7 +810,19 @@
         "trophyHint": "Pez de tamaño trofeo: la cocción pasa a 90 s. Visible para toda la tripulación.",
         "ocrPartial": "{count} ingrediente(s) reconocido(s): probablemente falten algunos (un menú tiene 3 platos de 2 ingredientes). Completa la lista de abajo.",
         "dragHint": "Arrastra para mover (en este plato o a otro)",
-        "dropHere": "Suelta un ingrediente aquí"
+        "dropHere": "Suelta un ingrediente aquí",
+        "browseFiles": "Explorar archivos",
+        "notAnImage": "Este archivo no es una imagen.",
+        "ocrSteps": {
+          "enlarged": "imagen ampliada",
+          "reduced": "imagen reducida contra el muaré",
+          "reducedMore": "imagen aún más reducida",
+          "medium": "imagen de tamaño medio"
+        },
+        "ocrLayouts": {
+          "block": "lectura en bloque",
+          "column": "lectura línea por línea"
+        }
       }
     }
   }
