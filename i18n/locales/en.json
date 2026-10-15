@@ -746,7 +746,7 @@
         "ocrLanguage": "Game language",
         "ocrButton": "Choose an image",
         "ocrLoading": "Loading the reading engine…",
-        "ocrRunning": "Reading the image… {progress} %",
+        "ocrRunning": "Reading the image ({pass}/{total})… {progress} %",
         "ocrDone": "{count} ingredient(s) recognized, check the list below.",
         "ocrNothing": "No ingredient recognized. Try a sharper screenshot, or fill in the list by hand.",
         "ocrError": "Reading the image failed.",
@@ -808,7 +808,9 @@
         "cookTimerHint": "Start it when you put the food on the fire: the whole crew sees it cook, with a signal when it's cooked, then if it burns.",
         "trophy": "Trophy",
         "trophyHint": "Fish caught in trophy size: cooking takes 90 s. Visible to the whole crew.",
-        "ocrPartial": "{count} ingredient(s) recognized: some are probably missing (a menu has 3 dishes of 2 ingredients). Complete the list below."
+        "ocrPartial": "{count} ingredient(s) recognized: some are probably missing (a menu has 3 dishes of 2 ingredients). Complete the list below.",
+        "dragHint": "Drag to move (within this dish or to another one)",
+        "dropHere": "Drop an ingredient here"
       }
     }
   }

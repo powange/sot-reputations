@@ -1,3 +1,5 @@
+import type { PSM as TesseractPSM } from 'tesseract.js'
+
 // Libellés, OCR et listes récentes des quêtes de Merrick (/tools/fishing/merrick).
 
 // Présentation commune au guide de pêche et aux quêtes
@@ -101,7 +103,9 @@ export type MerrickOcrLanguage = 'fra' | 'eng' | 'spa'
 export async function recognizeMerrickMenu(
   file: File,
   lang: MerrickOcrLanguage,
-  onProgress: (progress: number | null) => void
+  onProgress: (progress: number | null) => void,
+  // Lecture n sur total (plusieurs lectures fusionnées)
+  onPass: (pass: number, total: number) => void = () => {}
 ): Promise<MerrickDish[]> {
   const [{ createWorker, PSM }, fr, en, es] = await Promise.all([
     import('tesseract.js'),
@@ -118,22 +122,30 @@ export async function recognizeMerrickMenu(
     }
   })
   try {
-    // 1re lecture : niveaux de gris contrastés, découpage « colonne de texte de tailles
-    // variables » (PSM 4) — nettement plus fiable que l'automatique sur le parchemin.
-    // Si le menu semble incomplet (un menu de Merrick a 3 plats de 2 ingrédients),
-    // 2e lecture en noir et blanc pur, découpage en bloc uniforme (PSM 6) ; on garde la
-    // plus complète.
+    // Selon le cadrage, chaque mode de découpage de Tesseract rate des lignes différentes :
+    // on cumule les lectures (colonne de tailles variables, bloc uniforme, puis automatique
+    // et noir et blanc en secours) et on les fusionne ligne par ligne, jusqu'à obtenir un
+    // menu complet (3 plats de 2 ingrédients).
     const gray = await preprocessImage(file)
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_COLUMN })
-    const first = parseMerrickMenu((await worker.recognize(gray)).data.text.split('\n'), vocab)
-    if (isCompleteMenu(first)) return first
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK })
-    const second = parseMerrickMenu((await worker.recognize(binarize(gray))).data.text.split('\n'), vocab)
-    if (countIngredients(second) <= countIngredients(first)) return first
-    // Le noir et blanc perd souvent les « (CUIT) / (CRU) » gris clair : on reprend ceux de la 1re lecture
-    const firstStates = new Map(first.flatMap(d => d.ingredients).map(i => [merrickItemId(i), i.state]))
-    for (const ing of second.flatMap(d => d.ingredients)) ing.state = firstStates.get(merrickItemId(ing)) ?? ing.state
-    return second
+    const attempts: Array<{ psm: TesseractPSM, image: () => HTMLCanvasElement }> = [
+      { psm: PSM.SINGLE_COLUMN, image: () => gray },
+      { psm: PSM.SINGLE_BLOCK, image: () => gray },
+      { psm: PSM.AUTO, image: () => gray },
+      { psm: PSM.SINGLE_BLOCK, image: () => binarize(gray) }
+    ]
+    const passes: OcrLine[][] = []
+    let best: MerrickDish[] = []
+    for (const [index, attempt] of attempts.entries()) {
+      onPass(index + 1, attempts.length)
+      await worker.setParameters({ tessedit_pageseg_mode: attempt.psm })
+      const { data } = await worker.recognize(attempt.image(), {}, { blocks: true, text: true })
+      passes.push((data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines.map(l => ({ text: l.text, y0: l.bbox.y0, y1: l.bbox.y1 })))))
+      const merged = parseMerrickMenu(mergeOcrPasses(passes, vocab), vocab)
+      if (countIngredients(merged) >= countIngredients(best)) best = merged
+      // Deux lectures au minimum : une seule peut paraître complète en ayant mal rangé les plats
+      if (index >= 1 && isCompleteMenu(best)) break
+    }
+    return best
   } finally {
     await worker.terminate()
   }

@@ -747,7 +747,7 @@
         "ocrLanguage": "Langue du jeu",
         "ocrButton": "Choisir une image",
         "ocrLoading": "Chargement du moteur de lecture…",
-        "ocrRunning": "Lecture de l'image… {progress} %",
+        "ocrRunning": "Lecture de l'image ({pass}/{total})… {progress} %",
         "ocrDone": "{count} ingrédient(s) reconnu(s), vérifiez la liste ci-dessous.",
         "ocrNothing": "Aucun ingrédient reconnu. Essayez une capture plus nette, ou remplissez la liste à la main.",
         "ocrError": "La lecture de l'image a échoué.",
@@ -809,7 +809,9 @@
         "cookTimerHint": "Lancez-le en posant l'aliment sur le feu : tout l'équipage voit la cuisson avancer, avec un signal quand c'est cuit puis s'il brûle.",
         "trophy": "Trophée",
         "trophyHint": "Poisson récupéré en taille trophée : la cuisson passe à 90 s. Visible par tout l'équipage.",
-        "ocrPartial": "{count} ingrédient(s) reconnu(s) : il en manque sans doute (un menu compte 3 plats de 2 ingrédients). Complétez la liste ci-dessous."
+        "ocrPartial": "{count} ingrédient(s) reconnu(s) : il en manque sans doute (un menu compte 3 plats de 2 ingrédients). Complétez la liste ci-dessous.",
+        "dragHint": "Glisser pour déplacer (dans ce plat ou vers un autre)",
+        "dropHere": "Déposez un ingrédient ici"
       }
     }
   }

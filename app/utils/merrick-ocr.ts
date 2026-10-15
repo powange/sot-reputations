@@ -312,6 +312,16 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
       const read = (text === trailing.text ? null : split.quantity) ?? leadingQuantity ?? pendingQuantity
       const quantity = looksPlural(text, match.text) ? Math.max(2, read ?? 2) : 1
       pendingQuantity = null
+      // Même ligne lue deux fois (fusion de lectures) : un menu ne liste jamais deux fois
+      // de suite le même ingrédient, on garde la variété la plus précise
+      const last = dish.ingredients.at(-1)
+      if (last && last.type === match.item.type && last.key === match.item.key
+        && (!last.variant || !match.item.variant || last.variant === match.item.variant)) {
+        last.variant ??= match.item.variant
+        last.quantity = Math.max(last.quantity, quantity)
+        if (trailing.state) last.state = trailing.state
+        continue
+      }
       dish.ingredients.push({ ...match.item, state: trailing.state ?? 'cooked', quantity })
       continue
     }
@@ -335,4 +345,60 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
   }
 
   return dishes.filter(d => d.ingredients.length > 0).slice(0, MERRICK_LIMITS.dishes)
+}
+
+// --- Fusion de plusieurs lectures OCR ---
+// Selon le cadrage, chaque mode de Tesseract rate des lignes différentes (aucun réglage
+// ne lit tout sur toutes les captures). On fusionne donc plusieurs lectures ligne par
+// ligne : les lignes à la même hauteur sont regroupées et on garde la plus « lisible ».
+
+export interface OcrLine {
+  text: string
+  y0: number
+  y1: number
+}
+
+// Intérêt d'une ligne lue : ingrédient reconnu > en-tête > état > titre lisible > bruit
+function lineScore(raw: string, vocab: MerrickVocabEntry[]): number {
+  const { core } = trimNoise(normalizeOcr(raw))
+  if (core.replace(/[^a-z]/g, '').length < 2) return 0
+  const trailing = splitTrailingState(core)
+  const item = bestEntry(splitQuantity(trailing.text).rest, vocab)
+  // Bonus à la variété précise : « HOULE CHAR SONNEUSE » (94 %) vaut mieux que « HOULE TT » (espèce, 100 %)
+  if (item && item.sim >= MATCH_THRESHOLD) return 3 + item.sim + (item.entry.item.variant ? 0.1 : 0)
+  if (courseHeader(core)) return 2.5
+  if (core.split(' ').length === 1 && stateOf(core)) return 2
+  const name = cleanDishName(raw)
+  return name ? 1 + Math.min(name.length, 60) / 100 : 0.1
+}
+
+export function mergeOcrPasses(passes: OcrLine[][], vocab: MerrickVocabEntry[]): string[] {
+  const lines = passes.flatMap((pass, index) => pass.map(l => ({ ...l, pass: index })))
+    .filter(l => l.text.trim() && l.y1 > l.y0)
+    .sort((a, b) => (a.y0 + a.y1) - (b.y0 + b.y1))
+  // Chaque groupe garde la boîte de sa 1re ligne (il ne grossit pas, sinon il avalerait
+  // les lignes voisines) et au plus une ligne par lecture : deux lignes d'une même
+  // lecture sont forcément deux lignes différentes du parchemin.
+  const clusters: { y0: number, y1: number, lines: (OcrLine & { pass: number })[] }[] = []
+  for (const line of lines) {
+    const height = line.y1 - line.y0
+    const cluster = clusters.findLast(c => !c.lines.some(l => l.pass === line.pass)
+      && Math.min(c.y1, line.y1) - Math.max(c.y0, line.y0) > 0.5 * Math.min(c.y1 - c.y0, height))
+    if (cluster) cluster.lines.push(line)
+    else clusters.push({ y0: line.y0, y1: line.y1, lines: [line] })
+  }
+  return clusters
+    .sort((a, b) => (a.y0 + a.y1) - (b.y0 + b.y1))
+    .map((c) => {
+      let best = c.lines[0]!
+      let bestScore = -1
+      for (const l of c.lines) {
+        const score = lineScore(l.text, vocab)
+        if (score > bestScore) {
+          best = l
+          bestScore = score
+        }
+      }
+      return best.text
+    })
 }

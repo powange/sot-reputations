@@ -24,6 +24,7 @@ const ocrLanguages: Array<{ label: string, value: MerrickOcrLanguage }> = [
 const ocrLang = ref<MerrickOcrLanguage>(locale.value === 'en' ? 'eng' : locale.value === 'es' ? 'spa' : 'fra')
 const ocrRunning = ref(false)
 const ocrProgress = ref<number | null>(null)
+const ocrPass = ref({ pass: 1, total: 1 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const cameraInput = ref<HTMLInputElement | null>(null)
 
@@ -68,6 +69,8 @@ async function runOcr(file: File) {
   try {
     const result = await recognizeMerrickMenu(file, ocrLang.value, (p) => {
       ocrProgress.value = p
+    }, (pass, total) => {
+      ocrPass.value = { pass, total }
     })
     const count = result.reduce((n, d) => n + d.ingredients.length, 0)
     if (count === 0) {
@@ -212,7 +215,7 @@ async function create() {
           v-if="ocrRunning"
           class="text-sm text-muted"
         >
-          {{ ocrProgress === null ? $t('tools.fishing.merrick.ocrLoading') : $t('tools.fishing.merrick.ocrRunning', { progress: ocrProgress }) }}
+          {{ ocrProgress === null ? $t('tools.fishing.merrick.ocrLoading') : $t('tools.fishing.merrick.ocrRunning', { progress: ocrProgress, ...ocrPass }) }}
         </span>
       </div>
     </UCard>
