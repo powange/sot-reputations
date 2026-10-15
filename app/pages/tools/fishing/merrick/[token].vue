@@ -4,6 +4,7 @@ const toast = useToast()
 const route = useRoute()
 const token = route.params.token as string
 const { itemLabel } = useMerrickLabels()
+const cooking = useCookingTimers()
 const { remember, forget } = useMerrickRecent()
 
 const { data: quest, error, refresh } = await useFetch<MerrickQuest>(`/api/merrick-quests/${token}`, {
@@ -58,6 +59,24 @@ const remaining = computed(() => {
     else map.set(k, { ing, count: left })
   }
   return [...map.values()]
+})
+
+// --- Minuteurs de cuisson (locaux à cet appareil, communs avec le guide) ---
+function timerKey(ing: MerrickIngredient) {
+  return `merrick:${token}:${ing.id}`
+}
+
+function startCooking(ing: MerrickIngredient) {
+  const food = cookingFoodFor(ing)
+  if (food) cooking.start(food, { label: itemLabel(ing), image: merrickItemImage(ing), key: timerKey(ing) })
+}
+
+// Un ingrédient entièrement livré n'a plus besoin de son minuteur
+watch(() => ingredients.value.filter(i => i.delivered === i.quantity).map(timerKey), (keys) => {
+  for (const key of keys) {
+    const timer = cooking.timerFor(key)
+    if (timer) cooking.remove(timer)
+  }
 })
 
 // --- Cocher / décocher (optimiste, confirmé par le serveur et diffusé aux autres) ---
@@ -430,13 +449,51 @@ async function saveEdit() {
                       :label="$t(`tools.fishing.bait.${fishInfo.get(ing.id!)!.bait}`)"
                     />
                   </div>
+                  <!-- Minuteur de cuisson en cours pour cet ingrédient -->
+                  <div
+                    v-if="cooking.timerFor(timerKey(ing))"
+                    class="flex items-center gap-1 mt-2 max-w-sm"
+                  >
+                    <CookingTimerBar
+                      :timer="cooking.timerFor(timerKey(ing))!"
+                      class="flex-1"
+                    />
+                    <UButton
+                      icon="i-lucide-rotate-ccw"
+                      size="xs"
+                      variant="ghost"
+                      color="neutral"
+                      :aria-label="$t('tools.fishing.cooking.timers.restart')"
+                      @click="cooking.restart(cooking.timerFor(timerKey(ing))!)"
+                    />
+                    <UButton
+                      icon="i-lucide-x"
+                      size="xs"
+                      variant="ghost"
+                      color="neutral"
+                      :aria-label="$t('tools.fishing.cooking.timers.remove')"
+                      @click="cooking.remove(cooking.timerFor(timerKey(ing))!)"
+                    />
+                  </div>
                 </div>
-                <UBadge
-                  :icon="ing.state === 'cooked' ? 'i-lucide-flame' : 'i-lucide-snowflake'"
-                  :color="ing.state === 'cooked' ? 'warning' : 'info'"
-                  variant="subtle"
-                  :label="$t(`tools.fishing.merrick.state.${ing.state}`)"
-                />
+                <div class="flex flex-col items-end gap-1 shrink-0">
+                  <UBadge
+                    :icon="ing.state === 'cooked' ? 'i-lucide-flame' : 'i-lucide-snowflake'"
+                    :color="ing.state === 'cooked' ? 'warning' : 'info'"
+                    variant="subtle"
+                    :label="$t(`tools.fishing.merrick.state.${ing.state}`)"
+                  />
+                  <UButton
+                    v-if="cookingFoodFor(ing) && ing.delivered !== ing.quantity && !cooking.timerFor(timerKey(ing))"
+                    icon="i-lucide-timer"
+                    size="xs"
+                    variant="soft"
+                    :label="$t('tools.fishing.merrick.cookTimer', { seconds: COOKING_TIMES[cookingFoodFor(ing)!].cooked })"
+                    :title="$t('tools.fishing.merrick.cookTimerHint')"
+                    :disabled="cooking.timers.value.length >= MAX_COOKING_TIMERS"
+                    @click="startCooking(ing)"
+                  />
+                </div>
               </li>
             </ul>
           </UCard>

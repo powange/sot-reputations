@@ -803,7 +803,9 @@
         "deleteConfirm": "¿Eliminar definitivamente esta lista? El enlace dejará de funcionar para todos.",
         "deleted": "Lista eliminada.",
         "deletedByOther": "Un miembro de la tripulación ha eliminado esta lista.",
-        "takePhoto": "Hacer una foto"
+        "takePhoto": "Hacer una foto",
+        "cookTimer": "Cocinar · {seconds} s",
+        "cookTimerHint": "Inícialo al poner la comida al fuego: suena una señal cuando está cocinada y otra si se quema."
       }
     }
   }

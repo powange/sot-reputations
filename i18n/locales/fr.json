@@ -804,7 +804,9 @@
         "deleteConfirm": "Supprimer définitivement cette liste ? Le lien ne fonctionnera plus pour personne.",
         "deleted": "Liste supprimée.",
         "deletedByOther": "Cette liste a été supprimée par un membre de l'équipage.",
-        "takePhoto": "Prendre une photo"
+        "takePhoto": "Prendre une photo",
+        "cookTimer": "Cuire · {seconds} s",
+        "cookTimerHint": "Lancez-le en posant l'aliment sur le feu : un signal sonne quand c'est cuit, puis s'il brûle."
       }
     }
   }

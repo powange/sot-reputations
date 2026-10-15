@@ -803,7 +803,9 @@
         "deleteConfirm": "Permanently delete this list? The link will stop working for everyone.",
         "deleted": "List deleted.",
         "deletedByOther": "This list was deleted by a crew member.",
-        "takePhoto": "Take a photo"
+        "takePhoto": "Take a photo",
+        "cookTimer": "Cook · {seconds} s",
+        "cookTimerHint": "Start it when you put the food on the fire: a signal plays when it's cooked, then if it burns."
       }
     }
   }
