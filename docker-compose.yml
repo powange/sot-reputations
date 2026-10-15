@@ -1,8 +1,11 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Image construite par GitHub Actions (.github/workflows/publier-image.yml) et publiée sur
+    # GHCR : le serveur ne construit plus rien, il télécharge. pull_policy: always -> chaque
+    # redéploiement (webhook Portainer) récupère la dernière :main. Pour revenir en arrière,
+    # remplacer :main par :sha-<commit>.
+    image: ghcr.io/powange/sot-reputations:main
+    pull_policy: always
     container_name: sot-reputations
     restart: unless-stopped
     ports:

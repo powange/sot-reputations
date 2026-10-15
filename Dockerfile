@@ -19,6 +19,9 @@ RUN npm run build
 # Production image
 FROM base AS runner
 
+# Relie l'image publiée sur GHCR (workflow publier-image) au dépôt GitHub
+LABEL org.opencontainers.image.source=https://github.com/powange/sot-reputations
+
 ENV NODE_ENV=production
 
 # Setup: wget for healthcheck, user, data folder

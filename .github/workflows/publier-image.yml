@@ -1,0 +1,69 @@
+name: Publier l'image
+
+# Construit l'image de production et la publie sur GHCR à chaque push sur main.
+#
+# Avant, Portainer construisait l'image sur le serveur de production à chaque déploiement
+# (~4 min, et le build Nuxt réclame plus de 2 Go de mémoire). Désormais le serveur ne fait
+# que télécharger l'image déjà construite (docker-compose.yml : image + pull_policy: always).
+#
+# Ce workflow ne DÉPLOIE rien : il publie. Le déploiement reste une décision explicite
+# (/deploy), qui attend que l'image du commit soit publiée puis appelle le webhook Portainer.
+
+on:
+  push:
+    branches: [main]
+  # Republier sans nouveau commit (panne de registre, image perdue…)
+  workflow_dispatch:
+
+# Pas d'annulation : un run interrompu laisserait :main sur une image plus ancienne que main
+concurrency:
+  group: publier-image
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publier-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Se connecter à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Préparer Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Deux étiquettes : :main est celle que la stack Portainer télécharge, :sha-<commit>
+      # permet de revenir à un build précis sans rien reconstruire.
+      - name: Construire et publier
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: runner
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:main
+            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Rappeler ce qui vient d'être publié
+        run: |
+          echo "Image publiée :"
+          echo "  ghcr.io/${{ github.repository }}:main"
+          echo "  ghcr.io/${{ github.repository }}:sha-${{ github.sha }}"
+          echo ""
+          echo "Rien n'est déployé pour autant : lancer /deploy (webhook Portainer) pour mettre en ligne."
