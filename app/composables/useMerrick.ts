@@ -123,34 +123,62 @@ export async function recognizeMerrickMenu(
   })
   try {
     // Selon le cadrage, chaque mode de découpage de Tesseract rate des lignes différentes :
-    // on cumule les lectures (colonne de tailles variables, bloc uniforme, puis automatique
-    // et noir et blanc en secours) et on les fusionne ligne par ligne, jusqu'à obtenir un
+    // on cumule les lectures (colonne de tailles variables, bloc uniforme, puis les mêmes
+    // en noir et blanc en secours) et on les fusionne ligne par ligne, jusqu'à obtenir un
     // menu complet (3 plats de 2 ingrédients).
-    const gray = await preprocessImage(file)
-    const attempts: Array<{ psm: TesseractPSM, image: () => HTMLCanvasElement }> = [
-      { psm: PSM.SINGLE_COLUMN, image: () => gray },
-      { psm: PSM.SINGLE_BLOCK, image: () => gray },
-      { psm: PSM.AUTO, image: () => gray },
-      { psm: PSM.SINGLE_BLOCK, image: () => binarize(gray) }
+    // from-image : applique l'orientation EXIF des photos prises en portrait
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const full = preprocessImage(bitmap, FULL)
+    // Image déjà recadrée sur le parchemin (plus haute que large) : pas de zone centrale
+    const wide = bitmap.width > bitmap.height * 0.9
+    let center: Prepared | null = null
+    const zoom = () => center ??= preprocessImage(bitmap, CENTER)
+    const bw = (p: Prepared): Prepared => ({ ...p, canvas: binarize(p.canvas) })
+    // Pas de découpage automatique (PSM 3) : le plus lent sur une photo et le moins fiable
+    // dans nos tests. Secours : la zone centrale agrandie (capture plein écran, photo
+    // d'écran), puis le noir et blanc.
+    const attempts: Array<{ psm: TesseractPSM, image: () => Prepared }> = [
+      { psm: PSM.SINGLE_COLUMN, image: () => full },
+      { psm: PSM.SINGLE_BLOCK, image: () => full },
+      ...(wide
+        ? [
+            { psm: PSM.SINGLE_BLOCK, image: zoom },
+            { psm: PSM.SINGLE_COLUMN, image: zoom },
+            { psm: PSM.SINGLE_BLOCK, image: () => bw(zoom()) }
+          ]
+        : [
+            { psm: PSM.SINGLE_BLOCK, image: () => bw(full) },
+            { psm: PSM.SINGLE_COLUMN, image: () => bw(full) }
+          ])
     ]
     const passes: OcrLine[][] = []
     let best: MerrickDish[] = []
-    for (const [index, attempt] of attempts.entries()) {
-      onPass(index + 1, attempts.length)
-      onProgress(0)
-      // Laisse le navigateur afficher la progression entre deux lectures
-      await new Promise(resolve => setTimeout(resolve))
-      await worker.setParameters({ tessedit_pageseg_mode: attempt.psm })
-      // Sortie TSV (lignes + positions) plutôt que l'arbre complet mots/caractères,
-      // bien plus lourd en mémoire sur mobile. Une lecture bloquée (téléphone à court de
-      // mémoire…) ne doit pas figer l'import : on garde alors le meilleur résultat obtenu.
-      const result = await withTimeout(worker.recognize(attempt.image(), {}, { tsv: true, text: false }), PASS_TIMEOUT_MS)
-      if (!result) break
-      passes.push(linesFromTsv(result.data.tsv ?? ''))
-      const merged = parseMerrickMenu(mergeOcrPasses(passes, vocab), vocab)
-      if (countIngredients(merged) >= countIngredients(best)) best = merged
-      // Deux lectures au minimum : une seule peut paraître complète en ayant mal rangé les plats
-      if (index >= 1 && isCompleteMenu(best)) break
+    try {
+      for (const [index, attempt] of attempts.entries()) {
+        onPass(index + 1, attempts.length)
+        onProgress(0)
+        // Laisse le navigateur afficher la progression entre deux lectures
+        await new Promise(resolve => setTimeout(resolve))
+        await worker.setParameters({ tessedit_pageseg_mode: attempt.psm })
+        const prepared = attempt.image()
+        // Sortie TSV (lignes + positions) plutôt que l'arbre complet mots/caractères,
+        // bien plus lourd en mémoire sur mobile. Une lecture bloquée (téléphone à court de
+        // mémoire…) ne doit pas figer l'import : on garde alors le meilleur résultat obtenu.
+        const result = await withTimeout(worker.recognize(prepared.canvas, {}, { tsv: true, text: false }), PASS_TIMEOUT_MS)
+        if (!result) break
+        // Positions ramenées à l'image d'origine pour fusionner lectures entières et zoomées
+        passes.push(linesFromTsv(result.data.tsv ?? '').map(l => ({
+          text: l.text,
+          y0: prepared.offsetY + l.y0 / prepared.scale,
+          y1: prepared.offsetY + l.y1 / prepared.scale
+        })))
+        const merged = parseMerrickMenu(mergeOcrPasses(passes, vocab), vocab)
+        if (countIngredients(merged) >= countIngredients(best)) best = merged
+        // Deux lectures au minimum : une seule peut paraître complète en ayant mal rangé les plats
+        if (index >= 1 && isCompleteMenu(best)) break
+      }
+    } finally {
+      bitmap.close()
     }
     return best
   } finally {
@@ -232,21 +260,36 @@ function binarize(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas
 }
 
+// Zone de l'image d'origine à lire, en fractions (0-1)
+interface Region { x: number, y: number, w: number, h: number }
+const FULL: Region = { x: 0, y: 0, w: 1, h: 1 }
+// Le joueur tient toujours le parchemin au centre de l'écran : sur une capture plein écran
+// ou une photo d'écran, relire cette zone agrandie rend le petit texte lisible
+const CENTER: Region = { x: 0.22, y: 0.04, w: 0.56, h: 0.92 }
+
+interface Prepared {
+  canvas: HTMLCanvasElement
+  // Pour ramener les lignes lues aux coordonnées de l'image d'origine
+  offsetY: number
+  scale: number
+}
+
 // Met à l'échelle, passe en niveaux de gris et étire le contraste : les captures in-game
-// sont souvent sombres (parchemin à l'ombre) et le texte fin. Les captures sont agrandies
+// sont souvent sombres (parchemin à l'ombre) et le texte fin. La zone est agrandie
 // (~2200 px : les petites lignes « 1 POULE » deviennent lisibles) ; les photos de
 // téléphone (souvent ~4000 px) réduites pour garder l'OCR rapide.
-async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
-  // from-image : applique l'orientation EXIF des photos prises en portrait
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+function preprocessImage(bitmap: ImageBitmap, region: Region): Prepared {
+  const sx = Math.round(bitmap.width * region.x)
+  const sy = Math.round(bitmap.height * region.y)
+  const sw = Math.round(bitmap.width * region.w)
+  const sh = Math.round(bitmap.height * region.h)
   // ~2200 px de large, mais 6 Mpx au plus (photo de téléphone en portrait : mémoire limitée)
-  const scale = Math.min(Math.max(1, 2200 / bitmap.width), 2600 / bitmap.width, Math.sqrt(6_000_000 / (bitmap.width * bitmap.height)))
+  const scale = Math.min(Math.max(1, 2200 / sw), 2600 / sw, Math.sqrt(6_000_000 / (sw * sh)))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
+  canvas.width = Math.round(sw * scale)
+  canvas.height = Math.round(sh * scale)
   const ctx = canvas.getContext('2d')!
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
+  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
 
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const px = img.data
@@ -272,7 +315,7 @@ async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
     px[i] = px[i + 1] = px[i + 2] = v
   }
   ctx.putImageData(img, 0, 0)
-  return canvas
+  return { canvas, offsetY: sy, scale }
 }
 
 // Listes ouvertes récemment sur cet appareil (simple confort, pas de compte).

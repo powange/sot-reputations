@@ -24,7 +24,7 @@ interface LocaleMessages {
 const COURSE_WORDS: Record<MerrickCourse, string[]> = {
   starter: ['entree', 'starter', 'entrante'],
   main: ['plat principal', 'main course', 'plato principal'],
-  special: ['plat du jour', 'special', 'dish of the day', 'plato del dia']
+  special: ['plat du jour', 'special', 'todays special', 'today s special', 'dish of the day', 'plato del dia']
 }
 const MENU_TITLE_WORDS = ['menu de merrick', 'merrick s menu', 'merricks menu']
 
@@ -160,7 +160,21 @@ function bestEntry(text: string, vocab: MerrickVocabEntry[]): { entry: MerrickVo
 // n'est que du bruit (« v | POULE | PR ») — ou si c'est un nom de variété très proche
 // (« eee M DE FEB ANTE CORALLIENNE »). Ainsi un titre comme « CURRY DE DÉFERLANTE »
 // ne devient jamais l'ingrédient « Déferlante ».
+// Mémo des rapprochements : lors de la fusion de plusieurs lectures, les mêmes lignes sont
+// réanalysées à chaque lecture ; on ne refait pas le calcul (vocabulaire identique)
+const matchCache = new WeakMap<MerrickVocabEntry[], Map<string, MerrickVocabEntry | null>>()
+
 function matchItem(text: string, vocab: MerrickVocabEntry[], allowWindows = false): MerrickVocabEntry | null {
+  let cache = matchCache.get(vocab)
+  if (!cache) matchCache.set(vocab, cache = new Map())
+  const key = `${allowWindows ? 1 : 0}|${text}`
+  if (cache.has(key)) return cache.get(key)!
+  const result = computeMatch(text, vocab, allowWindows)
+  cache.set(key, result)
+  return result
+}
+
+function computeMatch(text: string, vocab: MerrickVocabEntry[], allowWindows: boolean): MerrickVocabEntry | null {
   let best = bestEntry(text, vocab)
   // Découpage seulement en secours : sinon « HOULE » (exact) battrait « HOULE ORCHIDEE » mal lu
   // Une ligne d'ingrédient compte au plus ~7 mots, bruit compris : au-delà, pas de découpage
@@ -170,9 +184,12 @@ function matchItem(text: string, vocab: MerrickVocabEntry[], allowWindows = fals
     for (let i = 0; i < words.length; i++) {
       // Morceaux de 6 mots / 45 lettres au plus : couvre les noms les plus longs, et évite
       // une explosion de calculs sur les longues lignes de bruit (photos d'écran)
+      // Un nom d'ingrédient commence et finit par un vrai mot (≥ 3 lettres)
+      if (words[i]!.length < 3) continue
       for (let j = i + 1, letters = 0; j <= words.length && j - i <= WINDOW_MAX_WORDS; j++) {
         letters += words[j - 1]!.length
         if (letters > WINDOW_MAX_LETTERS) break
+        if (words[j - 1]!.length < 3) continue
         if (i === 0 && j === words.length) continue
         const found = bestEntry(words.slice(i, j).join(' '), vocab)
         if (!found || found.sim < MATCH_THRESHOLD) continue
