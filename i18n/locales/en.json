@@ -805,7 +805,10 @@
         "deletedByOther": "This list was deleted by a crew member.",
         "takePhoto": "Take a photo",
         "cookTimer": "Cook · {seconds} s",
-        "cookTimerHint": "Start it when you put the food on the fire: a signal plays when it's cooked, then if it burns."
+        "cookTimerHint": "Start it when you put the food on the fire: the whole crew sees it cook, with a signal when it's cooked, then if it burns.",
+        "trophy": "Trophy",
+        "trophyHint": "Fish caught in trophy size: cooking takes 90 s. Visible to the whole crew.",
+        "ocrPartial": "{count} ingredient(s) recognized: some are probably missing (a menu has 3 dishes of 2 ingredients). Complete the list below."
       }
     }
   }

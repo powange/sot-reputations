@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
   if (!item) {
     throw createError({ statusCode: 404, message: 'Ingrédient introuvable' })
   }
-  broadcastToGroup(`merrick:${token}`, 'item', item)
-  return item
+  const payload = { ...item, serverTime: Date.now() }
+  broadcastToGroup(`merrick:${token}`, 'item', payload)
+  return payload
 })

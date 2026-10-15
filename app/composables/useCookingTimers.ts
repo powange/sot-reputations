@@ -11,6 +11,8 @@ export interface CookingTimer {
   image?: string
   // Rattachement à un élément de la page (ex. merrick:<token>:<id ingrédient>)
   key?: string
+  // Minuteur partagé (liste de quête) : piloté par le serveur, jamais enregistré localement
+  shared?: boolean
 }
 
 export type CookingStage = 'raw' | 'undercooked' | 'cooked' | 'burnt'
@@ -34,9 +36,9 @@ export const COOKING_STAGE_CLASSES: Record<CookingStage, string> = {
 }
 
 // Type de cuisson d'un ingrédient de quête à livrer cuit (null s'il est demandé cru)
-export function cookingFoodFor(i: Pick<MerrickIngredient, 'type' | 'key' | 'state'>): CookingFood | null {
+export function cookingFoodFor(i: Pick<MerrickIngredient, 'type' | 'key' | 'state' | 'trophy'>): CookingFood | null {
   if (i.state !== 'cooked') return null
-  if (i.type === 'fish') return 'fish'
+  if (i.type === 'fish') return i.trophy ? 'trophy' : 'fish'
   return i.key === 'kraken' || i.key === 'megalodon' ? 'monster' : 'meat'
 }
 
@@ -54,7 +56,7 @@ let loaded = false
 
 function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(timers.value))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(timers.value.filter(x => !x.shared)))
   } catch {
     // Stockage indisponible : les minuteurs restent en mémoire
   }
@@ -101,23 +103,27 @@ function beep(frequency: number, count: number, duration = 0.15) {
   }
 }
 
+// Étapes déjà franchies au moment où l'on découvre un minuteur : pas d'alerte rétroactive
+function markPassedStages(timer: CookingTimer) {
+  now.value = Date.now()
+  const stage = stageOf(timer)
+  if (stage === 'cooked') alerted.set(timer.id, new Set(['cooked']))
+  if (stage === 'burnt') alerted.set(timer.id, new Set(['cooked', 'burnt']))
+}
+
 function load() {
   if (loaded) return
   loaded = true
   try {
-    timers.value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    // Les minuteurs de quête sont partagés via le serveur, plus enregistrés localement
+    timers.value = (JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as CookingTimer[]).filter(x => !x.key?.startsWith('merrick:'))
     soundOn.value = localStorage.getItem(SOUND_KEY) !== '0'
   } catch {
     timers.value = []
   }
   if ('Notification' in window) notifPermission.value = Notification.permission
   // Les étapes déjà passées avant le rechargement ne doivent pas resonner
-  now.value = Date.now()
-  for (const timer of timers.value) {
-    const stage = stageOf(timer)
-    if (stage === 'cooked') alerted.set(timer.id, new Set(['cooked']))
-    if (stage === 'burnt') alerted.set(timer.id, new Set(['cooked', 'burnt']))
-  }
+  for (const timer of timers.value) markPassedStages(timer)
 }
 
 export function useCookingTimers() {
@@ -215,6 +221,26 @@ export function useCookingTimers() {
     save()
   }
 
+  // Crée ou met à jour un minuteur partagé. startedAt est déjà recalé sur l'horloge locale.
+  function syncShared(key: string, food: CookingFood, startedAt: number, extra: Pick<CookingTimer, 'label' | 'image'> = {}) {
+    const existing = timers.value.find(x => x.key === key)
+    if (existing && existing.startedAt === startedAt && existing.food === food) return
+    if (existing) {
+      // Relancé ou passé en trophée : les alertes repartent de zéro
+      Object.assign(existing, { food, startedAt, ...extra })
+      alerted.delete(existing.id)
+      markPassedStages(existing)
+      return
+    }
+    const timer: CookingTimer = { id: Date.now() + Math.random(), food, startedAt, key, shared: true, ...extra }
+    timers.value.push(timer)
+    markPassedStages(timer)
+  }
+
+  function removeByKey(predicate: (key: string) => boolean) {
+    for (const timer of timers.value.filter(x => x.key && predicate(x.key))) remove(timer)
+  }
+
   function timerFor(key: string): CookingTimer | undefined {
     return timers.value.find(x => x.key === key)
   }
@@ -248,6 +274,9 @@ export function useCookingTimers() {
     remove,
     clearAll,
     timerFor,
+    syncShared,
+    removeByKey,
+    unlockAudio,
     toggleSound,
     enableNotifications
   }

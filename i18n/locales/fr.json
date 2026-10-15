@@ -624,7 +624,7 @@
           "foodHint": {
             "fish": "Taille normale",
             "trophy": "Grand poisson",
-            "meat": "Poulet, porc, serpent, requin",
+            "meat": "Poule, porc, serpent, requin",
             "monster": "Kraken, mégalodon"
           },
           "cookedIn": "Cuit dans {time}",
@@ -690,7 +690,7 @@
           "russet": "Mordorée",
           "sandy": "Sablonneuse",
           "ocean": "Océanique",
-          "coral": "Coralienne",
+          "coral": "Corallienne",
           "muddy": "Vaseuse"
         },
         "devilfish": {
@@ -709,7 +709,7 @@
         },
         "pondie": {
           "charcoal": "Charbonneuse",
-          "orchid": "Orchidée",
+          "orchid": "D'orchidée",
           "bronze": "Bronze",
           "moonsky": "Lunaire",
           "bright": "Brillante"
@@ -790,7 +790,7 @@
         "live": "En direct",
         "reconnecting": "Reconnexion…",
         "meats": {
-          "chicken": "Poulet",
+          "chicken": "Poule",
           "pork": "Porc",
           "snake": "Serpent",
           "shark": "Requin",
@@ -806,7 +806,10 @@
         "deletedByOther": "Cette liste a été supprimée par un membre de l'équipage.",
         "takePhoto": "Prendre une photo",
         "cookTimer": "Cuire · {seconds} s",
-        "cookTimerHint": "Lancez-le en posant l'aliment sur le feu : un signal sonne quand c'est cuit, puis s'il brûle."
+        "cookTimerHint": "Lancez-le en posant l'aliment sur le feu : tout l'équipage voit la cuisson avancer, avec un signal quand c'est cuit puis s'il brûle.",
+        "trophy": "Trophée",
+        "trophyHint": "Poisson récupéré en taille trophée : la cuisson passe à 90 s. Visible par tout l'équipage.",
+        "ocrPartial": "{count} ingrédient(s) reconnu(s) : il en manque sans doute (un menu compte 3 plats de 2 ingrédients). Complétez la liste ci-dessous."
       }
     }
   }

@@ -118,11 +118,66 @@ export async function recognizeMerrickMenu(
     }
   })
   try {
-    const { data } = await worker.recognize(await preprocessImage(file))
-    return parseMerrickMenu(data.text.split('\n'), vocab)
+    // 1re lecture : niveaux de gris contrastés. Si le menu semble incomplet (un menu de
+    // Merrick a 3 plats de 2 ingrédients), 2e lecture en noir et blanc pur, qui efface
+    // mieux l'emblème en fond du parchemin ; on garde la plus complète.
+    const gray = await preprocessImage(file)
+    const first = parseMerrickMenu((await worker.recognize(gray)).data.text.split('\n'), vocab)
+    if (isCompleteMenu(first)) return first
+    const second = parseMerrickMenu((await worker.recognize(binarize(gray))).data.text.split('\n'), vocab)
+    if (countIngredients(second) <= countIngredients(first)) return first
+    // Le noir et blanc perd souvent les « (CUIT) / (CRU) » gris clair : on reprend ceux de la 1re lecture
+    const firstStates = new Map(first.flatMap(d => d.ingredients).map(i => [merrickItemId(i), i.state]))
+    for (const ing of second.flatMap(d => d.ingredients)) ing.state = firstStates.get(merrickItemId(ing)) ?? ing.state
+    return second
   } finally {
     await worker.terminate()
   }
+}
+
+const countIngredients = (dishes: MerrickDish[]) => dishes.reduce((n, d) => n + d.ingredients.length, 0)
+
+// Un menu de Merrick compte 3 plats de 2 ingrédients : en dessous, la lecture a sans doute raté des lignes
+export function isCompleteMenu(dishes: MerrickDish[]): boolean {
+  return dishes.length >= 3 && dishes.every(d => d.ingredients.length >= 2)
+}
+
+// Seuil d'Otsu : sépare au mieux encre et parchemin d'après l'histogramme
+function binarize(source: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = source.width
+  canvas.height = source.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(source, 0, 0)
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const px = img.data
+  const histogram = new Array<number>(256).fill(0)
+  for (let i = 0; i < px.length; i += 4) histogram[px[i]!]!++
+  const total = px.length / 4
+  let sum = 0
+  for (let v = 0; v < 256; v++) sum += v * histogram[v]!
+  let sumB = 0
+  let weightB = 0
+  let best = 0
+  let threshold = 128
+  for (let v = 0; v < 256; v++) {
+    weightB += histogram[v]!
+    if (!weightB) continue
+    const weightF = total - weightB
+    if (!weightF) break
+    sumB += v * histogram[v]!
+    const between = weightB * weightF * (sumB / weightB - (sum - sumB) / weightF) ** 2
+    if (between > best) {
+      best = between
+      threshold = v
+    }
+  }
+  for (let i = 0; i < px.length; i += 4) {
+    const v = px[i]! > threshold ? 255 : 0
+    px[i] = px[i + 1] = px[i + 2] = v
+  }
+  ctx.putImageData(img, 0, 0)
+  return canvas
 }
 
 // Met à l'échelle, passe en niveaux de gris et étire le contraste : les captures in-game

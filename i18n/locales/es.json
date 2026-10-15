@@ -805,7 +805,10 @@
         "deletedByOther": "Un miembro de la tripulación ha eliminado esta lista.",
         "takePhoto": "Hacer una foto",
         "cookTimer": "Cocinar · {seconds} s",
-        "cookTimerHint": "Inícialo al poner la comida al fuego: suena una señal cuando está cocinada y otra si se quema."
+        "cookTimerHint": "Inícialo al poner la comida al fuego: toda la tripulación ve la cocción avanzar, con una señal cuando está cocinada y otra si se quema.",
+        "trophy": "Trofeo",
+        "trophyHint": "Pez de tamaño trofeo: la cocción pasa a 90 s. Visible para toda la tripulación.",
+        "ocrPartial": "{count} ingrediente(s) reconocido(s): probablemente falten algunos (un menú tiene 3 platos de 2 ingredientes). Completa la lista de abajo."
       }
     }
   }

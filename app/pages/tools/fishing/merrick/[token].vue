@@ -61,40 +61,49 @@ const remaining = computed(() => {
   return [...map.values()]
 })
 
-// --- Minuteurs de cuisson (locaux à cet appareil, communs avec le guide) ---
+// --- Minuteurs de cuisson partagés : l'heure de mise sur le feu est stockée sur le
+// serveur et diffusée, chaque membre voit donc la même cuisson progresser ---
+// Écart entre l'horloge du serveur et celle de cet appareil (ms)
+let clockOffset = 0
+function syncClock(serverTime: number | undefined) {
+  if (serverTime) clockOffset = serverTime - Date.now()
+}
+
 function timerKey(ing: MerrickIngredient) {
   return `merrick:${token}:${ing.id}`
 }
 
-function startCooking(ing: MerrickIngredient) {
-  const food = cookingFoodFor(ing)
-  if (food) cooking.start(food, { label: itemLabel(ing), image: merrickItemImage(ing), key: timerKey(ing) })
+type ItemState = Pick<MerrickIngredient, 'delivered' | 'trophy' | 'cookingStartedAt'> & { id: number, serverTime?: number }
+
+function applyItemState(state: ItemState) {
+  syncClock(state.serverTime)
+  const ing = ingredients.value.find(i => i.id === state.id)
+  if (ing) Object.assign(ing, { delivered: state.delivered, trophy: state.trophy, cookingStartedAt: state.cookingStartedAt })
 }
 
-// Un ingrédient entièrement livré n'a plus besoin de son minuteur
-watch(() => ingredients.value.filter(i => i.delivered === i.quantity).map(timerKey), (keys) => {
-  for (const key of keys) {
-    const timer = cooking.timerFor(key)
-    if (timer) cooking.remove(timer)
-  }
-})
-
-// --- Cocher / décocher (optimiste, confirmé par le serveur et diffusé aux autres) ---
-async function step(ing: MerrickIngredient, delta: 1 | -1) {
-  const before = ing.delivered ?? 0
-  ing.delivered = Math.max(0, Math.min(ing.quantity, before + delta))
-  if (ing.delivered === before) return
+async function patchItem(ing: MerrickIngredient, body: { trophy?: boolean, cooking?: 'start' | 'stop' }) {
+  cooking.unlockAudio()
   try {
-    const res = await $fetch<{ id: number, delivered: number }>(`/api/merrick-quests/${token}/items/${ing.id}`, {
-      method: 'POST',
-      body: { delta }
-    })
-    ing.delivered = res.delivered
+    applyItemState(await $fetch<ItemState>(`/api/merrick-quests/${token}/items/${ing.id}`, { method: 'PATCH', body }))
   } catch {
     toast.add({ title: t('tools.fishing.merrick.errorSave'), color: 'error' })
-    await refresh()
   }
 }
+
+// Reflète l'état serveur dans les minuteurs locaux (barre, bips, notifications).
+// Côté client uniquement : appelé au montage puis à chaque changement.
+function syncTimers() {
+  const active = new Set<string>()
+  for (const ing of ingredients.value) {
+    const food = cookingFoodFor(ing)
+    if (!food || !ing.cookingStartedAt || (ing.delivered ?? 0) >= ing.quantity) continue
+    const key = timerKey(ing)
+    active.add(key)
+    cooking.syncShared(key, food, ing.cookingStartedAt - clockOffset, { label: itemLabel(ing), image: merrickItemImage(ing) })
+  }
+  cooking.removeByKey(key => key.startsWith(`merrick:${token}:`) && !active.has(key))
+}
+watch(() => ingredients.value.map(i => [i.id, i.cookingStartedAt, i.trophy, i.delivered]), syncTimers, { deep: true })
 
 // --- Temps réel ---
 const live = ref(false)
@@ -109,12 +118,13 @@ function connect() {
     live.value = true
   })
   eventSource.addEventListener('item', (event) => {
-    const { id, delivered } = JSON.parse(event.data) as { id: number, delivered: number }
-    const ing = ingredients.value.find(i => i.id === id)
-    if (ing) ing.delivered = delivered
+    applyItemState(JSON.parse(event.data))
   })
   eventSource.addEventListener('quest', (event) => {
-    if (!editing.value) quest.value = JSON.parse(event.data)
+    if (editing.value) return
+    const next = JSON.parse(event.data) as MerrickQuest
+    syncClock(next.serverTime)
+    quest.value = next
   })
   eventSource.addEventListener('deleted', () => {
     closed = true
@@ -136,14 +146,26 @@ function connect() {
   })
 }
 
+// Les bips d'un minuteur lancé par un autre membre ne peuvent sonner qu'une fois le son
+// débloqué par un geste sur la page : le premier clic/toucher suffit
+function unlockOnGesture() {
+  cooking.unlockAudio()
+}
+
 onMounted(() => {
+  window.addEventListener('pointerdown', unlockOnGesture, { once: true })
   if (!quest.value) return
+  syncClock(quest.value.serverTime)
+  syncTimers()
   const names = quest.value.dishes.map(d => d.name).filter(Boolean)
   remember(token, names.length ? names.join(' · ') : t('tools.fishing.merrick.title'))
   connect()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', unlockOnGesture)
+  // Les minuteurs partagés n'existent que sur la page de la liste
+  cooking.removeByKey(key => key.startsWith(`merrick:${token}:`))
   closed = true
   if (reconnectTimer) clearTimeout(reconnectTimer)
   eventSource?.close()
@@ -464,7 +486,7 @@ async function saveEdit() {
                       variant="ghost"
                       color="neutral"
                       :aria-label="$t('tools.fishing.cooking.timers.restart')"
-                      @click="cooking.restart(cooking.timerFor(timerKey(ing))!)"
+                      @click="patchItem(ing, { cooking: 'start' })"
                     />
                     <UButton
                       icon="i-lucide-x"
@@ -472,7 +494,7 @@ async function saveEdit() {
                       variant="ghost"
                       color="neutral"
                       :aria-label="$t('tools.fishing.cooking.timers.remove')"
-                      @click="cooking.remove(cooking.timerFor(timerKey(ing))!)"
+                      @click="patchItem(ing, { cooking: 'stop' })"
                     />
                   </div>
                 </div>
@@ -483,15 +505,26 @@ async function saveEdit() {
                     variant="subtle"
                     :label="$t(`tools.fishing.merrick.state.${ing.state}`)"
                   />
+                  <!-- Poisson récupéré en taille trophée : cuisson plus longue (partagé) -->
                   <UButton
-                    v-if="cookingFoodFor(ing) && ing.delivered !== ing.quantity && !cooking.timerFor(timerKey(ing))"
+                    v-if="ing.type === 'fish' && ing.delivered !== ing.quantity"
+                    icon="i-lucide-trophy"
+                    size="xs"
+                    :color="ing.trophy ? 'warning' : 'neutral'"
+                    :variant="ing.trophy ? 'solid' : 'outline'"
+                    :label="$t('tools.fishing.merrick.trophy')"
+                    :title="$t('tools.fishing.merrick.trophyHint')"
+                    :aria-pressed="!!ing.trophy"
+                    @click="patchItem(ing, { trophy: !ing.trophy })"
+                  />
+                  <UButton
+                    v-if="cookingFoodFor(ing) && ing.delivered !== ing.quantity && !ing.cookingStartedAt"
                     icon="i-lucide-timer"
                     size="xs"
                     variant="soft"
                     :label="$t('tools.fishing.merrick.cookTimer', { seconds: COOKING_TIMES[cookingFoodFor(ing)!].cooked })"
                     :title="$t('tools.fishing.merrick.cookTimerHint')"
-                    :disabled="cooking.timers.value.length >= MAX_COOKING_TIMERS"
-                    @click="startCooking(ing)"
+                    @click="patchItem(ing, { cooking: 'start' })"
                   />
                 </div>
               </li>

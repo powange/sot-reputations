@@ -74,7 +74,9 @@ async function runOcr(file: File) {
       toast.add({ title: t('tools.fishing.merrick.ocrNothing'), color: 'warning' })
     } else {
       dishes.value = result
-      toast.add({ title: t('tools.fishing.merrick.ocrDone', { count }), color: 'success' })
+      toast.add(isCompleteMenu(result)
+        ? { title: t('tools.fishing.merrick.ocrDone', { count }), color: 'success' }
+        : { title: t('tools.fishing.merrick.ocrPartial', { count }), color: 'warning' })
     }
   } catch (err) {
     console.error(err)

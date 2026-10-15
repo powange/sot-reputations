@@ -24,6 +24,15 @@ const COURSE_WORDS: Record<MerrickCourse, string[]> = {
   main: ['plat principal', 'main course', 'plato principal'],
   special: ['plat du jour', 'special', 'dish of the day', 'plato del dia']
 }
+const MENU_TITLE_WORDS = ['menu de merrick', 'merrick s menu', 'merricks menu']
+
+// En-tête gris souvent mal lu (« PLAT BRING PAI ») : ligne courte commençant par « PLAT »
+function platHeader(line: string): MerrickCourse | null {
+  const words = line.split(' ')
+  if (words.length > 4 || bestScore(words[0] ?? '', ['plat', 'plato']) < 0.75) return null
+  return words.slice(1).some(w => bestScore(w, ['jour', 'dia']) >= 0.5) ? 'special' : 'main'
+}
+
 const STATE_WORDS: Record<MerrickState, string[]> = {
   cooked: ['cuit', 'cooked', 'cocinado'],
   raw: ['cru', 'raw', 'crudo']
@@ -60,6 +69,11 @@ function bestScore(line: string, words: string[]): number {
   return Math.max(...words.map(w => similarity(line, w)))
 }
 
+// Autres libellés possibles d'un même item (le jeu écrit « Poule », on dit souvent « Poulet »)
+const OCR_ALIASES: MerrickVocabEntry[] = [
+  { text: 'poulet', item: { type: 'meat', key: 'chicken', variant: null } }
+]
+
 // Vocabulaire des items à partir des messages i18n (une ou plusieurs langues).
 export function buildMerrickVocabulary(messagesList: LocaleMessages[], frenchOrder: boolean[]): MerrickVocabEntry[] {
   const entries: MerrickVocabEntry[] = []
@@ -82,10 +96,13 @@ export function buildMerrickVocabulary(messagesList: LocaleMessages[], frenchOrd
       if (label) entries.push({ text: normalizeOcr(label), item: { type: 'meat', key: meat, variant: null } })
     }
   })
+  for (const alias of OCR_ALIASES) entries.push({ text: alias.text, item: alias.item })
   return entries
 }
 
-function matchItem(text: string, vocab: MerrickVocabEntry[]): MerrickVocabEntry | null {
+const MATCH_THRESHOLD = 0.72
+
+function bestEntry(text: string, vocab: MerrickVocabEntry[]): { entry: MerrickVocabEntry, sim: number } | null {
   let best: MerrickVocabEntry | null = null
   let bestSim = 0
   for (const entry of vocab) {
@@ -96,7 +113,55 @@ function matchItem(text: string, vocab: MerrickVocabEntry[]): MerrickVocabEntry 
       bestSim = sim
     }
   }
-  return bestSim >= 0.72 ? best : null
+  return best ? { entry: best, sim: bestSim } : null
+}
+
+// Ligne entière, ou (si une quantité a été lue, donc ligne d'ingrédient) n'importe quelle
+// suite de mots de la ligne : rattrape le texte parasite autour du nom (« 7e 1 HOULE … | »).
+// Les titres de plats (« CURRY DE DÉFERLANTE ») n'ont pas de quantité : jamais découpés.
+// windows : 'all' pour une ligne d'ingrédient (quantité lue) ; 'variants' quand le chiffre est
+// illisible, limité aux noms de variétés (plusieurs mots : « HOULE » seul pourrait venir d'un titre)
+function matchItem(text: string, vocab: MerrickVocabEntry[], windows: 'none' | 'all' | 'variants' = 'none'): MerrickVocabEntry | null {
+  let best = bestEntry(text, vocab)
+  // Découpage seulement en secours : sinon « HOULE » (exact) battrait « HOULE ORCHIDEE » mal lu
+  if (windows !== 'none' && (!best || best.sim < MATCH_THRESHOLD)) {
+    best = null
+    const pool = windows === 'variants' ? vocab.filter(e => e.item.variant) : vocab
+    const minSim = windows === 'variants' ? 0.8 : MATCH_THRESHOLD
+    const words = text.split(' ')
+    for (let i = 0; i < words.length; i++) {
+      for (let j = i + 1; j <= words.length; j++) {
+        if (i === 0 && j === words.length) continue
+        const found = bestEntry(words.slice(i, j).join(' '), pool)
+        const candidate = found && found.sim >= minSim ? found : null
+        if (!candidate) continue
+        // À score égal, la variété précise (libellé plus long) l'emporte sur l'espèce seule
+        if (!best || candidate.sim > best.sim || (candidate.sim === best.sim && candidate.entry.text.length > best.entry.text.length)) best = candidate
+      }
+    }
+  }
+  return best && best.sim >= MATCH_THRESHOLD ? best.entry : null
+}
+
+// « 1 POULE (CUIT) » lu sur une seule ligne : retire l'état en fin de ligne
+function splitTrailingState(line: string): { text: string, state: MerrickState | null } {
+  const words = line.split(' ')
+  const last = words.at(-1) ?? ''
+  if (words.length < 2 || last.length > 7) return { text: line, state: null }
+  const state = MERRICK_STATES.find(s => bestScore(last, STATE_WORDS[s]) >= 0.75)
+  return state ? { text: words.slice(0, -1).join(' '), state } : { text: line, state: null }
+}
+
+// Titre de plat lisible, ou '' si la ligne n'est que du bruit OCR (« 7e TS BR ‘ NT »)
+function cleanDishName(raw: string): string {
+  const name = raw.replace(/[^\p{L}\s'’-]/gu, ' ').replace(/\s+/g, ' ').trim()
+    // Lettres isolées en début / fin de ligne : souvent le cadre du parchemin (« | GRATIN »)
+    .replace(/^(\p{L}\s)+/u, '').replace(/(\s\p{L})+$/u, '')
+  const words = name.split(' ').filter(w => w.length >= 3)
+  const letters = name.replace(/[^\p{L}]/gu, '').length
+  const rawLetters = raw.replace(/\s/g, '').length
+  if (!words.length || letters < 6 || letters / Math.max(1, rawLetters) < 0.75) return ''
+  return name.slice(0, MERRICK_LIMITS.nameLength)
 }
 
 // Lettres que l'OCR lit souvent à la place du chiffre de quantité (retirées avant le rapprochement)
@@ -132,7 +197,11 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
   let pendingCourse: MerrickCourse | null = null
   let pendingQuantity: number | null = null
 
-  const nextCourse = (): MerrickCourse => MERRICK_COURSES[Math.min(dishes.length, MERRICK_COURSES.length - 1)]!
+  // Plats sans en-tête lisible : entrée, plat principal puis plat du jour, dans l'ordre
+  const nextCourse = (): MerrickCourse => {
+    const started = dishes.filter(d => d.ingredients.length > 0).length
+    return MERRICK_COURSES[Math.min(started, MERRICK_COURSES.length - 1)]!
+  }
   const startDish = (course: MerrickCourse, name = '') => {
     current = { course, name, ingredients: [] }
     dishes.push(current)
@@ -148,8 +217,11 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
     }
     if (line.replace(/[^a-z]/g, '').length < 3) continue
 
+    // Titre du parchemin (« MENU DE MERRICK ») : ignoré
+    if (bestScore(line, MENU_TITLE_WORDS) >= 0.7) continue
+
     // En-tête de plat (ENTRÉE / PLAT PRINCIPAL / PLAT DU JOUR)
-    const course = MERRICK_COURSES.find(c => bestScore(line, COURSE_WORDS[c]) >= 0.75)
+    const course = MERRICK_COURSES.find(c => bestScore(line, COURSE_WORDS[c]) >= 0.75) ?? platHeader(line)
     if (course) {
       pendingCourse = course
       current = null
@@ -164,12 +236,14 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
       continue
     }
 
-    const split = splitQuantity(line)
+    const trailing = splitTrailingState(line)
+    const split = splitQuantity(trailing.text)
     let text = split.rest
-    let match = matchItem(text, vocab)
+    let match = matchItem(text, vocab, split.quantity !== null ? 'all' : 'none')
     if (!match) {
-      text = line
-      match = matchItem(text, vocab)
+      text = trailing.text
+      // La ligne qui suit un en-tête est le titre du plat : jamais découpée
+      match = matchItem(text, vocab, pendingCourse ? 'none' : 'variants')
     }
     if (match) {
       const dish: MerrickDish = current ?? startDish(pendingCourse ?? nextCourse())
@@ -177,22 +251,27 @@ export function parseMerrickMenu(rawLines: string[], vocab: MerrickVocabEntry[])
       // Le chiffre stylisé du jeu est mal lu (le « 1 » à crochet sort en 2, 7, Z…) :
       // c'est l'accord du nom qui décide. Singulier = 1 ; pluriel = le chiffre lu s'il
       // est plausible, sinon 2.
-      const read = (text === line ? null : split.quantity) ?? pendingQuantity
+      const read = (text === trailing.text ? null : split.quantity) ?? pendingQuantity
       const quantity = looksPlural(text, match.text) ? Math.max(2, read ?? 2) : 1
       pendingQuantity = null
-      dish.ingredients.push({ ...match.item, state: 'cooked', quantity })
+      dish.ingredients.push({ ...match.item, state: trailing.state ?? 'cooked', quantity })
       continue
     }
 
     // Sinon : nom du plat (juste après l'en-tête), le reste est ignoré ("MENU DE MERRICK"…)
+    const name = cleanDishName(raw)
     if (pendingCourse) {
-      startDish(pendingCourse, raw.trim().slice(0, MERRICK_LIMITS.nameLength))
+      // Même illisible, la ligne après l'en-tête est le titre : le plat commence ici
+      startDish(pendingCourse, name)
       pendingCourse = null
-    } else if (current && (current as MerrickDish).ingredients.length > 0) {
+    } else if (!name) {
+      // Bruit OCR (cadre, emblème du parchemin) : ne doit pas couper un plat en deux
+      continue
+    } else if (!current || (current as MerrickDish).ingredients.length > 0) {
       // Nouveau plat sans en-tête lisible
-      startDish(nextCourse(), raw.trim().slice(0, MERRICK_LIMITS.nameLength))
-    } else if (current && !(current as MerrickDish).name) {
-      (current as MerrickDish).name = raw.trim().slice(0, MERRICK_LIMITS.nameLength)
+      startDish(nextCourse(), name)
+    } else if (!(current as MerrickDish).name) {
+      (current as MerrickDish).name = name
     }
   }
 

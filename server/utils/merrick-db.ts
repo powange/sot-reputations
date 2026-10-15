@@ -34,6 +34,10 @@ function db() {
       );
       CREATE INDEX IF NOT EXISTS idx_merrick_quest_items_quest ON merrick_quest_items(quest_id);
     `)
+    // Poisson livré en taille trophée (cuisson plus longue) et minuteur de cuisson partagé
+    const columns = (d.prepare('PRAGMA table_info(merrick_quest_items)').all() as { name: string }[]).map(c => c.name)
+    if (!columns.includes('trophy')) d.exec('ALTER TABLE merrick_quest_items ADD COLUMN trophy INTEGER NOT NULL DEFAULT 0')
+    if (!columns.includes('cooking_started_at')) d.exec('ALTER TABLE merrick_quest_items ADD COLUMN cooking_started_at INTEGER')
     initialized = true
   }
   return d
@@ -50,7 +54,25 @@ interface ItemRow {
   state: MerrickState
   quantity: number
   delivered: number
+  trophy: number
+  // Horodatage serveur (ms) de la mise sur le feu, null si pas de cuisson en cours
+  cooking_started_at: number | null
 }
+
+// État partagé d'un ingrédient, diffusé aux membres connectés à chaque changement
+export interface MerrickItemState {
+  id: number
+  delivered: number
+  trophy: boolean
+  cookingStartedAt: number | null
+}
+
+const toItemState = (row: Pick<ItemRow, 'id' | 'delivered' | 'trophy' | 'cooking_started_at'>): MerrickItemState => ({
+  id: row.id,
+  delivered: row.delivered,
+  trophy: !!row.trophy,
+  cookingStartedAt: row.cooking_started_at
+})
 
 // Valide et normalise les plats reçus du client ; lève une 400 sinon.
 export function sanitizeMerrickDishes(input: unknown): MerrickDish[] {
@@ -85,15 +107,21 @@ export function sanitizeMerrickDishes(input: unknown): MerrickDish[] {
   })
 }
 
-function insertItems(questId: number, dishes: MerrickDish[], keepDelivered: Map<number, number> = new Map()) {
+type KeptState = Pick<ItemRow, 'delivered' | 'trophy' | 'cooking_started_at'>
+
+function insertItems(questId: number, dishes: MerrickDish[], kept: Map<number, KeptState> = new Map()) {
   const insert = db().prepare(`
-    INSERT INTO merrick_quest_items (quest_id, dish_index, course, dish_name, position, item_type, item_key, variant, state, quantity, delivered)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO merrick_quest_items (quest_id, dish_index, course, dish_name, position, item_type, item_key, variant, state, quantity, delivered, trophy, cooking_started_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   dishes.forEach((dish, dishIndex) => {
     dish.ingredients.forEach((ing, position) => {
-      const delivered = Math.min(ing.id ? keepDelivered.get(ing.id) ?? 0 : 0, ing.quantity)
-      insert.run(questId, dishIndex, dish.course, dish.name, position, ing.type, ing.key, ing.variant, ing.state, ing.quantity, delivered)
+      const prev = ing.id ? kept.get(ing.id) : undefined
+      const delivered = Math.min(prev?.delivered ?? 0, ing.quantity)
+      // Trophée : poissons uniquement ; la cuisson n'a de sens que pour un ingrédient à livrer cuit et pas encore livré
+      const trophy = ing.type === 'fish' ? prev?.trophy ?? 0 : 0
+      const cooking = ing.state === 'cooked' && delivered < ing.quantity ? prev?.cooking_started_at ?? null : null
+      insert.run(questId, dishIndex, dish.course, dish.name, position, ing.type, ing.key, ing.variant, ing.state, ing.quantity, delivered, trophy, cooking)
     })
   })
 }
@@ -133,10 +161,12 @@ export function getMerrickQuest(token: string): MerrickQuest | null {
       variant: row.variant,
       state: row.state,
       quantity: row.quantity,
-      delivered: row.delivered
+      delivered: row.delivered,
+      trophy: !!row.trophy,
+      cookingStartedAt: row.cooking_started_at
     })
   }
-  return { token, updatedAt: quest.updated_at, dishes: dishes.filter(Boolean) }
+  return { token, updatedAt: quest.updated_at, serverTime: Date.now(), dishes: dishes.filter(Boolean) }
 }
 
 // Remplace le contenu de la liste ; les ingrédients conservés (même id) gardent leur avancement.
@@ -145,28 +175,51 @@ export function updateMerrickQuest(token: string, dishes: MerrickDish[]): boolea
   const questId = getQuestId(token)
   if (!questId) return false
   d.transaction(() => {
-    const previous = d.prepare('SELECT id, delivered FROM merrick_quest_items WHERE quest_id = ?').all(questId) as { id: number, delivered: number }[]
+    const previous = d.prepare('SELECT id, delivered, trophy, cooking_started_at FROM merrick_quest_items WHERE quest_id = ?').all(questId) as (KeptState & { id: number })[]
     d.prepare('DELETE FROM merrick_quest_items WHERE quest_id = ?').run(questId)
-    insertItems(questId, dishes, new Map(previous.map(p => [p.id, p.delivered])))
+    insertItems(questId, dishes, new Map(previous.map(p => [p.id, p])))
     d.prepare('UPDATE merrick_quests SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(questId)
   })()
   return true
 }
 
 // Coche / décoche une unité d'un ingrédient (borné entre 0 et la quantité demandée).
-export function stepMerrickItem(token: string, itemId: number, delta: 1 | -1): { id: number, delivered: number } | null {
+// Une fois tout livré, le minuteur de cuisson n'a plus lieu d'être.
+export function stepMerrickItem(token: string, itemId: number, delta: 1 | -1): MerrickItemState | null {
   const d = db()
   const questId = getQuestId(token)
   if (!questId) return null
   const row = d.prepare(`
     UPDATE merrick_quest_items
-    SET delivered = MAX(0, MIN(quantity, delivered + ?))
+    SET delivered = MAX(0, MIN(quantity, delivered + ?)),
+        cooking_started_at = CASE WHEN MAX(0, MIN(quantity, delivered + ?)) >= quantity THEN NULL ELSE cooking_started_at END
     WHERE id = ? AND quest_id = ?
-    RETURNING id, delivered
-  `).get(delta, itemId, questId) as { id: number, delivered: number } | undefined
+    RETURNING id, delivered, trophy, cooking_started_at
+  `).get(delta, delta, itemId, questId) as ItemRow | undefined
   if (!row) return null
   d.prepare('UPDATE merrick_quests SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(questId)
-  return row
+  return toItemState(row)
+}
+
+// Taille trophée (poissons) et minuteur de cuisson partagé (ingrédients à livrer cuits).
+export function updateMerrickItem(
+  token: string,
+  itemId: number,
+  change: { trophy?: boolean, cooking?: 'start' | 'stop' }
+): MerrickItemState | 'not-found' | 'invalid' {
+  const d = db()
+  const questId = getQuestId(token)
+  if (!questId) return 'not-found'
+  const row = d.prepare('SELECT * FROM merrick_quest_items WHERE id = ? AND quest_id = ?').get(itemId, questId) as ItemRow | undefined
+  if (!row) return 'not-found'
+  if (change.trophy !== undefined && row.item_type !== 'fish') return 'invalid'
+  if (change.cooking === 'start' && (row.state !== 'cooked' || row.delivered >= row.quantity)) return 'invalid'
+
+  const trophy = change.trophy === undefined ? row.trophy : change.trophy ? 1 : 0
+  const cooking = change.cooking === 'start' ? Date.now() : change.cooking === 'stop' ? null : row.cooking_started_at
+  d.prepare('UPDATE merrick_quest_items SET trophy = ?, cooking_started_at = ? WHERE id = ?').run(trophy, cooking, itemId)
+  d.prepare('UPDATE merrick_quests SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(questId)
+  return toItemState({ id: itemId, delivered: row.delivered, trophy, cooking_started_at: cooking })
 }
 
 // Suppression autorisée uniquement une fois tous les ingrédients livrés.

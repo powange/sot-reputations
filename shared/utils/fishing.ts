@@ -156,6 +156,10 @@ export interface MerrickIngredient {
   state: MerrickState
   quantity: number
   delivered?: number
+  // Poisson récupéré en taille trophée (cuisson plus longue)
+  trophy?: boolean
+  // Minuteur de cuisson partagé : horodatage serveur (ms) de la mise sur le feu
+  cookingStartedAt?: number | null
 }
 
 export interface MerrickDish {
@@ -167,6 +171,8 @@ export interface MerrickDish {
 export interface MerrickQuest {
   token: string
   updatedAt: string
+  // Heure du serveur à la réponse, pour recaler les minuteurs sur l'horloge locale
+  serverTime: number
   dishes: MerrickDish[]
 }
 
