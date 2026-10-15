@@ -137,9 +137,16 @@ export async function recognizeMerrickMenu(
     let best: MerrickDish[] = []
     for (const [index, attempt] of attempts.entries()) {
       onPass(index + 1, attempts.length)
+      onProgress(0)
+      // Laisse le navigateur afficher la progression entre deux lectures
+      await new Promise(resolve => setTimeout(resolve))
       await worker.setParameters({ tessedit_pageseg_mode: attempt.psm })
-      const { data } = await worker.recognize(attempt.image(), {}, { blocks: true, text: true })
-      passes.push((data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines.map(l => ({ text: l.text, y0: l.bbox.y0, y1: l.bbox.y1 })))))
+      // Sortie TSV (lignes + positions) plutôt que l'arbre complet mots/caractères,
+      // bien plus lourd en mémoire sur mobile. Une lecture bloquée (téléphone à court de
+      // mémoire…) ne doit pas figer l'import : on garde alors le meilleur résultat obtenu.
+      const result = await withTimeout(worker.recognize(attempt.image(), {}, { tsv: true, text: false }), PASS_TIMEOUT_MS)
+      if (!result) break
+      passes.push(linesFromTsv(result.data.tsv ?? ''))
       const merged = parseMerrickMenu(mergeOcrPasses(passes, vocab), vocab)
       if (countIngredients(merged) >= countIngredients(best)) best = merged
       // Deux lectures au minimum : une seule peut paraître complète en ayant mal rangé les plats
@@ -152,6 +159,35 @@ export async function recognizeMerrickMenu(
 }
 
 const countIngredients = (dishes: MerrickDish[]) => dishes.reduce((n, d) => n + d.ingredients.length, 0)
+
+const PASS_TIMEOUT_MS = 60_000
+
+// null si la promesse ne s'est pas résolue à temps
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([promise, new Promise<null>(resolve => setTimeout(() => resolve(null), ms))])
+}
+
+// TSV de Tesseract : une ligne par élément ; niveau 5 = mot, regroupés par ligne de texte
+// (bloc, paragraphe, ligne) avec leur boîte verticale
+function linesFromTsv(tsv: string): OcrLine[] {
+  const lines = new Map<string, OcrLine & { words: string[] }>()
+  for (const row of tsv.split('\n')) {
+    const cols = row.split('\t')
+    if (cols[0] !== '5' || cols.length < 12 || !cols[11]?.trim()) continue
+    const key = `${cols[2]}-${cols[3]}-${cols[4]}`
+    const top = Number(cols[7])
+    const bottom = top + Number(cols[9])
+    const line = lines.get(key)
+    if (line) {
+      line.words.push(cols[11])
+      line.y0 = Math.min(line.y0, top)
+      line.y1 = Math.max(line.y1, bottom)
+    } else {
+      lines.set(key, { text: '', words: [cols[11]], y0: top, y1: bottom })
+    }
+  }
+  return [...lines.values()].map(l => ({ text: l.words.join(' '), y0: l.y0, y1: l.y1 }))
+}
 
 // Un menu de Merrick compte 3 plats de 2 ingrédients : en dessous, la lecture a sans doute raté des lignes
 export function isCompleteMenu(dishes: MerrickDish[]): boolean {
@@ -203,7 +239,8 @@ function binarize(source: HTMLCanvasElement): HTMLCanvasElement {
 async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
   // from-image : applique l'orientation EXIF des photos prises en portrait
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const scale = Math.min(Math.max(1, 2200 / bitmap.width), 2600 / bitmap.width)
+  // ~2200 px de large, mais 6 Mpx au plus (photo de téléphone en portrait : mémoire limitée)
+  const scale = Math.min(Math.max(1, 2200 / bitmap.width), 2600 / bitmap.width, Math.sqrt(6_000_000 / (bitmap.width * bitmap.height)))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(bitmap.width * scale)
   canvas.height = Math.round(bitmap.height * scale)

@@ -6,6 +6,8 @@
 export interface MerrickVocabEntry {
   // Libellé normalisé (minuscules, sans accents ni ponctuation)
   text: string
+  // Libellé sans espaces, précalculé (les espaces sont peu fiables en OCR)
+  compact?: string
   item: Pick<MerrickIngredient, 'type' | 'key' | 'variant'>
 }
 
@@ -119,16 +121,31 @@ export function buildMerrickVocabulary(messagesList: LocaleMessages[], frenchOrd
     }
   })
   for (const alias of OCR_ALIASES) entries.push({ text: alias.text, item: alias.item })
-  return entries
+  return entries.map(e => ({ ...e, compact: e.text.replace(/ /g, '') }))
 }
 
 const MATCH_THRESHOLD = 0.72
+const WINDOW_MAX_WORDS = 6
+const WINDOW_MAX_LETTERS = 45
+const WINDOW_MAX_LINE_WORDS = 14
 
 function bestEntry(text: string, vocab: MerrickVocabEntry[]): { entry: MerrickVocabEntry, sim: number } | null {
   let best: MerrickVocabEntry | null = null
   let bestSim = 0
+  const compact = text.replace(/ /g, '')
+  if (!compact) return null
   for (const entry of vocab) {
-    const sim = similarity(text, entry.text)
+    const target = entry.compact ?? entry.text.replace(/ /g, '')
+    const maxLen = Math.max(compact.length, target.length)
+    // Seuls comptent les candidats qui atteignent le seuil et égalent au moins le meilleur :
+    // la distance d'édition vaut au moins l'écart de longueur (élagage immédiat), et le
+    // calcul s'arrête dès que la distance autorisée est dépassée
+    const minSim = Math.max(bestSim, MATCH_THRESHOLD)
+    const maxDist = Math.floor((1 - minSim) * maxLen + 1e-9)
+    if (Math.abs(compact.length - target.length) > maxDist) continue
+    const dist = levenshtein(compact, target, maxDist)
+    if (dist > maxDist) continue
+    const sim = 1 - dist / maxLen
     // À score égal, préférer le libellé le plus long (variété précise plutôt qu'espèce)
     if (sim > bestSim || (sim === bestSim && best && entry.text.length > best.text.length)) {
       best = entry
@@ -138,9 +155,6 @@ function bestEntry(text: string, vocab: MerrickVocabEntry[]): { entry: MerrickVo
   return best ? { entry: best, sim: bestSim } : null
 }
 
-// Ligne entière, ou (si une quantité a été lue, donc ligne d'ingrédient) n'importe quelle
-// suite de mots de la ligne : rattrape le texte parasite autour du nom (« 7e 1 HOULE … | »).
-// Les titres de plats (« CURRY DE DÉFERLANTE ») n'ont pas de quantité : jamais découpés.
 // Rapprochement de la ligne entière, puis (si allowWindows) d'une suite de mots de la ligne.
 // Une suite n'est retenue que si aucun autre vrai mot (≥ 3 lettres) ne l'entoure — le reste
 // n'est que du bruit (« v | POULE | PR ») — ou si c'est un nom de variété très proche
@@ -149,11 +163,16 @@ function bestEntry(text: string, vocab: MerrickVocabEntry[]): { entry: MerrickVo
 function matchItem(text: string, vocab: MerrickVocabEntry[], allowWindows = false): MerrickVocabEntry | null {
   let best = bestEntry(text, vocab)
   // Découpage seulement en secours : sinon « HOULE » (exact) battrait « HOULE ORCHIDEE » mal lu
-  if (allowWindows && (!best || best.sim < MATCH_THRESHOLD)) {
+  // Une ligne d'ingrédient compte au plus ~7 mots, bruit compris : au-delà, pas de découpage
+  if (allowWindows && (!best || best.sim < MATCH_THRESHOLD) && text.split(' ').length <= WINDOW_MAX_LINE_WORDS) {
     best = null
     const words = text.split(' ')
     for (let i = 0; i < words.length; i++) {
-      for (let j = i + 1; j <= words.length; j++) {
+      // Morceaux de 6 mots / 45 lettres au plus : couvre les noms les plus longs, et évite
+      // une explosion de calculs sur les longues lignes de bruit (photos d'écran)
+      for (let j = i + 1, letters = 0; j <= words.length && j - i <= WINDOW_MAX_WORDS; j++) {
+        letters += words[j - 1]!.length
+        if (letters > WINDOW_MAX_LETTERS) break
         if (i === 0 && j === words.length) continue
         const found = bestEntry(words.slice(i, j).join(' '), vocab)
         if (!found || found.sim < MATCH_THRESHOLD) continue
