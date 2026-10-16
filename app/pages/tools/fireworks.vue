@@ -71,6 +71,9 @@ const offset = computed(() => timeZoneOffsetLabel(tz.value, now.value))
 const timeFmt = computed(() => new Intl.DateTimeFormat(locale.value, { timeZone: tz.value, hour: '2-digit', minute: '2-digit' }))
 const dateFmt = computed(() => new Intl.DateTimeFormat(locale.value, { timeZone: tz.value, weekday: 'short', day: 'numeric', month: 'short' }))
 const formatTime = (time: number) => timeFmt.value.format(time)
+// Largeur fixe des cases du planning, selon le format d'heure de la langue (« 14:44 » ou
+// « 02:44 PM ») : des cases de même largeur gardent les colonnes alignées
+const cellWidth = computed(() => timeFmt.value.formatToParts(0).some(p => p.type === 'dayPeriod') ? 'w-[5.5rem]' : 'w-14')
 
 // --- Planning ---
 const current = computed(() => fireworksShowAt(now.value, anchor.value))
@@ -278,7 +281,10 @@ const isOtherDay = (time: number) => dayKeyIn(tz.value, time) !== todayKey.value
                 v-for="show in row.shows"
                 :key="show.slot"
                 :class="[
-                  'px-2 py-0.5 rounded-md text-sm tabular-nums',
+                  // Même largeur et même marge pour toutes les cases (passées ou non) :
+                  // sinon les colonnes se décalent d'une ligne à l'autre
+                  'py-0.5 rounded-md text-sm text-center tabular-nums',
+                  cellWidth,
                   show.slot === current.slot
                     ? ['font-bold ring-2', OUTPOST_COLORS[row.index]!.ring, OUTPOST_COLORS[row.index]!.bg]
                     : show.start + FIREWORKS_INTERVAL_MS <= now ? 'text-dimmed' : 'bg-elevated'
