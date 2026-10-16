@@ -836,7 +836,7 @@
         "reset": "Revenir au fuseau détecté ({tz})"
       },
       "loading": "Chargement du planning…",
-      "current": "Avant-poste en cours",
+      "current": "Feu d'artifice en cours",
       "startedAt": "Feu d'artifice tiré à {time}",
       "next": "Prochain feu d’artifice",
       "at": "à {time}",
@@ -844,8 +844,11 @@
       "upcoming": "Ensuite",
       "schedule": "Planning du jour",
       "scheduleHint": "{day}, dans votre fuseau horaire. Chaque avant-poste revient toutes les 2 h 24.",
-      "rule": "Un feu toutes les 24 minutes, dans l'ordre : Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
-      "adjusted": "Horaires recalés manuellement le {date}."
+      "rule": "Un feu toutes les 24 minutes, d'environ {duration} minutes, dans l'ordre : Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Horaires recalés manuellement le {date}.",
+      "none": "Aucun feu en ce moment",
+      "endsIn": "se termine dans {time}",
+      "lastShow": "Dernier feu tiré à {time} (terminé, un feu dure environ {duration} min)"
     }
   }
 }

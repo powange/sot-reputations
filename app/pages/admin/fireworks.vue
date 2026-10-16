@@ -24,6 +24,7 @@ interface AnchorState {
   anchor: FireworksAnchor
   custom: boolean
   updatedAt: string | null
+  durationMinutes: number
 }
 
 const { data: state, refresh } = await useFetch<AnchorState>('/api/fireworks-anchor', { key: 'admin-fireworks-anchor' })
@@ -69,6 +70,25 @@ const preview = computed(() => {
 })
 
 const saving = ref(false)
+
+// --- Durée d'un feu d'artifice ---
+const durationMinutes = ref(DEFAULT_FIREWORKS_DURATION_MINUTES)
+watch(() => state.value?.durationMinutes, (value) => {
+  if (value) durationMinutes.value = value
+}, { immediate: true })
+const savingDuration = ref(false)
+
+async function saveDuration() {
+  savingDuration.value = true
+  try {
+    state.value = await $fetch<AnchorState>('/api/admin/fireworks-duration', { method: 'PUT', body: { minutes: durationMinutes.value } })
+    toast.add({ title: 'Durée enregistrée', color: 'success' })
+  } catch {
+    toast.add({ title: 'Durée invalide ou échec de l\'enregistrement', color: 'error' })
+  } finally {
+    savingDuration.value = false
+  }
+}
 
 async function save() {
   if (!draftAnchor.value) return
@@ -144,6 +164,36 @@ async function reset() {
           class="text-muted"
         >— modifié le {{ state.updatedAt }} UTC</span>
       </p>
+    </UCard>
+
+    <UCard class="mb-6">
+      <h2 class="font-semibold mb-1">
+        Durée d'un feu d'artifice
+      </h2>
+      <p class="text-sm text-muted mb-4">
+        Pendant cette durée, la page affiche le feu « en cours » ; le reste du créneau de
+        {{ FIREWORKS_INTERVAL_MINUTES }} minutes, aucun feu n'est tiré.
+      </p>
+      <div class="flex flex-wrap items-end gap-3">
+        <UFormField
+          label="Durée (minutes)"
+          :help="`De ${FIREWORKS_DURATION_LIMITS.min} à ${FIREWORKS_DURATION_LIMITS.max} min, ${DEFAULT_FIREWORKS_DURATION_MINUTES} par défaut`"
+        >
+          <UInputNumber
+            v-model="durationMinutes"
+            :min="FIREWORKS_DURATION_LIMITS.min"
+            :max="FIREWORKS_DURATION_LIMITS.max"
+            class="w-36"
+          />
+        </UFormField>
+        <UButton
+          icon="i-lucide-save"
+          label="Enregistrer la durée"
+          :loading="savingDuration"
+          :disabled="durationMinutes === state?.durationMinutes"
+          @click="saveDuration"
+        />
+      </div>
     </UCard>
 
     <UCard>

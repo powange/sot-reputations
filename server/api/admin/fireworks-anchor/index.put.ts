@@ -1,3 +1,4 @@
+import { isValidFireworksAnchor } from '#shared/utils/fireworks'
 import { requireAdmin } from '../../../utils/admin'
 import { getFireworksAnchor, setFireworksAnchor } from '../../../utils/fireworks'
 

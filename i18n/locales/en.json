@@ -835,7 +835,7 @@
         "reset": "Back to detected time zone ({tz})"
       },
       "loading": "Loading the schedule…",
-      "current": "Current outpost",
+      "current": "Fireworks in progress",
       "startedAt": "Fireworks fired at {time}",
       "next": "Next fireworks",
       "at": "at {time}",
@@ -843,8 +843,11 @@
       "upcoming": "After that",
       "schedule": "Today's schedule",
       "scheduleHint": "{day}, in your time zone. Each outpost comes back every 2 h 24 min.",
-      "rule": "One show every 24 minutes, in order: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
-      "adjusted": "Times manually adjusted on {date}."
+      "rule": "One show every 24 minutes, lasting about {duration} minutes, in order: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Times manually adjusted on {date}.",
+      "none": "No fireworks right now",
+      "endsIn": "ends in {time}",
+      "lastShow": "Last show fired at {time} (over, a show lasts about {duration} min)"
     }
   }
 }

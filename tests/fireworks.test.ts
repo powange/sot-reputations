@@ -98,3 +98,27 @@ describe('fuseaux horaires', async () => {
     expect(isValidTimeZone('Mars/Olympus')).toBe(false)
   })
 })
+
+describe('durée d’un feu', async () => {
+  const { isFireworksShowActive, isValidFireworksDuration } = await import('../shared/utils/fireworks')
+
+  it('n’est actif que pendant sa durée (4 min par défaut)', () => {
+    const show = fireworksShowAt(utc(0, 44))
+    expect(isFireworksShowActive(show, utc(0, 44))).toBe(true)
+    expect(isFireworksShowActive(show, utc(0, 47))).toBe(true)
+    expect(isFireworksShowActive(show, utc(0, 48))).toBe(false)
+    // Le créneau reste celui de Port Merrick jusqu'à 01:08, mais sans feu
+    expect(fireworksShowAt(utc(1, 0)).start).toBe(utc(0, 44))
+    expect(isFireworksShowActive(fireworksShowAt(utc(1, 0)), utc(1, 0))).toBe(false)
+  })
+
+  it('respecte une durée réglée par un admin', () => {
+    const show = fireworksShowAt(utc(0, 44))
+    expect(isFireworksShowActive(show, utc(0, 50), 10)).toBe(true)
+    expect(isFireworksShowActive(show, utc(0, 54), 10)).toBe(false)
+    expect(isValidFireworksDuration(4)).toBe(true)
+    expect(isValidFireworksDuration(0)).toBe(false)
+    expect(isValidFireworksDuration(25)).toBe(false)
+    expect(isValidFireworksDuration(2.5)).toBe(false)
+  })
+})

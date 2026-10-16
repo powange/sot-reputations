@@ -11,10 +11,12 @@ useSeoMeta({
 })
 
 // Ancrage du planning (redéfinissable par un admin si le jeu décale les horaires)
-const { data: anchorState } = await useFetch<{ anchor: FireworksAnchor, custom: boolean, updatedAt: string | null }>('/api/fireworks-anchor', {
+const { data: anchorState } = await useFetch<{ anchor: FireworksAnchor, custom: boolean, updatedAt: string | null, durationMinutes: number }>('/api/fireworks-anchor', {
   key: 'fireworks-anchor'
 })
 const anchor = computed(() => anchorState.value?.anchor ?? DEFAULT_FIREWORKS_ANCHOR)
+// Durée d'un feu (réglable dans l'admin) : le reste du créneau de 24 min, rien n'est tiré
+const duration = computed(() => anchorState.value?.durationMinutes ?? DEFAULT_FIREWORKS_DURATION_MINUTES)
 
 // Couleur distincte par avant-poste (même ordre que FIREWORKS_OUTPOSTS)
 const OUTPOST_COLORS = [
@@ -82,11 +84,19 @@ const next = computed(() => upcoming.value[0]!)
 const later = computed(() => upcoming.value.slice(1))
 const todayKey = computed(() => dayKeyIn(tz.value, now.value))
 
-const countdownMs = computed(() => Math.max(0, next.value.start - now.value))
-const countdown = computed(() => {
-  const s = Math.ceil(countdownMs.value / 1000)
+const mmss = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-})
+}
+// Le feu du dernier créneau est-il encore en train d'être tiré ?
+const active = computed(() => isFireworksShowActive(current.value, now.value, duration.value))
+const endsIn = computed(() => mmss(current.value.start + duration.value * 60_000 - now.value))
+const isOver = (show: FireworksShow) => show.start + duration.value * 60_000 <= now.value
+// Créneau mis en avant dans la grille : le feu en cours, sinon le prochain
+const highlightSlot = computed(() => active.value ? current.value.slot : next.value.slot)
+
+const countdownMs = computed(() => Math.max(0, next.value.start - now.value))
+const countdown = computed(() => mmss(countdownMs.value))
 // Lecteurs d'écran : annonce à la minute, pas chaque seconde
 const countdownMinutes = computed(() => Math.max(1, Math.ceil(countdownMs.value / 60_000)))
 
@@ -181,27 +191,33 @@ const isOtherDay = (time: number) => dayKeyIn(tz.value, time) !== todayKey.value
 
     <template v-else>
       <div class="grid gap-4 sm:grid-cols-2 mb-6">
-        <!-- Avant-poste en cours -->
-        <UCard :class="['ring-2', OUTPOST_COLORS[current.outpost]!.ring]">
+        <!-- Feu en cours (pendant sa durée), sinon le dernier, terminé -->
+        <UCard :class="active ? ['ring-2', OUTPOST_COLORS[current.outpost]!.ring] : 'opacity-80'">
           <p class="text-xs uppercase tracking-wide text-muted">
-            {{ $t('tools.fireworks.current') }}
+            {{ active ? $t('tools.fireworks.current') : $t('tools.fireworks.none') }}
           </p>
           <p class="flex items-center gap-2 mt-2 text-xl font-semibold">
-            <span :class="['p-2 rounded-lg', OUTPOST_COLORS[current.outpost]!.bg]">
+            <span :class="['p-2 rounded-lg', active ? OUTPOST_COLORS[current.outpost]!.bg : 'bg-elevated']">
               <UIcon
-                name="i-lucide-sparkles"
-                :class="['size-6 block', OUTPOST_COLORS[current.outpost]!.text]"
+                :name="active ? 'i-lucide-sparkles' : 'i-lucide-moon-star'"
+                :class="['size-6 block', active ? OUTPOST_COLORS[current.outpost]!.text : 'text-muted']"
               />
             </span>
-            {{ outpostName(current.outpost) }}
+            <span :class="{ 'text-muted': !active }">{{ outpostName(current.outpost) }}</span>
           </p>
           <p class="text-sm text-muted mt-2">
-            {{ $t('tools.fireworks.startedAt', { time: formatTime(current.start) }) }}
+            <template v-if="active">
+              {{ $t('tools.fireworks.startedAt', { time: formatTime(current.start) }) }}
+              · <span class="font-semibold text-default tabular-nums">{{ $t('tools.fireworks.endsIn', { time: endsIn }) }}</span>
+            </template>
+            <template v-else>
+              {{ $t('tools.fireworks.lastShow', { time: formatTime(current.start), duration }) }}
+            </template>
           </p>
         </UCard>
 
-        <!-- Prochain show + compte à rebours -->
-        <UCard>
+        <!-- Prochain show + compte à rebours (mis en avant quand aucun feu n'est en cours) -->
+        <UCard :class="active ? '' : ['ring-2', OUTPOST_COLORS[next.outpost]!.ring]">
           <p class="text-xs uppercase tracking-wide text-muted">
             {{ $t('tools.fireworks.next') }}
           </p>
@@ -285,11 +301,11 @@ const isOtherDay = (time: number) => dayKeyIn(tz.value, time) !== todayKey.value
                   // sinon les colonnes se décalent d'une ligne à l'autre
                   'py-0.5 rounded-md text-sm text-center tabular-nums',
                   cellWidth,
-                  show.slot === current.slot
+                  show.slot === highlightSlot
                     ? ['font-bold ring-2', OUTPOST_COLORS[row.index]!.ring, OUTPOST_COLORS[row.index]!.bg]
-                    : show.start + FIREWORKS_INTERVAL_MS <= now ? 'text-dimmed' : 'bg-elevated'
+                    : isOver(show) ? 'text-dimmed' : 'bg-elevated'
                 ]"
-                :aria-current="show.slot === current.slot ? 'time' : undefined"
+                :aria-current="show.slot === highlightSlot ? 'time' : undefined"
               >
                 {{ formatTime(show.start) }}
               </li>
@@ -299,7 +315,7 @@ const isOtherDay = (time: number) => dayKeyIn(tz.value, time) !== todayKey.value
       </UCard>
 
       <p class="text-xs text-muted mt-4">
-        {{ $t('tools.fireworks.rule') }}
+        {{ $t('tools.fireworks.rule', { duration }) }}
         <template v-if="anchorState?.custom && anchorState.updatedAt">
           {{ $t('tools.fireworks.adjusted', { date: new Date(anchorState.updatedAt.replace(' ', 'T') + 'Z').toLocaleDateString(locale) }) }}
         </template>

@@ -835,7 +835,7 @@
         "reset": "Volver a la zona detectada ({tz})"
       },
       "loading": "Cargando el horario…",
-      "current": "Puesto avanzado actual",
+      "current": "Fuegos artificiales en curso",
       "startedAt": "Fuegos lanzados a las {time}",
       "next": "Próximos fuegos artificiales",
       "at": "a las {time}",
@@ -843,8 +843,11 @@
       "upcoming": "Después",
       "schedule": "Horario del día",
       "scheduleHint": "{day}, en tu zona horaria. Cada puesto avanzado vuelve cada 2 h 24 min.",
-      "rule": "Unos fuegos cada 24 minutos, en orden: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
-      "adjusted": "Horarios ajustados manualmente el {date}."
+      "rule": "Unos fuegos cada 24 minutos, de unos {duration} minutos, en orden: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Horarios ajustados manualmente el {date}.",
+      "none": "No hay fuegos en este momento",
+      "endsIn": "termina en {time}",
+      "lastShow": "Últimos fuegos lanzados a las {time} (terminados, duran unos {duration} min)"
     }
   }
 }

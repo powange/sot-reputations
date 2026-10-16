@@ -20,6 +20,21 @@ export const FIREWORKS_OUTPOSTS = [
 export const FIREWORKS_INTERVAL_MINUTES = 24
 export const FIREWORKS_INTERVAL_MS = FIREWORKS_INTERVAL_MINUTES * 60_000
 
+// Durée d'un feu d'artifice (le reste du créneau de 24 min, il n'y a pas de feu).
+// Valeur par défaut : modifiable dans /admin/fireworks.
+export const DEFAULT_FIREWORKS_DURATION_MINUTES = 4
+export const FIREWORKS_DURATION_LIMITS = { min: 1, max: FIREWORKS_INTERVAL_MINUTES }
+
+export function isValidFireworksDuration(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value)
+    && value >= FIREWORKS_DURATION_LIMITS.min && value <= FIREWORKS_DURATION_LIMITS.max
+}
+
+// Le feu de ce show est-il encore en train d'être tiré à cet instant ?
+export function isFireworksShowActive(show: FireworksShow, time: number, durationMinutes = DEFAULT_FIREWORKS_DURATION_MINUTES): boolean {
+  return time >= show.start && time < show.start + durationMinutes * 60_000
+}
+
 export interface FireworksAnchor {
   // Instant (ms depuis l'epoch, UTC) d'un show connu
   at: number
