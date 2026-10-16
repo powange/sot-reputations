@@ -824,6 +824,27 @@
           "column": "line-by-line reading"
         }
       }
+    },
+    "fireworks": {
+      "title": "Fireworks schedule",
+      "description": "Which outpost is firing its fireworks now, the next one and the full daily schedule, in your time zone.",
+      "intro": "A fireworks show is fired every 24 minutes, taking turns across six outposts. Times are shown in your time zone, daylight saving included.",
+      "timezone": {
+        "shown": "Times shown: {tz} {offset}",
+        "select": "Choose a time zone",
+        "reset": "Back to detected time zone ({tz})"
+      },
+      "loading": "Loading the schedule…",
+      "current": "Current outpost",
+      "startedAt": "Fireworks fired at {time}",
+      "next": "Next fireworks",
+      "at": "at {time}",
+      "countdownAria": "Next fireworks at {outpost} in {minutes} minute(s)",
+      "upcoming": "After that",
+      "schedule": "Today's schedule",
+      "scheduleHint": "{day}, in your time zone. Each outpost comes back every 2 h 24 min.",
+      "rule": "One show every 24 minutes, in order: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Times manually adjusted on {date}."
     }
   }
 }

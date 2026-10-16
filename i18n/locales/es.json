@@ -824,6 +824,27 @@
           "column": "lectura línea por línea"
         }
       }
+    },
+    "fireworks": {
+      "title": "Horarios de los fuegos artificiales",
+      "description": "Qué puesto avanzado lanza sus fuegos artificiales ahora, el siguiente y el horario del día, en tu zona horaria.",
+      "intro": "Cada 24 minutos se lanzan fuegos artificiales, por turnos en seis puestos avanzados. Los horarios se muestran en tu zona horaria, con el horario de verano incluido.",
+      "timezone": {
+        "shown": "Horas mostradas: {tz} {offset}",
+        "select": "Elegir una zona horaria",
+        "reset": "Volver a la zona detectada ({tz})"
+      },
+      "loading": "Cargando el horario…",
+      "current": "Puesto avanzado actual",
+      "startedAt": "Fuegos lanzados a las {time}",
+      "next": "Próximos fuegos artificiales",
+      "at": "a las {time}",
+      "countdownAria": "Próximos fuegos artificiales en {outpost} dentro de {minutes} minuto(s)",
+      "upcoming": "Después",
+      "schedule": "Horario del día",
+      "scheduleHint": "{day}, en tu zona horaria. Cada puesto avanzado vuelve cada 2 h 24 min.",
+      "rule": "Unos fuegos cada 24 minutos, en orden: Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Horarios ajustados manualmente el {date}."
     }
   }
 }

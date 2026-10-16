@@ -9,7 +9,8 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
-    "make-admin": "npx tsx scripts/make-admin.ts"
+    "make-admin": "npx tsx scripts/make-admin.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.74",
@@ -38,6 +39,7 @@
     "@types/sortablejs": "^1.15.8",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
+    "vitest": "^5.0.2",
     "vue-tsc": "^3.1.5"
   }
 }

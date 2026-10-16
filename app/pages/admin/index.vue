@@ -285,6 +285,39 @@ watchEffect(() => {
         </div>
       </section>
 
+      <!-- Outils - Admin seulement -->
+      <section v-if="isAdmin">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">
+          <UIcon
+            name="i-lucide-wrench"
+            class="w-4 h-4"
+          />
+          Outils
+        </h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Feux d'artifice -->
+          <NuxtLink
+            to="/admin/fireworks"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-sparkles"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Feux d'artifice</h3>
+                  <p class="text-sm text-muted">Recaler le planning des avant-postes après un décalage du jeu</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+        </div>
+      </section>
+
       <!-- Notes de version - Admin seulement -->
       <section v-if="isAdmin">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-muted mb-3 flex items-center gap-2">

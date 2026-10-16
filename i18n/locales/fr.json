@@ -825,6 +825,27 @@
           "column": "lecture ligne par ligne"
         }
       }
+    },
+    "fireworks": {
+      "title": "Horaires des feux d'artifice",
+      "description": "Quel avant-poste tire son feu d'artifice maintenant, le prochain et le planning du jour, à l'heure de votre fuseau.",
+      "intro": "Un feu d'artifice est tiré toutes les 24 minutes, à tour de rôle dans six avant-postes. Les horaires s'affichent dans votre fuseau horaire, heure d'été comprise.",
+      "timezone": {
+        "shown": "Heures affichées : {tz} {offset}",
+        "select": "Choisir un fuseau horaire",
+        "reset": "Revenir au fuseau détecté ({tz})"
+      },
+      "loading": "Chargement du planning…",
+      "current": "Avant-poste en cours",
+      "startedAt": "Feu d'artifice tiré à {time}",
+      "next": "Prochain feu d’artifice",
+      "at": "à {time}",
+      "countdownAria": "Prochain feu d'artifice à {outpost} dans {minutes} minute(s)",
+      "upcoming": "Ensuite",
+      "schedule": "Planning du jour",
+      "scheduleHint": "{day}, dans votre fuseau horaire. Chaque avant-poste revient toutes les 2 h 24.",
+      "rule": "Un feu toutes les 24 minutes, dans l'ordre : Port Merrick, Plunder, Ancient Spire, Dagger Tooth, Galleon's Grave, Sanctuary.",
+      "adjusted": "Horaires recalés manuellement le {date}."
     }
   }
 }
