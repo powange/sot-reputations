@@ -73,9 +73,23 @@ const offset = computed(() => timeZoneOffsetLabel(tz.value, now.value))
 const timeFmt = computed(() => new Intl.DateTimeFormat(locale.value, { timeZone: tz.value, hour: '2-digit', minute: '2-digit' }))
 const dateFmt = computed(() => new Intl.DateTimeFormat(locale.value, { timeZone: tz.value, weekday: 'short', day: 'numeric', month: 'short' }))
 const formatTime = (time: number) => timeFmt.value.format(time)
-// Largeur fixe des cases du planning, selon le format d'heure de la langue (« 14:44 » ou
-// « 02:44 PM ») : des cases de même largeur gardent les colonnes alignées
-const cellWidth = computed(() => timeFmt.value.formatToParts(0).some(p => p.type === 'dayPeriod') ? 'w-[5.5rem]' : 'w-14')
+// Grille du jour : cases de largeur fixe (colonnes alignées) et assez étroites pour que les
+// 10 horaires d'un avant-poste tiennent sur une ligne. En 12 h (anglais), heure sans zéro
+// initial et « AM/PM » en petit, sous l'heure : la case n'est pas plus large que « 12:20 »
+const is12h = computed(() => timeFmt.value.formatToParts(0).some(p => p.type === 'dayPeriod'))
+const gridFmt = computed(() => new Intl.DateTimeFormat(locale.value, {
+  timeZone: tz.value,
+  hour: is12h.value ? 'numeric' : '2-digit',
+  minute: '2-digit'
+}))
+const gridTime = (time: number) => {
+  const parts = gridFmt.value.formatToParts(time)
+  return {
+    main: parts.filter(p => p.type !== 'dayPeriod').map(p => p.value).join('').trim(),
+    period: parts.find(p => p.type === 'dayPeriod')?.value ?? ''
+  }
+}
+const cellWidth = computed(() => is12h.value ? 'w-12 flex flex-col items-center leading-tight' : 'w-14')
 
 // --- Planning ---
 const current = computed(() => fireworksShowAt(now.value, anchor.value))
@@ -307,7 +321,11 @@ const isOtherDay = (time: number) => dayKeyIn(tz.value, time) !== todayKey.value
                 ]"
                 :aria-current="show.slot === highlightSlot ? 'time' : undefined"
               >
-                {{ formatTime(show.start) }}
+                <span>{{ gridTime(show.start).main }}</span>
+                <span
+                  v-if="gridTime(show.start).period"
+                  class="text-[0.625rem] font-normal opacity-80"
+                >{{ gridTime(show.start).period }}</span>
               </li>
             </ul>
           </div>
