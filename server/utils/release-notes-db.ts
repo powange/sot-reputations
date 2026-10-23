@@ -52,6 +52,39 @@ export function getReleaseNotesWithContent(): ReleaseNoteRow[] {
   return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE content IS NOT NULL ORDER BY date DESC').all() as ReleaseNoteRow[]
 }
 
+export type ReleaseNoteSummary = Omit<ReleaseNoteRow, 'content'>
+
+// Compare deux versions « 3.8.0.2 » numériquement (décroissant : la plus récente d'abord).
+function compareVersionsDesc(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pb[i] || 0) - (pa[i] || 0)
+    if (diff) return diff
+  }
+  return 0
+}
+
+// Versions publiées (avec contenu), sans le contenu : la plus récente d'abord.
+// À date égale (plusieurs versions publiées le même jour), le numéro départage.
+export function getReleaseNoteVersions(): ReleaseNoteSummary[] {
+  const db = getReleaseNotesDb()
+  const rows = db.prepare('SELECT id, version, display_version, date FROM release_notes WHERE content IS NOT NULL').all() as ReleaseNoteSummary[]
+  return rows.sort((a, b) => b.date.localeCompare(a.date) || compareVersionsDesc(a.version, b.version))
+}
+
+// Dernière version publiée (avec contenu)
+export function getLatestReleaseNote(): ReleaseNoteRow | undefined {
+  const latest = getReleaseNoteVersions()[0]
+  return latest ? getReleaseNoteById(latest.id) : undefined
+}
+
+// Version publiée (avec contenu) par numéro interne ou affiché
+export function getPublishedReleaseNote(version: string): ReleaseNoteRow | undefined {
+  const db = getReleaseNotesDb()
+  return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE content IS NOT NULL AND (version = ? OR display_version = ?) LIMIT 1').get(version, version) as ReleaseNoteRow | undefined
+}
+
 export function getReleaseNoteById(id: number): ReleaseNoteRow | undefined {
   const db = getReleaseNotesDb()
   return db.prepare('SELECT id, version, display_version, date, content FROM release_notes WHERE id = ?').get(id) as ReleaseNoteRow | undefined

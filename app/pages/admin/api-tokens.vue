@@ -331,7 +331,26 @@ const origin = computed(() => useRequestURL().origin)
           <p class="font-medium mb-1">
             Notes de version (patch notes)
           </p>
-          <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes</code>
+          <div class="space-y-2">
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Liste des versions publiées avec leur date (sans contenu), la plus récente d'abord
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes</code>
+            </div>
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Contenu d'une version (numéro de la liste, ex. 3.9.1)
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes/&lt;version&gt;</code>
+            </div>
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Dernière version sortie, avec son contenu
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes/latest</code>
+            </div>
+          </div>
         </div>
         <div>
           <p class="font-medium mb-1">
