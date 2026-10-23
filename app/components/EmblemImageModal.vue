@@ -32,7 +32,7 @@ watch(open, async (isOpen) => {
   } catch {
     itemsLoaded.value = false // autorise un nouvel essai à la prochaine ouverture
   }
-})
+}, { immediate: true }) // monté déjà ouvert (montage paresseux dans EmblemCard)
 </script>
 
 <template>

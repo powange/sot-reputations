@@ -8,10 +8,15 @@ const props = defineProps<{
 }>()
 
 const isImageOpen = ref(false)
+// La modale n'est montée qu'à la première ouverture : ~1 600 cards × UModal fermé
+// coûtaient cher au montage de la page.
+const modalMounted = ref(false)
 
 // Toute la card est cliquable (ouvre la modale), seulement s'il y a une image.
 function openModal() {
-  if (props.row.image) isImageOpen.value = true
+  if (!props.row.image) return
+  modalMounted.value = true
+  isImageOpen.value = true
 }
 
 // État visuel : complété (vert), en cours (ambre), rien (atténué).
@@ -121,6 +126,7 @@ const isScalar = computed(() => props.row.threshold > 0)
     </div>
 
     <EmblemImageModal
+      v-if="modalMounted"
       v-model:open="isImageOpen"
       :name="row.name"
       :description="row.description"
