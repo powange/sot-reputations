@@ -21,10 +21,21 @@ const toast = useToast()
 // useRequestFetch() : forwarde le contexte de la requête (cookie de session) à l'appel
 // interne en SSR, sinon le serveur ne verrait pas la session et renverrait le public.
 const reqFetch = useRequestFetch()
+// DIAGNOSTIC TEMPORAIRE (voir plugins/diag-navigation.client.ts)
+const diag = (...args: unknown[]) => {
+  if (import.meta.client) console.info('[diag]', `${Math.round(performance.now())}ms`, ...args)
+}
+diag('reputations : setup, demande des données')
 const { data, refresh, status } = await useAsyncData(
   'my-reputations',
-  () => reqFetch<MyReputationsData>('/api/my-reputations')
+  async () => {
+    const res = await reqFetch<MyReputationsData>('/api/my-reputations')
+    diag('reputations : données reçues', res?.user ? `connecté (${res.factions?.length} factions)` : 'public')
+    return res
+  }
 )
+diag('reputations : setup terminé, statut', status.value)
+onMounted(() => diag('reputations : page montée'))
 const isPublic = computed(() => !data.value?.user)
 const isLoading = computed(() => status.value === 'pending')
 
