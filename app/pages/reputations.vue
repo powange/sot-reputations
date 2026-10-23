@@ -204,30 +204,6 @@ const {
   factions
 })
 
-// Rendu progressif des factions lors d'une navigation côté client : monter ~1 600 cards
-// d'un coup bloquait le thread principal. En SSR / hydratation, tout est rendu d'emblée
-// (pas de mismatch d'hydratation).
-const nuxtApp = useNuxtApp()
-const renderedFactionCount = ref(import.meta.server || nuxtApp.isHydrating ? Infinity : 1)
-const renderedFactionsCampaigns = computed(() =>
-  filteredFactionsCampaigns.value.slice(0, renderedFactionCount.value))
-let renderTimer: ReturnType<typeof setTimeout> | null = null
-function renderMoreFactions() {
-  renderTimer = null
-  if (renderedFactionCount.value >= filteredFactionsCampaigns.value.length) return
-  renderedFactionCount.value++
-  renderTimer = setTimeout(renderMoreFactions, 16)
-}
-function scheduleRender() {
-  if (import.meta.client && !renderTimer) renderTimer = setTimeout(renderMoreFactions, 16)
-}
-onMounted(scheduleRender)
-// Les données peuvent arriver après le montage (ou un filtre élargir la liste).
-watch(() => filteredFactionsCampaigns.value.length, scheduleRender)
-onBeforeUnmount(() => {
-  if (renderTimer) clearTimeout(renderTimer)
-})
-
 // Résultats de recherche
 const searchResults = computed(() => {
   if (!isSearchActive.value) return []
@@ -550,7 +526,7 @@ async function handleDelete() {
         <!-- Factions (toutes ou filtrées) -->
         <template v-else>
           <template
-            v-for="{ faction, campaigns } in renderedFactionsCampaigns"
+            v-for="{ faction, campaigns } in filteredFactionsCampaigns"
             :key="faction.key"
           >
             <div
@@ -597,14 +573,17 @@ async function handleDelete() {
                       {{ translateCampaignField(campaign, 'description', locale) }}
                     </p>
                   </div>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    <EmblemCard
-                      v-for="row in getTableData(campaign.emblems)"
-                      :key="row.id"
-                      :row="row"
-                      :show-progress="hasImportedData"
-                    />
-                  </div>
+                  <!-- Cards montées à l'approche du viewport (~1 600 au total) -->
+                  <DeferredRender :count="filterEmblemsList(campaign.emblems).length">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                      <EmblemCard
+                        v-for="row in getTableData(campaign.emblems)"
+                        :key="row.id"
+                        :row="row"
+                        :show-progress="hasImportedData"
+                      />
+                    </div>
+                  </DeferredRender>
                 </div>
               </template>
             </div>

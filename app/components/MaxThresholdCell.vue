@@ -7,6 +7,9 @@ defineProps<{
   gradeThresholds?: GradeThreshold[]
 }>()
 
+// UPopover monté au premier clic seulement (un par card, ~1 600 sur /reputations).
+const popoverMounted = ref(false)
+
 function getThreshold(gradeThresholds: GradeThreshold[] | undefined, grade: number): number | undefined {
   return gradeThresholds?.find(g => g.grade === grade)?.threshold
 }
@@ -14,7 +17,16 @@ function getThreshold(gradeThresholds: GradeThreshold[] | undefined, grade: numb
 
 <template>
   <template v-if="maxGrade >= 2 && gradeThresholds?.length">
+    <span
+      v-if="!popoverMounted"
+      class="cursor-pointer underline decoration-dotted"
+      @click="popoverMounted = true"
+    >
+      {{ maxThreshold ?? '?' }}
+    </span>
     <UPopover
+      v-else
+      default-open
       mode="click"
       :content="{
         side: 'right'
