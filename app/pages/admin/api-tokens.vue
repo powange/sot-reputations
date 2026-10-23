@@ -356,7 +356,26 @@ const origin = computed(() => useRequestURL().origin)
           <p class="font-medium mb-1">
             Recommandations
           </p>
-          <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations</code>
+          <div class="space-y-2">
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Sommaire : factions et campagnes avec leur nombre d'emblèmes (sans les emblèmes)
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations</code>
+            </div>
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Emblèmes d'une faction (clé du sommaire, ex. HuntersCall)
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations/&lt;faction&gt;</code>
+            </div>
+            <div>
+              <p class="text-sm text-muted mb-1">
+                Emblèmes d'une campagne (ex. HuntersCall/splashtails)
+              </p>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations/&lt;faction&gt;/&lt;campagne&gt;</code>
+            </div>
+          </div>
         </div>
         <div>
           <p class="font-medium mb-1">
