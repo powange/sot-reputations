@@ -1,6 +1,6 @@
 import { requireApiToken } from '../../../utils/api-token'
-import { getRecommendationsIndex, type RecommendationFactionSummary } from '../../../utils/recommendations-agent'
-import { wantsMarkdown, sendMarkdown, mdInline, pushMdHeading } from '../../../utils/api-markdown'
+import { getRecommendationsIndex, mdBilingual, type RecommendationFactionSummary } from '../../../utils/recommendations-agent'
+import { wantsMarkdown, sendMarkdown, pushMdHeading } from '../../../utils/api-markdown'
 
 /**
  * Rendu Markdown : une section par faction (nombre d'emblèmes, chemin de son
@@ -12,11 +12,11 @@ function renderIndexMarkdown(factions: RecommendationFactionSummary[]): string {
   pushMdHeading(lines, `# Recommandations d'emblèmes (${total})`)
   lines.push('Emblèmes d\'une faction : `GET /api/agent/recommendations/<faction>` ; d\'une campagne : `GET /api/agent/recommendations/<faction>/<campagne>`.')
   for (const f of factions) {
-    pushMdHeading(lines, `## ${mdInline(f.name)} (${f.count}) — \`${f.url}\``)
+    pushMdHeading(lines, `## ${mdBilingual(f.name, f.nameEn)} (${f.count}) — \`${f.url}\``)
     // Faction sans campagne propre (campagne unique « default ») : rien à détailler.
     if (f.campaigns.length > 1) {
       for (const c of f.campaigns) {
-        lines.push(`- ${mdInline(c.name)} (${c.count}) : \`${c.url}\``)
+        lines.push(`- ${mdBilingual(c.name, c.nameEn)} (${c.count}) : \`${c.url}\``)
       }
     }
   }

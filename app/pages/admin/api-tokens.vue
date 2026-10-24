@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import { AGENT_API_SECTIONS } from '~/utils/agent-api-docs'
 
 const { isAdmin, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
@@ -327,61 +328,36 @@ const origin = computed(() => useRequestURL().origin)
           du <strong>Markdown</strong> à la place — pratique pour un agent IA qui exploite mieux du
           texte structuré. Cumulable avec le paramètre <code class="px-1.5 py-0.5 rounded bg-elevated">token</code>.
         </p>
-        <div>
+        <p class="text-muted">
+          Exemples de réponse JSON : vraies réponses, listes réduites à un ou deux éléments et
+          contenus tronqués (les compteurs <code class="px-1.5 py-0.5 rounded bg-elevated">count</code>
+          gardent leur valeur réelle). Erreurs : 401 sans jeton valide, 404 si la version, la
+          faction, la campagne ou la catégorie n'existe pas.
+        </p>
+        <div
+          v-for="section in AGENT_API_SECTIONS"
+          :key="section.title"
+        >
           <p class="font-medium mb-1">
-            Notes de version (patch notes)
+            {{ section.title }}
           </p>
-          <div class="space-y-2">
-            <div>
+          <div class="space-y-3">
+            <div
+              v-for="endpoint in section.endpoints"
+              :key="endpoint.path"
+            >
               <p class="text-sm text-muted mb-1">
-                Liste des versions publiées avec leur date (sans contenu), la plus récente d'abord
+                {{ endpoint.description }}
               </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes</code>
-            </div>
-            <div>
-              <p class="text-sm text-muted mb-1">
-                Contenu d'une version (numéro de la liste, ex. 3.9.1)
-              </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes/&lt;version&gt;</code>
-            </div>
-            <div>
-              <p class="text-sm text-muted mb-1">
-                Dernière version sortie, avec son contenu
-              </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/release-notes/latest</code>
+              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}{{ endpoint.path }}</code>
+              <details class="mt-1">
+                <summary class="cursor-pointer text-xs text-muted hover:text-default select-none">
+                  Exemple de réponse JSON
+                </summary>
+                <pre class="mt-1 px-3 py-2 rounded bg-elevated text-xs overflow-x-auto max-h-96">{{ JSON.stringify(endpoint.example, null, 2) }}</pre>
+              </details>
             </div>
           </div>
-        </div>
-        <div>
-          <p class="font-medium mb-1">
-            Recommandations
-          </p>
-          <div class="space-y-2">
-            <div>
-              <p class="text-sm text-muted mb-1">
-                Sommaire : factions et campagnes avec leur nombre d'emblèmes (sans les emblèmes)
-              </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations</code>
-            </div>
-            <div>
-              <p class="text-sm text-muted mb-1">
-                Emblèmes d'une faction (clé du sommaire, ex. HuntersCall)
-              </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations/&lt;faction&gt;</code>
-            </div>
-            <div>
-              <p class="text-sm text-muted mb-1">
-                Emblèmes d'une campagne (ex. HuntersCall/splashtails)
-              </p>
-              <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/recommendations/&lt;faction&gt;/&lt;campagne&gt;</code>
-            </div>
-          </div>
-        </div>
-        <div>
-          <p class="font-medium mb-1">
-            Catalogue du coffre
-          </p>
-          <code class="block px-3 py-2 rounded bg-elevated break-all">GET {{ origin }}/api/agent/chest-items</code>
         </div>
         <div>
           <p class="font-medium mb-1">

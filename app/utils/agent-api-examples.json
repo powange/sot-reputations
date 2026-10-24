@@ -1,0 +1,239 @@
+{
+  "release-notes": {
+    "count": 2,
+    "releaseNotes": [
+      {
+        "version": "3.9.1",
+        "display_version": null,
+        "date": "2026-10-23",
+        "url": "/api/agent/release-notes/3.9.1"
+      },
+      {
+        "version": "3.9.0",
+        "display_version": null,
+        "date": "2026-09-17",
+        "url": "/api/agent/release-notes/3.9.0"
+      }
+    ]
+  },
+  "release-notes/latest": {
+    "version": "3.9.1",
+    "display_version": null,
+    "date": "2026-10-23",
+    "content": "# 3.9.1\n\n## Custom Seas\n\nThe free customisation toolset introduced in Season 20 expands with new options and additions! For more info on everything else taking …"
+  },
+  "release-notes/3.9.0": {
+    "version": "3.9.0",
+    "display_version": null,
+    "date": "2026-09-17",
+    "content": "# 3.9.0\n\n## Custom Seas\n\nThe free customisation toolset introduced in Season 20 expands with new options and additions! For more info on everything else taking …"
+  },
+  "recommendations": {
+    "count": 1599,
+    "factions": [
+      {
+        "key": "HuntersCall",
+        "name": "L'appel du chasseur",
+        "nameEn": "Hunter's Call",
+        "count": 143,
+        "url": "/api/agent/recommendations/HuntersCall",
+        "campaigns": [
+          {
+            "key": "call-of-the-hunter",
+            "name": "L’Appel du chasseur",
+            "nameEn": "Call of the Hunter",
+            "count": 50,
+            "url": "/api/agent/recommendations/HuntersCall/call-of-the-hunter"
+          },
+          {
+            "key": "splashtails",
+            "name": "Queues éclaboussantes",
+            "nameEn": "Splashtails",
+            "count": 7,
+            "url": "/api/agent/recommendations/HuntersCall/splashtails"
+          }
+        ]
+      }
+    ]
+  },
+  "recommendations/HuntersCall": {
+    "faction": {
+      "key": "HuntersCall",
+      "name": "L'appel du chasseur",
+      "nameEn": "Hunter's Call"
+    },
+    "count": 143,
+    "recommendations": [
+      {
+        "nameFr": "L’Appel du chasseur",
+        "nameEn": "Call of the Hunter",
+        "descriptionFr": "Vous avez terminé 250 voyages de l’Appel du chasseur !",
+        "descriptionEn": "Complete 250 Hunter's Call Voyages.",
+        "image": "https://athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net/2-152-3728-0/Emblem/Unlocked/1DEB3F7C4E578B63AE26F1925DB2CF0D.png",
+        "maxGrade": 5,
+        "faction": {
+          "key": "HuntersCall",
+          "name": "L'appel du chasseur",
+          "nameEn": "Hunter's Call"
+        },
+        "campaign": {
+          "key": "call-of-the-hunter",
+          "name": "L’Appel du chasseur",
+          "nameEn": "Call of the Hunter"
+        },
+        "gradeThresholds": [
+          {
+            "grade": 1,
+            "threshold": 5
+          },
+          {
+            "grade": 2,
+            "threshold": 25
+          },
+          {
+            "grade": 3,
+            "threshold": 50
+          },
+          {
+            "grade": 4,
+            "threshold": 100
+          },
+          {
+            "grade": 5,
+            "threshold": 250
+          }
+        ]
+      }
+    ]
+  },
+  "recommendations/HuntersCall/splashtails": {
+    "faction": {
+      "key": "HuntersCall",
+      "name": "L'appel du chasseur",
+      "nameEn": "Hunter's Call"
+    },
+    "campaign": {
+      "key": "splashtails",
+      "name": "Queues éclaboussantes",
+      "nameEn": "Splashtails"
+    },
+    "count": 7,
+    "recommendations": [
+      {
+        "nameFr": "Chasseur de la queue éclaboussante rubis",
+        "nameEn": "Hunter of the Ruby Splashtail",
+        "descriptionFr": "Vous avez livré 50 queues éclaboussantes rubis.",
+        "descriptionEn": "You delivered 50 Ruby Splashtails.",
+        "image": "https://athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net/2-152-3728-0/Emblem/Unlocked/C528DA914297A8C5FCEF50988E5BD399.png",
+        "maxGrade": 5,
+        "faction": {
+          "key": "HuntersCall",
+          "name": "L'appel du chasseur",
+          "nameEn": "Hunter's Call"
+        },
+        "campaign": {
+          "key": "splashtails",
+          "name": "Queues éclaboussantes",
+          "nameEn": "Splashtails"
+        },
+        "gradeThresholds": [
+          {
+            "grade": 1,
+            "threshold": 1
+          },
+          {
+            "grade": 2,
+            "threshold": 10
+          },
+          {
+            "grade": 3,
+            "threshold": 20
+          },
+          {
+            "grade": 4,
+            "threshold": 35
+          },
+          {
+            "grade": 5,
+            "threshold": 50
+          }
+        ]
+      }
+    ]
+  },
+  "chest-items": {
+    "count": 7719,
+    "categories": [
+      {
+        "key": "Pets",
+        "label": {
+          "fr": "Familiers",
+          "en": "Pets"
+        },
+        "count": 42,
+        "url": "/api/agent/chest-items/Pets",
+        "subcategories": [
+          {
+            "key": "Cat",
+            "label": {
+              "fr": "Chat",
+              "en": "Cat"
+            },
+            "count": 5,
+            "url": "/api/agent/chest-items/Pets/Cat"
+          },
+          {
+            "key": "Dog",
+            "label": {
+              "fr": "Chien",
+              "en": "Dog"
+            },
+            "count": 7,
+            "url": "/api/agent/chest-items/Pets/Dog"
+          }
+        ]
+      }
+    ]
+  },
+  "chest-items/Pets": {
+    "category": "Pets",
+    "count": 42,
+    "chestItems": [
+      {
+        "key": "b8d7c832-8808-4b4d-9359-07c2f18d275f.png",
+        "category": "Pets",
+        "subcategory": "Cat",
+        "nameFr": "Chat de pleine lune",
+        "nameEn": "Full Moon Cat",
+        "descriptionFr": "C'est peut-être la même magie qui fait briller ce chat qui le rend aussi incroyablement mignon.",
+        "descriptionEn": "Perhaps the same magic that enables this cat to glow is also responsible for just how cute it looks.",
+        "image": "https://athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net/2-153-100-0/Entitlement/Inventory/6ca51519-14ff-4f84-813d-5a7445e7cf6a.png",
+        "cost": {
+          "ancientCoins": 649
+        },
+        "prerequisites": {
+          "requires": "The is exclusively available to purchase during Season 21."
+        }
+      }
+    ]
+  },
+  "chest-items/Pets/Parrot": {
+    "category": "Pets",
+    "subcategory": "Parrot",
+    "count": 7,
+    "chestItems": [
+      {
+        "key": "4583ac6e-80df-4f4f-b044-800e4056c828.png",
+        "category": "Pets",
+        "subcategory": "Parrot",
+        "nameFr": "Ara pourpre",
+        "nameEn": null,
+        "descriptionFr": "Appelez-le « Coco » si ça vous chante, mais c'est une créature orgueilleuse au bec acéré…",
+        "descriptionEn": null,
+        "image": "https://athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net/2-150-1583-0/Entitlement/Inventory/7b47cf1c-8e3a-49d9-90d6-38e8c910d182.png",
+        "cost": null,
+        "prerequisites": null
+      }
+    ]
+  }
+}

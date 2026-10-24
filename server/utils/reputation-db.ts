@@ -2434,8 +2434,11 @@ export interface ChestCatalogItem {
   key: string
   category: string
   subcategory: string | null
-  name: string
-  description: string | null
+  // Nom / description FR (nom de base) et EN (chest_item_translations, null si absente).
+  nameFr: string
+  nameEn: string | null
+  descriptionFr: string | null
+  descriptionEn: string | null
   image: string | null
   // Coût d'achat (or / doublons / pièces anciennes) et prérequis d'obtention,
   // déduits du wiki. null si l'item n'est pas achetable / sans condition.
@@ -2444,21 +2447,33 @@ export interface ChestCatalogItem {
 }
 
 /**
- * Catalogue complet des items du coffre (non lié à un utilisateur), trié par
- * catégorie (ordre du jeu) puis ordre d'import. Pour les endpoints agent.
+ * Catalogue des items du coffre (non lié à un utilisateur), éventuellement
+ * restreint à une catégorie / sous-catégorie (clés comparées sans tenir compte de
+ * la casse), trié par catégorie (ordre du jeu) puis ordre d'import. Pour les
+ * endpoints agent.
  */
-export function getChestCatalog(): ChestCatalogItem[] {
+export function getChestCatalog(filter: { category?: string, subcategory?: string } = {}): ChestCatalogItem[] {
   const db = getReputationDb()
+  const category = filter.category ?? null
+  const subcategory = filter.subcategory ?? null
   const rows = db.prepare(`
-    SELECT uid, item_key, category, subcategory, name, description, image, cost, prerequisites, sort_order as sortOrder
-    FROM chest_items
-  `).all() as Array<{
+    SELECT
+      ci.uid, ci.item_key, ci.category, ci.subcategory, ci.name, ci.description,
+      NULLIF(t.name, '') AS nameEn, NULLIF(t.description, '') AS descriptionEn,
+      ci.image, ci.cost, ci.prerequisites, ci.sort_order as sortOrder
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE (? IS NULL OR LOWER(ci.category) = LOWER(?))
+      AND (? IS NULL OR LOWER(ci.subcategory) = LOWER(?))
+  `).all(category, category, subcategory, subcategory) as Array<{
     uid: string
     item_key: string | null
     category: string
     subcategory: string | null
     name: string
     description: string | null
+    nameEn: string | null
+    descriptionEn: string | null
     image: string | null
     cost: string | null
     prerequisites: string | null
@@ -2471,8 +2486,10 @@ export function getChestCatalog(): ChestCatalogItem[] {
     key: r.item_key || r.uid,
     category: r.category,
     subcategory: r.subcategory,
-    name: r.name,
-    description: r.description,
+    nameFr: r.name,
+    nameEn: r.nameEn,
+    descriptionFr: r.description,
+    descriptionEn: r.descriptionEn,
     image: r.image,
     cost: parseChestItemCost(r.cost),
     prerequisites: parseChestItemPrereqs(r.prerequisites)
