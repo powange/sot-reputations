@@ -2492,6 +2492,94 @@ export interface ChestItemTranslationInput {
  * sans aucun override (ni nom ni description) est supprimée. Nom vide mais description
  * présente : nom stocké vide → repli sur le nom FR à l'affichage.
  */
+export interface ChestTranslationRestoreResult {
+  updated: number
+  unchanged: number
+  // Objets de l'export absents du catalogue (ignorés : on ne crée rien ici).
+  unknown: number
+  samples: Array<{ locale: string, name: string, before: string | null, after: string }>
+}
+
+/**
+ * Restaure les traductions EN / ES (nom + description) des objets DÉJÀ au catalogue à
+ * partir d'un export du bookmarklet ({ chestEn, chestEs } : { chestData }), par item_key.
+ * Ne crée aucun objet et ne touche ni aux possessions ni aux réputations. `apply` = false
+ * pour un simple aperçu (aucune écriture).
+ */
+export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, apply: boolean): ChestTranslationRestoreResult {
+  const db = getReputationDb()
+  // Clé de l'export -> ligne du catalogue. La clé d'un objet (nom du fichier image au 1er
+  // import) peut différer de son image ACTUELLE si le jeu a renommé ses assets : on
+  // reconnaît donc aussi l'objet au nom de fichier de son image courante.
+  const catalog = new Map<string, { itemKey: string, name: string }>()
+  for (const r of db.prepare(`SELECT item_key AS itemKey, name, image FROM chest_items WHERE source = 'official' AND item_key IS NOT NULL`).all() as Array<{ itemKey: string, name: string, image: string | null }>) {
+    catalog.set(r.itemKey, { itemKey: r.itemKey, name: r.name })
+    const file = r.image?.split('/').pop()
+    if (file && !catalog.has(file)) catalog.set(file, { itemKey: r.itemKey, name: r.name })
+  }
+  const current = new Map((db.prepare('SELECT item_key AS itemKey, locale, name, description FROM chest_item_translations').all() as Array<{ itemKey: string, locale: string, name: string | null, description: string | null }>).map(r => [`${r.locale}\u0000${r.itemKey}`, r]))
+  const upsert = db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name, description)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
+  `)
+  const result: ChestTranslationRestoreResult = { updated: 0, unchanged: 0, unknown: 0, samples: [] }
+  const writes: Array<[string, string, string, string | null]> = []
+  for (const locale of ['en', 'es'] as const) {
+    const items = parseChestTranslations((input[locale] as { chestData?: unknown } | undefined)?.chestData)
+    for (const [exportKey, value] of items) {
+      const row = catalog.get(exportKey)
+      if (!row) {
+        result.unknown++
+        continue
+      }
+      const { itemKey, name: frName } = row
+      const cur = current.get(`${locale}\u0000${itemKey}`)
+      const description = value.description || cur?.description || null
+      if (cur && cur.name === value.name && (cur.description ?? null) === description) {
+        result.unchanged++
+        continue
+      }
+      result.updated++
+      if (result.samples.length < 30 && cur?.name !== value.name) {
+        result.samples.push({ locale, name: frName, before: cur?.name ?? null, after: value.name })
+      }
+      writes.push([itemKey, locale, value.name, description])
+    }
+  }
+  if (apply && writes.length) {
+    db.transaction(() => {
+      for (const w of writes) upsert.run(...w)
+    })()
+  }
+  return result
+}
+
+/**
+ * Rétablit la qualité dans le nom EN des trophées officiels dont seul le nom FR la porte
+ * (« Lord of Legends » -> « Prized 'Lord of Legends' », format du jeu), typiquement après
+ * remplacement par le titre de la page wiki. `apply` = false pour un simple aperçu.
+ */
+export function repairTrophyEnNames(apply: boolean): { count: number, samples: Array<{ name: string, before: string, after: string }> } {
+  const db = getReputationDb()
+  const rows = db.prepare(`
+    SELECT ci.item_key AS itemKey, ci.name, t.name AS en
+    FROM chest_items ci
+    JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'official' AND ci.subcategory = 'Trophy' AND t.name != ''
+  `).all() as Array<{ itemKey: string, name: string, en: string }>
+  const fixes = rows
+    .map(r => ({ ...r, fixed: withTrophyQualityEn(r.en, r.name) }))
+    .filter(r => r.fixed !== r.en)
+  if (apply && fixes.length) {
+    const update = db.prepare(`UPDATE chest_item_translations SET name = ? WHERE item_key = ? AND locale = 'en'`)
+    db.transaction(() => {
+      for (const f of fixes) update.run(f.fixed, f.itemKey)
+    })()
+  }
+  return { count: fixes.length, samples: fixes.slice(0, 30).map(f => ({ name: f.name, before: f.en, after: f.fixed })) }
+}
+
 /**
  * Pose le nom EN d'un item (par id) sans toucher à sa description EN : sert au
  * rapprochement avec le wiki depuis l'aperçu des coûts. Renvoie false si l'item n'existe pas.
