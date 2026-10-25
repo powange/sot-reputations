@@ -1,5 +1,5 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { getChestScopeItemsForCost, type ChestItemCost } from '../../../utils/reputation-db'
+import { getChestScopeItemsForCost, type ChestItemCost, type ChestItemPrereqs } from '../../../utils/reputation-db'
 import { fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
 
 /**
@@ -45,8 +45,9 @@ export default defineEventHandler(async (event) => {
 
   // image = image du catalogue (site officiel, ou wiki pour un brouillon) ; wikiImage =
   // image de la page wiki rapprochée, en repli d'affichage quand l'item n'en a pas.
-  const matched: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null }> = []
-  const noCost: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: WikiPrereqs | null }> = []
+  // currentCost / currentPrereqs = valeurs en base, pour n'appliquer que ce qui change.
+  const matched: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null, currentPrereqs: ChestItemPrereqs | null }> = []
+  const noCost: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: WikiPrereqs | null, currentPrereqs: ChestItemPrereqs | null }> = []
   const unmatched: Array<{ id: number, name: string, enName: string | null, image: string | null }> = []
 
   for (const it of items) {
@@ -57,10 +58,10 @@ export default defineEventHandler(async (event) => {
     }
     usedTitles.add(normalizeName(w.title))
     if (!w.cost) {
-      noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs: w.prereqs })
+      noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs: w.prereqs, currentPrereqs: it.prerequisites })
       continue
     }
-    matched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs })
+    matched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs, currentPrereqs: it.prerequisites })
   }
 
   const wikiOnly = wiki

@@ -21,8 +21,8 @@ interface Scope { category: string, subcategory: string | null, count: number, w
 interface Cost { gold?: number, doubloons?: number, ancientCoins?: number }
 interface Prereqs { commendations?: Array<{ name: string, grade: number | null }>, factionLevels?: Record<string, number>, legendary?: boolean, requires?: string }
 // image = image du catalogue ; wikiImage = image de la page wiki rapprochée (repli).
-interface Matched { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null, prereqs: Prereqs | null }
-interface NoCost { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: Prereqs | null }
+interface Matched { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null, prereqs: Prereqs | null, currentPrereqs: Prereqs | null }
+interface NoCost { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: Prereqs | null, currentPrereqs: Prereqs | null }
 interface Unmatched { id: number, name: string, enName: string | null, image: string | null }
 interface WikiOnly { title: string, cost: Cost | null, image: string | null }
 interface FetchResult {
@@ -115,8 +115,26 @@ function formatCost(cost: Cost | null): string {
   return parts.length ? parts.join(' · ') : '—'
 }
 
+// JSON à clés triées : l'ordre des clés ne doit pas faire croire à un changement.
+function stableJson(v: unknown): string {
+  return JSON.stringify(v ?? null, (_k, val) => val && typeof val === 'object' && !Array.isArray(val)
+    ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b)))
+    : val)
+}
+
 function sameCost(a: Cost | null, b: Cost | null): boolean {
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  return stableJson(a) === stableJson(b)
+}
+
+// Prérequis à écrire : seulement si le wiki en donne (on n'envoie jamais null, qui
+// effacerait l'existant) ET qu'ils diffèrent de ceux en base.
+function prereqsChanged(x: { prereqs: Prereqs | null, currentPrereqs: Prereqs | null }): boolean {
+  return !!x.prereqs && stableJson(x.prereqs) !== stableJson(x.currentPrereqs)
+}
+
+// Ligne à appliquer : coût OU prérequis différents de la base.
+function matchedChanged(m: Matched): boolean {
+  return !sameCost(m.cost, m.currentCost) || prereqsChanged(m)
 }
 
 async function fetchCosts() {
@@ -131,8 +149,14 @@ async function fetchCosts() {
     })
     result.value = res
     selectedTitles.value = new Set()
-    // Par défaut : on coche les matchés dont le coût change réellement.
-    selectedIds.value = new Set(res.matched.filter(m => !sameCost(m.cost, m.currentCost)).map(m => m.id))
+    // Par défaut : on coche les matchés dont le coût ou les prérequis changent réellement.
+    // + les « sans coût » dont les prérequis changent (seuls les prérequis sont écrits).
+    selectedIds.value = new Set([
+      ...res.matched.filter(matchedChanged).map(m => m.id),
+      ...res.noCost.filter(prereqsChanged).map(n => n.id)
+    ])
+    enNameInputs.value = Object.fromEntries(res.unmatched.map(u => [u.id, u.enName ?? '']))
+    showUnchanged.value = false
     toast.add({ title: `Wiki « ${res.wikiCategory} » : ${res.counts.matched} matchés, ${res.counts.unmatched} non matchés`, color: 'info' })
   } catch (e) {
     const msg = (e as { statusMessage?: string })?.statusMessage || 'Échec de la récupération'
@@ -149,8 +173,14 @@ function toggle(id: number) {
   selectedIds.value = set
 }
 
+// Lignes inchangées (coût et prérequis identiques) : rien à appliquer, masquées par défaut.
+const showUnchanged = ref(false)
+const changedMatched = computed(() => result.value?.matched.filter(matchedChanged) ?? [])
+const unchangedCount = computed(() => (result.value?.matched.length ?? 0) - changedMatched.value.length)
+const visibleMatched = computed(() => showUnchanged.value ? (result.value?.matched ?? []) : changedMatched.value)
+
 const allSelected = computed(() =>
-  !!result.value?.matched.length && result.value.matched.every(m => selectedIds.value.has(m.id))
+  changedMatched.value.length > 0 && changedMatched.value.every(m => selectedIds.value.has(m.id))
 )
 // Nombre d'items (matchés + sans coût) pour lesquels le wiki donne des prérequis.
 const prereqCount = computed(() =>
@@ -158,23 +188,30 @@ const prereqCount = computed(() =>
 )
 function toggleAll() {
   if (!result.value) return
-  selectedIds.value = allSelected.value ? new Set() : new Set(result.value.matched.map(m => m.id))
+  selectedIds.value = allSelected.value ? new Set() : new Set(changedMatched.value.map(m => m.id))
 }
 
 async function apply() {
   if (!result.value) return
   const toApply = result.value.matched.filter(m => selectedIds.value.has(m.id))
-  if (!toApply.length) {
-    toast.add({ title: 'Aucun coût sélectionné', color: 'warning' })
+  // « Sans coût » cochés : prérequis seuls (aucun coût à écrire).
+  const prereqsOnly = result.value.noCost.filter(n => selectedIds.value.has(n.id) && prereqsChanged(n))
+  if (!toApply.length && !prereqsOnly.length) {
+    toast.add({ title: 'Aucune ligne sélectionnée', color: 'warning' })
     return
   }
   applying.value = true
   try {
     const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
       method: 'POST',
-      body: { items: toApply.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }) }
+      body: {
+        items: [
+          ...toApply.map(m => prereqsChanged(m) ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
+          ...prereqsOnly.map(n => ({ id: n.id, prereqs: n.prereqs }))
+        ]
+      }
     })
-    toast.add({ title: `${res.updated} coût(s) appliqué(s)`, color: 'success' })
+    toast.add({ title: `${res.updated} item(s) mis à jour`, color: 'success' })
     result.value = null
     selectedScopeIdx.value = undefined
     await refreshScopes()
@@ -196,6 +233,35 @@ function toggleTitle(title: string) {
   if (set.has(title)) set.delete(title)
   else set.add(title)
   selectedTitles.value = set
+}
+
+// Non matchés : saisie du nom EN (souvent absent) pour les rapprocher du wiki.
+const enNameInputs = ref<Record<number, string>>({})
+const savingEnName = ref<number | null>(null)
+
+async function saveEnName(u: Unmatched) {
+  const name = (enNameInputs.value[u.id] ?? '').trim()
+  if (!name) return
+  savingEnName.value = u.id
+  try {
+    await $fetch('/api/admin/chest-costs/en-name', { method: 'POST', body: { id: u.id, name } })
+    toast.add({ title: `Nom anglais enregistré : ${name}`, color: 'success' })
+    // Nouvel aperçu : l'item doit maintenant être rapproché de sa page wiki.
+    await fetchCosts()
+  } catch (e) {
+    const msg = (e as { statusMessage?: string })?.statusMessage || 'Échec de l\'enregistrement'
+    toast.add({ title: msg, color: 'error' })
+  } finally {
+    savingEnName.value = null
+  }
+}
+
+const allTitlesSelected = computed(() =>
+  !!result.value?.wikiOnly.length && result.value.wikiOnly.every(w => selectedTitles.value.has(w.title))
+)
+function toggleAllTitles() {
+  if (!result.value) return
+  selectedTitles.value = allTitlesSelected.value ? new Set() : new Set(result.value.wikiOnly.map(w => w.title))
 }
 
 async function createDrafts(all: boolean) {
@@ -269,11 +335,12 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
         // envoyé -> coûts intacts). all : coût (matchés) + prérequis (matchés ET sans-coût).
         // On n'envoie prereqs QUE s'il est non-null (un null effacerait les prérequis déjà
         // importés). Import = backfill/mise à jour.
+        // Seulement ce qui change réellement (coût ou prérequis différents de la base).
         const items = mode === 'prereqsOnly'
-          ? [...res.matched, ...res.noCost].filter(x => x.prereqs).map(x => ({ id: x.id, prereqs: x.prereqs }))
+          ? [...res.matched, ...res.noCost].filter(prereqsChanged).map(x => ({ id: x.id, prereqs: x.prereqs }))
           : [
-              ...res.matched.map(m => m.prereqs ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
-              ...res.noCost.filter(n => n.prereqs).map(n => ({ id: n.id, prereqs: n.prereqs }))
+              ...res.matched.filter(matchedChanged).map(m => prereqsChanged(m) ? { id: m.id, cost: m.cost, prereqs: m.prereqs } : { id: m.id, cost: m.cost }),
+              ...res.noCost.filter(prereqsChanged).map(n => ({ id: n.id, prereqs: n.prereqs }))
             ]
         if (items.length) {
           const ap = await $fetch<{ updated: number }>('/api/admin/chest-costs/apply', {
@@ -465,6 +532,7 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-semibold">
               Coûts trouvés ({{ result.matched.length }})
+              <span class="text-sm font-normal text-muted">· {{ changedMatched.length }} à mettre à jour</span>
             </h2>
             <UButton
               icon="i-lucide-check-check"
@@ -509,14 +577,15 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           </thead>
           <tbody>
             <tr
-              v-for="m in result.matched"
+              v-for="m in visibleMatched"
               :key="m.id"
               class="border-b border-muted/10"
-              :class="sameCost(m.cost, m.currentCost) ? 'opacity-60' : ''"
+              :class="matchedChanged(m) ? '' : 'opacity-60'"
             >
               <td class="py-1.5 pr-2">
                 <UCheckbox
                   :model-value="selectedIds.has(m.id)"
+                  :disabled="!matchedChanged(m)"
                   @update:model-value="toggle(m.id)"
                 />
               </td>
@@ -546,7 +615,7 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
               <td class="py-1.5 font-medium">
                 {{ formatCost(m.cost) }}
                 <UBadge
-                  v-if="sameCost(m.cost, m.currentCost)"
+                  v-if="!matchedChanged(m)"
                   size="xs"
                   variant="subtle"
                   color="neutral"
@@ -554,10 +623,44 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
                 >
                   inchangé
                 </UBadge>
+                <UBadge
+                  v-else-if="sameCost(m.cost, m.currentCost)"
+                  size="xs"
+                  variant="subtle"
+                  color="primary"
+                  class="ml-1"
+                >
+                  prérequis modifiés
+                </UBadge>
+                <UBadge
+                  v-else-if="prereqsChanged(m)"
+                  size="xs"
+                  variant="subtle"
+                  color="primary"
+                  class="ml-1"
+                >
+                  + prérequis
+                </UBadge>
               </td>
             </tr>
           </tbody>
         </table>
+        <p
+          v-if="result.matched.length && !changedMatched.length && !showUnchanged"
+          class="text-sm text-muted"
+        >
+          Tout est déjà à jour : coûts et prérequis identiques à la base.
+        </p>
+        <UButton
+          v-if="unchangedCount"
+          :label="showUnchanged ? `Masquer les inchangés (${unchangedCount})` : `Afficher les inchangés (${unchangedCount})`"
+          :icon="showUnchanged ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+          variant="link"
+          color="neutral"
+          size="sm"
+          class="mt-2"
+          @click="showUnchanged = !showUnchanged"
+        />
       </UCard>
 
       <!-- Non matchés -->
@@ -572,27 +675,58 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
         </template>
         <p class="text-sm text-muted mb-2">
           Aucune page wiki ne correspond au nom EN de ces items (écart de nom, traduction EN
-          manquante…). À corriger via « Traductions des objets » si besoin.
+          manquante…). Saisissez le nom anglais (les pages wiki sans item sont proposées) :
+          l'aperçu est relancé et l'item rapproché de sa page.
         </p>
-        <ul class="text-sm space-y-1">
+        <datalist id="wiki-only-titles">
+          <option
+            v-for="w in result.wikiOnly"
+            :key="w.title"
+            :value="w.title"
+          />
+        </datalist>
+        <ul class="text-sm space-y-2">
           <li
             v-for="u in result.unmatched"
             :key="u.id"
-            class="flex items-center gap-2"
+            class="flex flex-wrap items-center gap-2"
           >
             <ChestCostThumb
               :image="u.image"
               :alt="u.enName || u.name"
             />
-            <span class="font-medium">{{ u.enName || u.name }}</span>
-            <span
-              v-if="u.enName && u.enName !== u.name"
-              class="text-muted"
-            > · {{ u.name }}</span>
-            <span
-              v-if="!u.enName"
-              class="text-warning text-xs"
-            > (pas de nom EN)</span>
+            <div class="min-w-40 flex-1">
+              <span class="font-medium">{{ u.name }}</span>
+              <span
+                v-if="!u.enName"
+                class="text-warning text-xs"
+              > (pas de nom EN)</span>
+              <span
+                v-else-if="u.enName !== u.name"
+                class="text-muted text-xs"
+              > · EN : {{ u.enName }}</span>
+            </div>
+            <form
+              class="flex items-center gap-1"
+              @submit.prevent="saveEnName(u)"
+            >
+              <UInput
+                v-model="enNameInputs[u.id]"
+                placeholder="Nom anglais"
+                size="xs"
+                class="w-64"
+                :ui="{ base: 'w-full' }"
+                list="wiki-only-titles"
+              />
+              <UButton
+                type="submit"
+                icon="i-lucide-check"
+                size="xs"
+                aria-label="Enregistrer le nom anglais"
+                :loading="savingEnName === u.id"
+                :disabled="!(enNameInputs[u.id] ?? '').trim() || (enNameInputs[u.id] ?? '').trim() === u.enName"
+              />
+            </form>
           </li>
         </ul>
       </UCard>
@@ -603,25 +737,52 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
         class="mb-6"
       >
         <template #header>
-          <h2 class="font-semibold">
-            Sans coût sur le wiki ({{ result.noCost.length }})
-          </h2>
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="font-semibold">
+              Sans coût sur le wiki ({{ result.noCost.length }})
+              <span class="text-sm font-normal text-muted">· {{ result.noCost.filter(prereqsChanged).length }} prérequis à mettre à jour</span>
+            </h2>
+            <UButton
+              icon="i-lucide-check-check"
+              :label="`Appliquer (${selectedIds.size})`"
+              color="success"
+              size="sm"
+              :loading="applying"
+              :disabled="selectedIds.size === 0"
+              @click="apply"
+            />
+          </div>
         </template>
         <p class="text-sm text-muted mb-2">
           Items trouvés sur le wiki mais sans coût d'achat (par défaut, événement, récompense…).
+          Seuls leurs prérequis sont comparés et appliqués ; « Appliquer » prend aussi les lignes
+          cochées des coûts trouvés.
         </p>
         <ul class="text-sm space-y-1">
           <li
             v-for="n in result.noCost"
             :key="n.id"
             class="flex items-center gap-2"
+            :class="prereqsChanged(n) ? '' : 'opacity-60'"
           >
+            <UCheckbox
+              :model-value="selectedIds.has(n.id)"
+              :disabled="!prereqsChanged(n)"
+              @update:model-value="toggle(n.id)"
+            />
             <ChestCostThumb
               :image="n.image"
               :wiki-image="n.wikiImage"
               :alt="n.enName || n.name"
             />
             {{ n.enName || n.name }}
+            <UBadge
+              size="xs"
+              variant="subtle"
+              :color="prereqsChanged(n) ? 'primary' : 'neutral'"
+            >
+              {{ prereqsChanged(n) ? (n.currentPrereqs ? 'prérequis modifiés' : 'nouveaux prérequis') : (n.prereqs ? 'prérequis inchangés' : 'aucun prérequis') }}
+            </UBadge>
           </li>
         </ul>
       </UCard>
@@ -672,6 +833,13 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           :title="`${result.unmatched.length} item(s) du site non rapprochés`"
           :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Ajoutez d'abord le nom anglais (Traductions des objets) ou décochez la page.`"
         />
+        <label class="flex items-center gap-2 text-sm cursor-pointer mb-2 pb-2 border-b border-muted/20">
+          <UCheckbox
+            :model-value="allTitlesSelected"
+            @update:model-value="toggleAllTitles"
+          />
+          {{ allTitlesSelected ? 'Tout désélectionner' : 'Tout sélectionner' }} ({{ result.wikiOnly.length }})
+        </label>
         <ul class="text-sm space-y-1">
           <li
             v-for="w in result.wikiOnly"

@@ -2221,10 +2221,10 @@ export function setChestCostWikiMap(category: string, subcategory: string | null
  * Items d'un scope avec leur nom EN (chest_item_translations, repli sur le nom FR) et
  * leur coût actuel — pour rapprocher du wiki par nom anglais.
  */
-export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, image: string | null, cost: ChestItemCost | null }> {
+export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, image: string | null, cost: ChestItemCost | null, prerequisites: ChestItemPrereqs | null }> {
   const db = getReputationDb()
   const sql = `
-    SELECT ci.id, ci.name, t.name as enName, ci.image, ci.cost
+    SELECT ci.id, ci.name, t.name as enName, ci.image, ci.cost, ci.prerequisites
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.category = ? AND ${subcategory === null ? 'ci.subcategory IS NULL' : 'ci.subcategory = ?'}
@@ -2233,8 +2233,8 @@ export function getChestScopeItemsForCost(category: string, subcategory: string 
   const rows = (subcategory === null
     ? db.prepare(sql).all(category)
     : db.prepare(sql).all(category, subcategory)
-  ) as Array<{ id: number, name: string, enName: string | null, image: string | null, cost: string | null }>
-  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, image: r.image || null, cost: parseChestItemCost(r.cost) }))
+  ) as Array<{ id: number, name: string, enName: string | null, image: string | null, cost: string | null, prerequisites: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, image: r.image || null, cost: parseChestItemCost(r.cost), prerequisites: parseChestItemPrereqs(r.prerequisites) }))
 }
 
 // ---- Items du coffre créés depuis le wiki (brouillons « source wiki ») ----
@@ -2444,6 +2444,22 @@ export interface ChestItemTranslationInput {
  * sans aucun override (ni nom ni description) est supprimée. Nom vide mais description
  * présente : nom stocké vide → repli sur le nom FR à l'affichage.
  */
+/**
+ * Pose le nom EN d'un item (par id) sans toucher à sa description EN : sert au
+ * rapprochement avec le wiki depuis l'aperçu des coûts. Renvoie false si l'item n'existe pas.
+ */
+export function setChestItemEnName(id: number, name: string): boolean {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT item_key as itemKey FROM chest_items WHERE id = ?').get(id) as { itemKey: string | null } | undefined
+  if (!row?.itemKey) return false
+  db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name, description)
+    VALUES (?, 'en', ?, NULL)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+  `).run(row.itemKey, name)
+  return true
+}
+
 export function setChestItemTranslations(entries: ChestItemTranslationInput[]): void {
   const db = getReputationDb()
   const upsert = db.prepare(`
