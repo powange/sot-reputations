@@ -393,6 +393,22 @@ export function trophyTierOf(enName: string | null, frName: string | null): Trop
   return FR_QUALITY.find(([re]) => re.test(fr))?.[1] ?? null
 }
 
+const TIER_LABEL_EN: Record<TrophyTier, string> = { admired: 'Admired', prized: 'Prized', treasured: 'Treasured', cherished: 'Cherished' }
+
+/**
+ * Nom anglais d'affichage d'un trophée : si le nom français porte une qualité
+ * (« Superbe « Seigneurs des légendes » ») mais pas le nom anglais (« Lord of Legends »,
+ * souvent remplacé par le titre de la page wiki), on la rajoute au format du jeu :
+ * « Prized 'Lord of Legends' » (apostrophes droites). Sinon, le nom anglais tel quel.
+ */
+export function withTrophyQualityEn(enName: string, frName: string): string {
+  if (QUALITY_PREFIX_RE.test(normalizeName(enName))) return enName
+  const tier = trophyTierOf(null, frName)
+  if (!tier) return enName
+  const quoted = /^['‘"“]/.test(enName.trim()) ? enName.trim() : `'${enName.trim()}'`
+  return `${TIER_LABEL_EN[tier]} ${quoted}`
+}
+
 /**
  * Coût et prérequis à appliquer à un objet du jeu rapproché d'une page wiki. Trophée
  * avec qualité (« Prized Raven Islehopper Plaque », « Superbe « … » ») : prix et grade de

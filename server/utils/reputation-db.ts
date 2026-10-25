@@ -1,6 +1,6 @@
 import { join } from 'path'
 import Database from 'better-sqlite3'
-import { looseWikiName, normalizeName, pickByDescription, type WikiPrereqs } from './sot-wiki'
+import { looseWikiName, normalizeName, pickByDescription, withTrophyQualityEn, type WikiPrereqs } from './sot-wiki'
 
 let db: Database.Database | null = null
 
@@ -1908,7 +1908,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
   const rows = db.prepare(`
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory,
-      COALESCE(NULLIF(t.name, ''), ci.name) as name,
+      COALESCE(NULLIF(t.name, ''), ci.name) as name, ci.name as baseName,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image,
       ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites,
@@ -1923,6 +1923,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     category: string
     subcategory: string | null
     name: string
+    baseName: string
     description: string | null
     image: string | null
     sortOrder: number
@@ -1949,7 +1950,9 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
       uid: r.uid,
       category: r.category,
       subcategory: r.subcategory,
-      name: r.name,
+      // EN : qualité de trophée rajoutée si seul le nom FR la porte (cf. withTrophyQualityEn).
+      // Trophées seulement : « superbe » / « magnifique » existent dans d'autres noms FR.
+      name: locale === 'en' && r.subcategory === 'Trophy' ? withTrophyQualityEn(r.name, r.baseName) : r.name,
       description: r.description,
       image: r.image,
       owned: r.owned === 1,
@@ -1972,7 +1975,7 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
   const rows = db.prepare(`
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory,
-      COALESCE(NULLIF(t.name, ''), ci.name) as name,
+      COALESCE(NULLIF(t.name, ''), ci.name) as name, ci.name as baseName,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image, ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites
     FROM chest_items ci
@@ -1984,6 +1987,7 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
     category: string
     subcategory: string | null
     name: string
+    baseName: string
     description: string | null
     image: string | null
     sortOrder: number
@@ -2002,7 +2006,9 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
       uid: r.uid,
       category: r.category,
       subcategory: r.subcategory,
-      name: r.name,
+      // EN : qualité de trophée rajoutée si seul le nom FR la porte (cf. withTrophyQualityEn).
+      // Trophées seulement : « superbe » / « magnifique » existent dans d'autres noms FR.
+      name: locale === 'en' && r.subcategory === 'Trophy' ? withTrophyQualityEn(r.name, r.baseName) : r.name,
       description: r.description,
       image: r.image,
       owned: false,

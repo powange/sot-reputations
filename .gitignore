@@ -31,3 +31,6 @@ reputation.json
 reputations.json
 data/
 *.traineddata
+
+# Export du bookmarklet déposé localement pour analyse (données de compte)
+import.json

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { looseWikiName, pickByDescription, wikiDataForItem, wikiVariantBase } from '../server/utils/sot-wiki'
+import { looseWikiName, pickByDescription, wikiDataForItem, wikiVariantBase, withTrophyQualityEn } from '../server/utils/sot-wiki'
 
 describe('wikiVariantBase', () => {
   it('retire la précision finale entre parenthèses', () => {
@@ -81,5 +81,17 @@ describe('wikiDataForItem (qualités de trophées)', () => {
 
   it('objet sans qualité : données de la page', () => {
     expect(wikiDataForItem(page, 'Raven Islehopper Plaque')).toEqual({ cost: null, prereqs: page.prereqs })
+  })
+})
+
+describe('withTrophyQualityEn', () => {
+  it('rajoute la qualité portée par le nom français', () => {
+    expect(withTrophyQualityEn('Lord of Legends', 'Superbe « Seigneurs des légendes »')).toBe('Prized \'Lord of Legends\'')
+    expect(withTrophyQualityEn('Arms of Athena', 'Inestimables « Armes d’Athéna »')).toBe('Cherished \'Arms of Athena\'')
+  })
+
+  it('laisse un nom anglais qui a déjà sa qualité, ou un objet sans qualité', () => {
+    expect(withTrophyQualityEn('Admired Raven Islehopper Plaque', 'Plaque admirable d’écumeur des îles de jais')).toBe('Admired Raven Islehopper Plaque')
+    expect(withTrophyQualityEn('Spartan Wheel', 'Barre Spartan')).toBe('Spartan Wheel')
   })
 })
