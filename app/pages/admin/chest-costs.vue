@@ -257,6 +257,94 @@ async function copyName(name: string) {
   }
 }
 
+// Prompt IA : noms anglais de TOUS les non matchés en une fois. L'IA répond en JSON
+// [{ id, fr, en }] ; l'id garantit l'attribution au bon item même si elle reformule le FR.
+function buildAiPrompt(): string {
+  const r = result.value
+  const s = selectedScope.value
+  if (!r || !s) return ''
+  const items = r.unmatched.map(u => `- id ${u.id} : ${u.name}${u.enName ? ` (nom anglais actuel, sans page wiki correspondante : ${u.enName})` : ''}`)
+  const candidates = r.wikiOnly.map(w => `- ${w.title}`)
+  return [
+    'Tu es un expert du jeu Sea of Thieves.',
+    `Pour chaque objet ci-dessous (catégorie « ${s.category}${s.subcategory ? ` / ${s.subcategory}` : ''} », nom français officiel du jeu), donne son nom anglais officiel exact, tel qu'il apparaît dans le jeu en anglais et sur le wiki https://seaofthieves.wiki.gg.`,
+    ...(candidates.length
+      ? ['', 'Noms candidats (pages du wiki de cette catégorie encore sans correspondance) ; utilise l\'un d\'eux, à l\'identique, quand il correspond :', ...candidates]
+      : []),
+    '',
+    'Objets :',
+    ...items,
+    '',
+    'Si tu n\'es pas sûr d\'un nom, mets null plutôt que d\'inventer.',
+    'Réponds UNIQUEMENT avec un tableau JSON, sans aucun texte autour, au format :',
+    '[{"id": 123, "fr": "nom français", "en": "English name"}]'
+  ].join('\n')
+}
+
+async function copyAiPrompt() {
+  const prompt = buildAiPrompt()
+  if (!prompt) return
+  try {
+    await navigator.clipboard.writeText(prompt)
+    toast.add({ title: 'Prompt copié', description: 'Collez-le dans une IA, puis collez sa réponse JSON ci-dessous.', color: 'success' })
+  } catch {
+    toast.add({ title: 'Impossible de copier automatiquement', color: 'error' })
+  }
+}
+
+// Réponse de l'IA collée : on extrait le tableau JSON (même entouré de texte ou d'un bloc
+// de code), en ne gardant que les ids des non matchés et les noms anglais renseignés.
+const aiAnswer = ref('')
+const savingAi = ref(false)
+interface AiMatch { id: number, fr: string, en: string }
+const aiParsed = computed<{ matches: AiMatch[], ignored: number, error: string | null }>(() => {
+  const text = aiAnswer.value.trim()
+  const r = result.value
+  if (!text || !r) return { matches: [], ignored: 0, error: null }
+  const start = text.indexOf('[')
+  const end = text.lastIndexOf(']')
+  if (start === -1 || end <= start) return { matches: [], ignored: 0, error: 'Aucun tableau JSON trouvé dans la réponse.' }
+  let data: unknown
+  try {
+    data = JSON.parse(text.slice(start, end + 1))
+  } catch {
+    return { matches: [], ignored: 0, error: 'JSON invalide : vérifiez que la réponse a été collée en entier.' }
+  }
+  if (!Array.isArray(data)) return { matches: [], ignored: 0, error: 'La réponse doit être un tableau JSON.' }
+  const byId = new Map(r.unmatched.map(u => [u.id, u]))
+  const matches: AiMatch[] = []
+  let ignored = 0
+  for (const entry of data as Array<Record<string, unknown>>) {
+    const u = byId.get(Number(entry?.id))
+    const en = typeof entry?.en === 'string' ? entry.en.trim() : ''
+    if (!u || !en || en === u.enName) {
+      ignored++
+      continue
+    }
+    matches.push({ id: u.id, fr: u.name, en })
+  }
+  return { matches, ignored, error: null }
+})
+
+async function applyAiAnswer() {
+  const matches = aiParsed.value.matches
+  if (!matches.length) return
+  savingAi.value = true
+  try {
+    const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/en-names', {
+      method: 'POST',
+      body: { items: matches.map(m => ({ id: m.id, name: m.en })) }
+    })
+    toast.add({ title: `${res.updated} nom(s) anglais enregistré(s)`, color: 'success' })
+    aiAnswer.value = ''
+    await fetchCosts()
+  } catch {
+    toast.add({ title: 'Échec de l\'enregistrement', color: 'error' })
+  } finally {
+    savingAi.value = false
+  }
+}
+
 async function saveEnName(u: Unmatched) {
   const name = (enNameInputs.value[u.id] ?? '').trim()
   if (!name) return
@@ -696,6 +784,18 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           manquante…). Saisissez le nom anglais (les pages wiki sans item sont proposées) :
           l'aperçu est relancé et l'item rapproché de sa page.
         </p>
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <UButton
+            icon="i-lucide-clipboard-copy"
+            label="Copier le prompt IA"
+            size="sm"
+            variant="soft"
+            @click="copyAiPrompt"
+          />
+          <span class="text-xs text-muted">
+            Tous les noms en une fois : collez le prompt dans une IA, puis sa réponse ci-dessous.
+          </span>
+        </div>
         <datalist id="wiki-only-titles">
           <option
             v-for="w in result.wikiOnly"
@@ -769,6 +869,48 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
             </form>
           </li>
         </ul>
+
+        <!-- Réponse de l'IA au prompt : noms anglais en lot -->
+        <div class="mt-4 pt-3 border-t border-muted/20 space-y-2">
+          <UTextarea
+            v-model="aiAnswer"
+            :rows="3"
+            autoresize
+            placeholder="Collez ici la réponse JSON de l'IA : [{&quot;id&quot;: …, &quot;fr&quot;: &quot;…&quot;, &quot;en&quot;: &quot;…&quot;}]"
+            class="w-full"
+          />
+          <p
+            v-if="aiParsed.error"
+            class="text-xs text-error"
+          >
+            {{ aiParsed.error }}
+          </p>
+          <template v-else-if="aiParsed.matches.length || aiParsed.ignored">
+            <ul class="text-xs space-y-0.5">
+              <li
+                v-for="m in aiParsed.matches"
+                :key="m.id"
+              >
+                {{ m.fr }} <span class="text-muted">→</span> <span class="font-medium">{{ m.en }}</span>
+              </li>
+            </ul>
+            <p
+              v-if="aiParsed.ignored"
+              class="text-xs text-muted"
+            >
+              {{ aiParsed.ignored }} entrée(s) ignorée(s) (nom absent ou null, id inconnu, ou nom identique).
+            </p>
+            <UButton
+              icon="i-lucide-check-check"
+              :label="`Enregistrer les noms anglais (${aiParsed.matches.length})`"
+              size="sm"
+              color="success"
+              :loading="savingAi"
+              :disabled="!aiParsed.matches.length"
+              @click="applyAiAnswer"
+            />
+          </template>
+        </div>
       </UCard>
 
       <!-- Sans coût sur le wiki -->
