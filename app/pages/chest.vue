@@ -11,6 +11,9 @@ interface ChestItem {
   description: string | null
   image: string | null
   owned: boolean
+  // Autres noms (FR, EN, ES, wiki) que celui affiché, séparés par « \n » : la recherche
+  // trouve l'objet quelle que soit la langue.
+  aliases?: string
   colors: string[]
   cost: { gold?: number, doubloons?: number, ancientCoins?: number } | null
   prerequisites: {
@@ -308,6 +311,7 @@ const filteredItems = computed(() => {
   if (q) {
     list = list.filter(i =>
       i.name.toLowerCase().includes(q)
+      || (i.aliases || '').toLowerCase().includes(q)
       || (i.description || '').toLowerCase().includes(q)
     )
   }

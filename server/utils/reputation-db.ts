@@ -1103,6 +1103,9 @@ export interface ChestItem {
   eligibility: ChestItemEligibility | null
   // Co-membres qui possèdent aussi cet item, regroupés par groupe partagé.
   groupOwners: Array<{ group: string, members: string[] }>
+  // Autres noms de l'objet (FR, EN, ES, nom wiki) que celui affiché, pour que la
+  // recherche le trouve quelle que soit la langue (« Wild Rose » -> « White Rose Shovel »).
+  aliases: string
 }
 
 export interface ChestItemEligibility {
@@ -1902,6 +1905,13 @@ function computeEligibility(prereqs: ChestItemPrereqs | null, ctx: EligibilityCo
 }
 
 /** Items du coffre possédés par un utilisateur, triés par catégorie puis ordre d'import. */
+/** Autres noms d'un objet que le nom affiché (FR, EN, ES, wiki), joints par « \n ». */
+function chestItemAliases(r: { name: string, baseName: string, enName: string | null, esName: string | null, wikiName: string | null }): string {
+  return [...new Set([r.baseName, r.enName, r.esName, r.wikiName])]
+    .filter((n): n is string => !!n && n !== r.name)
+    .join('\n')
+}
+
 /**
  * Catalogue complet des items du coffre (tous ceux connus, importés par n'importe
  * quel utilisateur), avec un indicateur `owned` pour l'utilisateur donné.
@@ -1916,6 +1926,9 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory,
       COALESCE(NULLIF(t.name, ''), ci.name) as name, ci.name as baseName,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'en') as enName,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'es') as esName,
+      ci.wiki_name as wikiName,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image,
       ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites,
@@ -1931,6 +1944,9 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     subcategory: string | null
     name: string
     baseName: string
+    enName: string | null
+    esName: string | null
+    wikiName: string | null
     description: string | null
     image: string | null
     sortOrder: number
@@ -1960,6 +1976,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
       // EN : qualité de trophée rajoutée si seul le nom FR la porte (cf. withTrophyQualityEn).
       // Trophées seulement : « superbe » / « magnifique » existent dans d'autres noms FR.
       name: locale === 'en' && r.subcategory === 'Trophy' ? withTrophyQualityEn(r.name, r.baseName) : r.name,
+      aliases: chestItemAliases(r),
       description: r.description,
       image: r.image,
       owned: r.owned === 1,
@@ -1983,6 +2000,9 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
     SELECT
       ci.id, ci.uid, ci.category, ci.subcategory,
       COALESCE(NULLIF(t.name, ''), ci.name) as name, ci.name as baseName,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'en') as enName,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'es') as esName,
+      ci.wiki_name as wikiName,
       COALESCE(NULLIF(t.description, ''), ci.description) as description,
       ci.image, ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites
     FROM chest_items ci
@@ -1995,6 +2015,9 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
     subcategory: string | null
     name: string
     baseName: string
+    enName: string | null
+    esName: string | null
+    wikiName: string | null
     description: string | null
     image: string | null
     sortOrder: number
@@ -2016,6 +2039,7 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
       // EN : qualité de trophée rajoutée si seul le nom FR la porte (cf. withTrophyQualityEn).
       // Trophées seulement : « superbe » / « magnifique » existent dans d'autres noms FR.
       name: locale === 'en' && r.subcategory === 'Trophy' ? withTrophyQualityEn(r.name, r.baseName) : r.name,
+      aliases: chestItemAliases(r),
       description: r.description,
       image: r.image,
       owned: false,
