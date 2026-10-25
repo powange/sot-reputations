@@ -76,6 +76,7 @@ describe('wikiDataForItem (qualités de trophées)', () => {
   it('qualité lue dans le nom français (tableaux)', () => {
     expect(wikiDataForItem(page, 'Raven Islehopper Plaque', 'Superbe « Plaque »').cost).toEqual({ gold: 45000 })
     expect(wikiDataForItem(page, 'Raven Islehopper Plaque', 'Inestimable « Plaque »').cost).toEqual({ gold: 150000 })
+    expect(wikiDataForItem(page, 'Arms of Athena', 'Magnifiques « Armes d’Athéna »').cost).toEqual({ gold: 85000 })
   })
 
   it('objet sans qualité : données de la page', () => {

@@ -31,6 +31,7 @@ interface WikiChestItem {
   published: boolean
   // Items officiels du même périmètre portant ce nom : > 0 = doublon probable.
   officialMatches: number
+  officialDuplicates: Array<{ id: number, name: string, enName: string, image: string | null, owners: number }>
 }
 
 const { data: items, status, refresh } = await useFetch<WikiChestItem[]>('/api/admin/chest-wiki-items', { default: () => [] })
@@ -323,6 +324,42 @@ function formatPrereqs(pr: Prereqs | null): string {
                 >
                   {{ [formatCost(it.cost), formatPrereqs(it.prerequisites)].filter(Boolean).join(' — ') }}
                 </p>
+                <!-- Doublon probable : items officiels correspondants et leurs possesseurs -->
+                <div
+                  v-if="it.officialDuplicates.length"
+                  class="mt-1.5 pl-2 border-l-2 border-warning/40 space-y-1"
+                >
+                  <p class="text-xs text-warning">
+                    Déjà au catalogue en item{{ it.officialDuplicates.length > 1 ? 's' : '' }} officiel{{ it.officialDuplicates.length > 1 ? 's' : '' }} :
+                  </p>
+                  <div
+                    v-for="d in it.officialDuplicates"
+                    :key="d.id"
+                    class="flex items-center gap-2 text-xs"
+                  >
+                    <ChestItemImage
+                      v-if="d.image"
+                      :src="d.image"
+                      :alt="d.name"
+                      :size="24"
+                      format="webp"
+                      loading="lazy"
+                      class="w-6 h-6 object-contain shrink-0 rounded bg-elevated"
+                    />
+                    <span class="font-medium">{{ d.name }}</span>
+                    <span
+                      v-if="d.enName !== d.name"
+                      class="text-muted"
+                    >· {{ d.enName }}</span>
+                    <UBadge
+                      size="xs"
+                      variant="subtle"
+                      :color="d.owners ? 'success' : 'neutral'"
+                    >
+                      {{ d.owners }} joueur{{ d.owners > 1 ? 's' : '' }}
+                    </UBadge>
+                  </div>
+                </div>
               </div>
             </label>
           </li>

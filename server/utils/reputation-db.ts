@@ -2319,8 +2319,10 @@ export interface WikiChestItem {
   prerequisites: ChestItemPrereqs | null
   published: boolean
   // Items officiels du même périmètre portant ce nom (sans qualité de trophée ni
-  // guillemets) : > 0 = doublon probable (ex. page wiki d'une plaque = ses 4 qualités).
+  // guillemets) : non vide = doublon probable (ex. page wiki d'une plaque = ses 4
+  // qualités). owners = joueurs qui possèdent l'item officiel.
   officialMatches: number
+  officialDuplicates: Array<{ id: number, name: string, enName: string, image: string | null, owners: number }>
 }
 
 /** Items « source wiki » (publiés ou non), triés par catégorie (ordre du jeu) puis titre. */
@@ -2329,16 +2331,17 @@ export function getWikiChestItems(): WikiChestItem[] {
     SELECT id, name, category, subcategory, description, image, cost, prerequisites, published
     FROM chest_items WHERE source = 'wiki'
   `).all() as Array<{ id: number, name: string, category: string, subcategory: string | null, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, published: number }>
-  // Noms souples des items officiels (EN), comptés par périmètre.
-  const official = new Map<string, number>()
+  // Items officiels (et leurs possesseurs) par périmètre + nom souple EN.
+  const official = new Map<string, WikiChestItem['officialDuplicates']>()
   for (const o of getReputationDb().prepare(`
-    SELECT ci.category, ci.subcategory, t.name AS enName
+    SELECT ci.id, ci.category, ci.subcategory, ci.name, t.name AS enName, ci.image,
+      (SELECT COUNT(*) FROM user_chest_items u WHERE u.item_id = ci.id) AS owners
     FROM chest_items ci
     JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.source = 'official' AND t.name != ''
-  `).all() as Array<{ category: string, subcategory: string | null, enName: string }>) {
+  `).all() as Array<{ id: number, category: string, subcategory: string | null, name: string, enName: string, image: string | null, owners: number }>) {
     const key = `${o.category}\u0000${o.subcategory ?? ''}\u0000${looseWikiName(o.enName)}`
-    official.set(key, (official.get(key) ?? 0) + 1)
+    official.set(key, [...(official.get(key) ?? []), { id: o.id, name: o.name, enName: o.enName, image: o.image, owners: o.owners }])
   }
   return rows
     .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
@@ -2355,8 +2358,10 @@ export function getWikiChestItems(): WikiChestItem[] {
       cost: parseChestItemCost(r.cost),
       prerequisites: parseChestItemPrereqs(r.prerequisites),
       published: r.published === 1,
-      officialMatches: official.get(`${r.category}\u0000${r.subcategory ?? ''}\u0000${looseWikiName(r.name)}`) ?? 0
+      officialMatches: 0,
+      officialDuplicates: official.get(`${r.category}\u0000${r.subcategory ?? ''}\u0000${looseWikiName(r.name)}`) ?? []
     }))
+    .map(it => ({ ...it, officialMatches: it.officialDuplicates.length }))
 }
 
 /** Publie / dépublie des items « source wiki ». Renvoie le nombre de lignes modifiées. */

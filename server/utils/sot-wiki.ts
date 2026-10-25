@@ -377,11 +377,12 @@ function trophyTiers(
 
 // Qualité dans le nom FRANÇAIS : les tableaux n'ont pas de qualité dans leur nom anglais
 // (« Be Alluring to Get Ahead » ×4) mais en ont une en français (« Superbe « … » »).
+// Singulier ou pluriel (« Admirables « Armes d'Athéna » »).
 const FR_QUALITY: Array<[RegExp, TrophyTier]> = [
-  [/\badmirable\b/, 'admired'],
-  [/\bsuperbe\b/, 'prized'],
-  [/\bmagnifique\b/, 'treasured'],
-  [/\binestimable\b/, 'cherished']
+  [/\badmirables?\b/, 'admired'],
+  [/\bsuperbes?\b/, 'prized'],
+  [/\bmagnifiques?\b/, 'treasured'],
+  [/\binestimables?\b/, 'cherished']
 ]
 
 /** Qualité de trophée d'un objet, d'après son nom anglais (préfixe) ou français. */
