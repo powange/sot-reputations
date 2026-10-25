@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
     }
     usedTitles.add(normalizeName(w.title))
     // Trophée avec qualité : coût et prérequis de cette qualité (sinon ceux de la page).
-    const { cost, prereqs } = wikiDataForItem(w, it.enName || it.name)
+    const { cost, prereqs } = wikiDataForItem(w, it.enName, it.name)
     if (!cost) {
       noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs, currentPrereqs: it.prerequisites })
       continue

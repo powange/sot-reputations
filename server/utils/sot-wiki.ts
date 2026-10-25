@@ -375,14 +375,32 @@ function trophyTiers(
   return Object.keys(tiers).length ? tiers : null
 }
 
+// Qualité dans le nom FRANÇAIS : les tableaux n'ont pas de qualité dans leur nom anglais
+// (« Be Alluring to Get Ahead » ×4) mais en ont une en français (« Superbe « … » »).
+const FR_QUALITY: Array<[RegExp, TrophyTier]> = [
+  [/\badmirable\b/, 'admired'],
+  [/\bsuperbe\b/, 'prized'],
+  [/\bmagnifique\b/, 'treasured'],
+  [/\binestimable\b/, 'cherished']
+]
+
+/** Qualité de trophée d'un objet, d'après son nom anglais (préfixe) ou français. */
+export function trophyTierOf(enName: string | null, frName: string | null): TrophyTier | null {
+  const en = QUALITY_PREFIX_RE.exec(normalizeName(enName ?? ''))
+  if (en) return en[1] as TrophyTier
+  const fr = normalizeName(frName ?? '')
+  return FR_QUALITY.find(([re]) => re.test(fr))?.[1] ?? null
+}
+
 /**
  * Coût et prérequis à appliquer à un objet du jeu rapproché d'une page wiki. Trophée
- * avec qualité (« Prized Raven Islehopper Plaque ») : prix et grade de cette qualité, et
- * classe de jalon ajoutée au texte « requires ». Sinon : ceux de la page, tels quels.
+ * avec qualité (« Prized Raven Islehopper Plaque », « Superbe « … » ») : prix et grade de
+ * cette qualité, et classe de jalon ajoutée au texte « requires ». Sinon : ceux de la
+ * page, tels quels.
  */
-export function wikiDataForItem(w: WikiItem, itemName: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
-  const m = QUALITY_PREFIX_RE.exec(normalizeName(itemName))
-  const tier = m ? w.tiers?.[m[1] as TrophyTier] : undefined
+export function wikiDataForItem(w: WikiItem, enName: string | null, frName: string | null = null): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
+  const quality = w.tiers ? trophyTierOf(enName, frName) : null
+  const tier = quality ? w.tiers?.[quality] : undefined
   if (!tier) return { cost: w.cost, prereqs: w.prereqs }
   const prereqs: WikiPrereqs = { ...(w.prereqs ?? {}) }
   if (prereqs.commendations?.length && tier.grade != null) {

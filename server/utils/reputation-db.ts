@@ -2318,6 +2318,9 @@ export interface WikiChestItem {
   cost: ChestItemCost | null
   prerequisites: ChestItemPrereqs | null
   published: boolean
+  // Items officiels du même périmètre portant ce nom (sans qualité de trophée ni
+  // guillemets) : > 0 = doublon probable (ex. page wiki d'une plaque = ses 4 qualités).
+  officialMatches: number
 }
 
 /** Items « source wiki » (publiés ou non), triés par catégorie (ordre du jeu) puis titre. */
@@ -2326,6 +2329,17 @@ export function getWikiChestItems(): WikiChestItem[] {
     SELECT id, name, category, subcategory, description, image, cost, prerequisites, published
     FROM chest_items WHERE source = 'wiki'
   `).all() as Array<{ id: number, name: string, category: string, subcategory: string | null, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, published: number }>
+  // Noms souples des items officiels (EN), comptés par périmètre.
+  const official = new Map<string, number>()
+  for (const o of getReputationDb().prepare(`
+    SELECT ci.category, ci.subcategory, t.name AS enName
+    FROM chest_items ci
+    JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'official' AND t.name != ''
+  `).all() as Array<{ category: string, subcategory: string | null, enName: string }>) {
+    const key = `${o.category}\u0000${o.subcategory ?? ''}\u0000${looseWikiName(o.enName)}`
+    official.set(key, (official.get(key) ?? 0) + 1)
+  }
   return rows
     .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
       || a.category.localeCompare(b.category)
@@ -2340,7 +2354,8 @@ export function getWikiChestItems(): WikiChestItem[] {
       image: r.image,
       cost: parseChestItemCost(r.cost),
       prerequisites: parseChestItemPrereqs(r.prerequisites),
-      published: r.published === 1
+      published: r.published === 1,
+      officialMatches: official.get(`${r.category}\u0000${r.subcategory ?? ''}\u0000${looseWikiName(r.name)}`) ?? 0
     }))
 }
 

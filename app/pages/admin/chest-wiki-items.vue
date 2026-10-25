@@ -29,17 +29,21 @@ interface WikiChestItem {
   cost: Cost | null
   prerequisites: Prereqs | null
   published: boolean
+  // Items officiels du même périmètre portant ce nom : > 0 = doublon probable.
+  officialMatches: number
 }
 
 const { data: items, status, refresh } = await useFetch<WikiChestItem[]>('/api/admin/chest-wiki-items', { default: () => [] })
 
 // Filtres : statut, périmètre (catégorie / sous-catégorie), recherche par titre.
-const statusFilter = ref<'draft' | 'published' | 'all'>('draft')
+const statusFilter = ref<'draft' | 'published' | 'all' | 'duplicates'>('draft')
 const statusOptions = [
   { value: 'draft' as const, label: 'Non publiés' },
   { value: 'published' as const, label: 'Publiés' },
-  { value: 'all' as const, label: 'Tous' }
+  { value: 'all' as const, label: 'Tous' },
+  { value: 'duplicates' as const, label: 'Doublons probables' }
 ]
+const duplicateCount = computed(() => items.value.filter(it => it.officialMatches > 0).length)
 // 'all' plutôt que '' : un SelectItem ne peut pas avoir une valeur vide.
 const scopeFilter = ref('all')
 const search = ref('')
@@ -62,7 +66,8 @@ const draftCount = computed(() => items.value.filter(it => !it.published).length
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return items.value.filter(it =>
-    (statusFilter.value === 'all' || it.published === (statusFilter.value === 'published'))
+    (statusFilter.value === 'all'
+      || (statusFilter.value === 'duplicates' ? it.officialMatches > 0 : it.published === (statusFilter.value === 'published')))
     && (scopeFilter.value === 'all' || scopeOf(it) === scopeFilter.value)
     && (!q || it.title.toLowerCase().includes(q))
   )
@@ -182,7 +187,7 @@ function formatPrereqs(pr: Prereqs | null): string {
           <UButton
             v-for="opt in statusOptions"
             :key="opt.value"
-            :label="opt.value === 'draft' ? `${opt.label} (${draftCount})` : opt.label"
+            :label="opt.value === 'draft' ? `${opt.label} (${draftCount})` : opt.value === 'duplicates' ? `${opt.label} (${duplicateCount})` : opt.label"
             size="xs"
             :color="statusFilter === opt.value ? 'primary' : 'neutral'"
             :variant="statusFilter === opt.value ? 'solid' : 'outline'"
@@ -296,6 +301,15 @@ function formatPrereqs(pr: Prereqs | null): string {
                     {{ it.published ? 'Publié' : 'Brouillon' }}
                   </UBadge>
                   <span class="text-xs text-muted">{{ scopeOf(it) }}</span>
+                  <UBadge
+                    v-if="it.officialMatches"
+                    color="warning"
+                    variant="subtle"
+                    size="sm"
+                    :title="`${it.officialMatches} item(s) officiel(s) du même périmètre portent ce nom (qualités de trophée, guillemets ignorés)`"
+                  >
+                    doublon probable ({{ it.officialMatches }} officiel{{ it.officialMatches > 1 ? 's' : '' }})
+                  </UBadge>
                 </div>
                 <p
                   v-if="it.description"

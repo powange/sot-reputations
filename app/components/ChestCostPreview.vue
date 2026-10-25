@@ -793,6 +793,10 @@ async function applyAiAnswer() {
               />
               {{ n.enName || n.name }}
               <span
+                v-if="n.enName && n.enName !== n.name"
+                class="text-xs text-muted"
+              >{{ n.name }}</span>
+              <span
                 v-if="n.wikiTitle !== (n.enName || n.name)"
                 class="text-xs text-info"
               >wiki : {{ n.wikiTitle }}</span>
