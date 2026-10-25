@@ -242,6 +242,15 @@ function toggleTitle(title: string) {
 const enNameInputs = ref<Record<number, string>>({})
 const savingEnName = ref<number | null>(null)
 
+async function copyName(name: string) {
+  try {
+    await navigator.clipboard.writeText(name)
+    toast.add({ title: `Copié : ${name}`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Impossible de copier automatiquement', color: 'error' })
+  }
+}
+
 async function saveEnName(u: Unmatched) {
   const name = (enNameInputs.value[u.id] ?? '').trim()
   if (!name) return
@@ -700,6 +709,16 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
             />
             <div class="min-w-40 flex-1">
               <span class="font-medium">{{ u.name }}</span>
+              <UButton
+                icon="i-lucide-copy"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                class="align-middle"
+                title="Copier le nom français"
+                aria-label="Copier le nom français"
+                @click="copyName(u.name)"
+              />
               <span
                 v-if="!u.enName"
                 class="text-warning text-xs"
