@@ -82,7 +82,10 @@ watch(scopeFilter, () => {
 })
 
 // Pré-remplit le nom de catégorie wiki : override mémorisé sinon la sous-catégorie.
-watch(selectedScope, (s) => {
+// Clé catégorie/sous-catégorie : un simple rafraîchissement de la liste (compteurs après
+// « Appliquer ») ne doit ni vider l'aperçu ni écraser la catégorie wiki saisie.
+watch(() => selectedScope.value ? `${selectedScope.value.category}\u0000${selectedScope.value.subcategory ?? ''}` : null, () => {
+  const s = selectedScope.value
   wikiCategory.value = s?.wikiCategory ?? s?.subcategory ?? ''
   result.value = null
 })
@@ -212,9 +215,9 @@ async function apply() {
       }
     })
     toast.add({ title: `${res.updated} item(s) mis à jour`, color: 'success' })
-    result.value = null
-    selectedScopeIdx.value = undefined
     await refreshScopes()
+    // Même sous-catégorie : nouvel aperçu (les lignes appliquées passent en « inchangé »).
+    await fetchCosts()
   } catch {
     toast.add({ title: 'Erreur lors de l\'application', color: 'error' })
   } finally {
