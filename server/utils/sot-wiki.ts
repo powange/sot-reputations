@@ -26,9 +26,14 @@ export interface WikiPrereqs {
   legendary?: boolean
   requires?: string
 }
+// Qualités d'un trophée (plaque, tableau) : un objet par qualité dans le jeu, une seule
+// page sur le wiki. Prix, grade de commendation et classe de jalon propres à chacune.
+export type TrophyTier = 'admired' | 'prized' | 'treasured' | 'cherished'
+export interface WikiTrophyTier { gold: number, grade: number | null, milestone: string | null, milestoneClass: number | null }
 // description (EN) et image (original de la page) servent à créer les items absents
-// du catalogue (brouillons « source wiki ») ; null si la page n'en a pas.
-export interface WikiItem { title: string, cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null, image: string | null }
+// du catalogue (brouillons « source wiki ») ; null si la page n'en a pas. tiers : pages
+// de trophées uniquement (cf. trophyTiers).
+export interface WikiItem { title: string, cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null, image: string | null, tiers?: Partial<Record<TrophyTier, WikiTrophyTier>> | null }
 
 // Champ wiki « *-level » -> clé de faction courte.
 const FACTION_LEVEL_FIELDS: Record<string, string> = {
@@ -61,6 +66,7 @@ interface RevisionsResponse {
  * pour la renvoyer à l'admin au lieu d'un message générique.
  */
 export function describeWikiError(err: unknown): string {
+  if (err instanceof WikiApiError) return err.message
   const e = err as { statusCode?: number, status?: number, response?: { status?: number }, name?: string, message?: string, cause?: { code?: string } }
   const status = e?.statusCode ?? e?.status ?? e?.response?.status
   if (status) return status === 429 ? 'HTTP 429 : le wiki limite les requêtes, réessayez dans un moment' : `HTTP ${status} du wiki`
@@ -68,17 +74,38 @@ export function describeWikiError(err: unknown): string {
   return e?.cause?.code || e?.message || 'erreur inconnue'
 }
 
+// Erreur renvoyée par l'API MediaWiki DANS une réponse HTTP 200 ({ error: { code, info } }).
+class WikiApiError extends Error {
+  constructor(public code: string, info: string) {
+    super(`API du wiki : ${code}${info ? ` (${info})` : ''}`)
+  }
+}
+// Codes d'erreur MediaWiki temporaires : on réessaie.
+const TRANSIENT_WIKI_CODES = new Set(['ratelimited', 'maxlag', 'readonly', 'internal_api_error_DBQueryError', 'internal_api_error_DBConnectionError'])
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 async function wikiApi<T>(params: Record<string, string>): Promise<T> {
   const url = `${WIKI_API}?${new URLSearchParams({ ...params, format: 'json' }).toString()}`
-  // wiki.gg limite les rafales (429) : nouvelles tentatives espacées sur les erreurs
-  // temporaires et les délais dépassés (récupération de nombreuses sous-catégories).
-  return await $fetch(url, {
-    headers: { 'User-Agent': USER_AGENT },
-    timeout: 20000,
-    retry: 3,
-    retryDelay: 2000,
-    retryStatusCodes: [408, 425, 429, 500, 502, 503, 504]
-  }) as T
+  for (let attempt = 0; ; attempt++) {
+    // wiki.gg limite les rafales (429) : nouvelles tentatives espacées sur les erreurs
+    // temporaires et les délais dépassés (récupération de nombreuses sous-catégories).
+    const data = await $fetch<unknown>(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      timeout: 20000,
+      retry: 3,
+      retryDelay: 2000,
+      retryStatusCodes: [408, 425, 429, 500, 502, 503, 504]
+    })
+    // Réponse non-JSON (page HTML de protection, etc.) ou erreur MediaWiki en HTTP 200 :
+    // à signaler, sinon elle passerait pour « aucune page » et rien ne serait rapproché.
+    if (!data || typeof data !== 'object') throw new WikiApiError('reponse_invalide', 'réponse non JSON')
+    const error = (data as { error?: { code?: string, info?: string } }).error
+    if (!error) return data as T
+    const code = error.code ?? 'inconnu'
+    if (!TRANSIENT_WIKI_CODES.has(code) || attempt >= 3) throw new WikiApiError(code, error.info ?? '')
+    await sleep(2000 * (attempt + 1))
+  }
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -98,6 +125,57 @@ export function normalizeName(s: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
+}
+
+// Qualités des trophées (plaques, tableaux) : un objet par qualité dans le jeu
+// (« Admired Raven Islehopper Plaque »…), une seule page sans qualité sur le wiki.
+const QUALITY_PREFIX_RE = /^(admired|cherished|treasured|prized) /
+
+/**
+ * Nom « souple » pour un dernier rapprochement nom du jeu <-> titre wiki : normalisé, sans
+ * qualité de trophée en tête ni guillemets (« ‘Below Wonderlit Skies’ » dans le jeu,
+ * « Below Wonderlit Skies » sur le wiki). Limité à ces écarts connus : retirer n'importe
+ * quel premier mot rapprocherait des objets distincts (« Dire Dark Warsmith Costume »).
+ */
+export function looseWikiName(s: string): string {
+  return normalizeName(s)
+    .replace(QUALITY_PREFIX_RE, '')
+    .replace(/['"“”]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Page de variante du wiki : « Nom (Précision) » (ex. « Barrel Bombardier Costume
+ * (Goggles) »). Dans le jeu, chaque variante est un objet distinct qui porte le nom SANS
+ * la précision ; seules leurs descriptions diffèrent. Renvoie le nom de base, ou null si
+ * le titre n'a pas de précision finale entre parenthèses.
+ */
+export function wikiVariantBase(title: string): string | null {
+  const m = /^(.+?)\s*\([^()]+\)$/.exec(title.trim())
+  return m ? m[1]!.trim() : null
+}
+
+/**
+ * Parmi des pages candidates, celle dont la description correspond le mieux à `description`
+ * (identique après normalisation, sinon plus de mots en commun) ; la première à défaut.
+ */
+export function pickByDescription<T extends { description: string | null }>(candidates: T[], description: string | null): T | undefined {
+  if (candidates.length <= 1 || !description) return candidates[0]
+  const target = normalizeName(description)
+  const exact = candidates.find(c => c.description && normalizeName(c.description) === target)
+  if (exact) return exact
+  const words = new Set(target.split(/\W+/).filter(Boolean))
+  let best = candidates[0]
+  let bestScore = -1
+  for (const c of candidates) {
+    const score = normalizeName(c.description ?? '').split(/\W+/).filter(w => words.has(w)).length
+    if (score > bestScore) {
+      best = c
+      bestScore = score
+    }
+  }
+  return best
 }
 
 /**
@@ -184,9 +262,9 @@ function parseInfoboxFields(body: string): Map<string, string> {
 /**
  * Parse l'infobox {{variant}} d'un wikitext en une passe : coût + prérequis.
  */
-function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null } {
+function parseVariant(wikitext: string, title = ''): { cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null, tiers: Partial<Record<TrophyTier, WikiTrophyTier>> | null } {
   const body = extractVariantBody(wikitext)
-  if (body == null) return { cost: null, prereqs: null, description: null }
+  if (body == null) return { cost: null, prereqs: null, description: null, tiers: null }
   const fields = parseInfoboxFields(body)
   const str = (name: string): string | undefined => {
     const v = fields.get(name)
@@ -247,8 +325,74 @@ function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiP
   return {
     cost: Object.keys(cost).length > 0 ? cost : null,
     prereqs: Object.keys(prereqs).length > 0 ? prereqs : null,
-    description: description ? cleanWiki(description) || null : null
+    description: description ? cleanWiki(description) || null : null,
+    tiers: trophyTiers(str, int, title)
   }
+}
+
+const TROPHY_TIERS: TrophyTier[] = ['admired', 'prized', 'treasured', 'cherished']
+const TROPHY_GOLD = [20000, 45000, 85000, 150000]
+const TROPHY_CLASSES = [5, 10, 20, 30]
+const TROPHY_GRADES = [1, 3, 4, 5]
+
+/**
+ * Qualités d'un trophée (`type = Trophy|Trophies`), selon la règle du modèle {{variant}}
+ * du wiki (section « Milestones ») :
+ * - avec `milestone` : 4 qualités, prix fixes 20k / 45k / 85k / 150k, classe de jalon
+ *   `class1..4` (défaut 5 / 10 / 20 / 30) et, avec une `commendation`, grade
+ *   `comm-grade1..4` (défaut 1 / 3 / 4 / 5) ;
+ * - sans jalon mais avec commendation : Cherished seul (grade `comm-grade`), sauf
+ *   « Sailing with Unbroken Bonds » (grades 1 / 3 / 5 / 7).
+ */
+function trophyTiers(
+  str: (name: string) => string | undefined,
+  int: (name: string) => number | undefined,
+  title: string
+): Partial<Record<TrophyTier, WikiTrophyTier>> | null {
+  const type = str('type')?.toLowerCase()
+  if (type !== 'trophy' && type !== 'trophies') return null
+  const milestone = str('milestone') ? cleanWiki(str('milestone')!) : null
+  const commendation = str('commendation') ? cleanWiki(str('commendation')!) : null
+  const tiers: Partial<Record<TrophyTier, WikiTrophyTier>> = {}
+  if (milestone) {
+    TROPHY_TIERS.forEach((tier, i) => {
+      tiers[tier] = {
+        gold: TROPHY_GOLD[i]!,
+        grade: commendation ? (int(`comm-grade${i + 1}`) ?? TROPHY_GRADES[i]!) : null,
+        milestone,
+        milestoneClass: int(`class${i + 1}`) ?? TROPHY_CLASSES[i]!
+      }
+    })
+  } else if (commendation) {
+    if (normalizeName(title) === 'sailing with unbroken bonds') {
+      [1, 3, 5, 7].forEach((grade, i) => {
+        tiers[TROPHY_TIERS[i]!] = { gold: TROPHY_GOLD[i]!, grade, milestone: null, milestoneClass: null }
+      })
+    } else {
+      tiers.cherished = { gold: 150000, grade: int('comm-grade') ?? null, milestone: null, milestoneClass: null }
+    }
+  }
+  return Object.keys(tiers).length ? tiers : null
+}
+
+/**
+ * Coût et prérequis à appliquer à un objet du jeu rapproché d'une page wiki. Trophée
+ * avec qualité (« Prized Raven Islehopper Plaque ») : prix et grade de cette qualité, et
+ * classe de jalon ajoutée au texte « requires ». Sinon : ceux de la page, tels quels.
+ */
+export function wikiDataForItem(w: WikiItem, itemName: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
+  const m = QUALITY_PREFIX_RE.exec(normalizeName(itemName))
+  const tier = m ? w.tiers?.[m[1] as TrophyTier] : undefined
+  if (!tier) return { cost: w.cost, prereqs: w.prereqs }
+  const prereqs: WikiPrereqs = { ...(w.prereqs ?? {}) }
+  if (prereqs.commendations?.length && tier.grade != null) {
+    prereqs.commendations = prereqs.commendations.map((c, i) => i === 0 ? { ...c, grade: tier.grade } : c)
+  }
+  if (tier.milestone && tier.milestoneClass != null) {
+    const milestoneText = `Class ${tier.milestoneClass} in the '${tier.milestone}' Pirate Milestone`
+    prereqs.requires = prereqs.requires ? `${prereqs.requires} ; ${milestoneText}` : milestoneText
+  }
+  return { cost: { gold: tier.gold }, prereqs: Object.keys(prereqs).length ? prereqs : null }
 }
 
 /**
@@ -299,8 +443,8 @@ export async function fetchWikiItemsByTitles(titles: string[]): Promise<WikiItem
     })
     for (const p of Object.values(d.query?.pages ?? {})) {
       const wt = p.revisions?.[0]?.slots?.main?.['*'] ?? ''
-      const { cost, prereqs, description } = parseVariant(wt)
-      out.push({ title: p.title, cost, prereqs, description, image: p.original?.source ?? null })
+      const { cost, prereqs, description, tiers } = parseVariant(wt, p.title)
+      out.push({ title: p.title, cost, prereqs, description, image: p.original?.source ?? null, tiers })
     }
   }
   return out

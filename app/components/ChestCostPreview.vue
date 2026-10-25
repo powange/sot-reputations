@@ -399,7 +399,22 @@ async function applyAiAnswer() {
 
     <template v-else>
       <!-- Récap -->
+      <UAlert
+        v-if="result.counts.wiki === 0"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-triangle-alert"
+        class="mb-3"
+        title="Aucune page trouvée sur le wiki"
+        :description="`La catégorie « ${result.wikiCategory} » ne contient aucune page d'objet : rien ne peut être rapproché. Vérifiez son nom sur le wiki (singulier, « (pets) »…), corrigez-le dans le champ ci-dessus, puis mémorisez-le.`"
+      />
       <div class="flex flex-wrap gap-2 text-sm">
+        <UBadge
+          color="neutral"
+          variant="outline"
+        >
+          {{ result.counts.wiki }} pages wiki
+        </UBadge>
         <UBadge
           color="success"
           variant="subtle"
@@ -528,6 +543,12 @@ async function applyAiAnswer() {
                         class="text-xs text-muted"
                       >
                         {{ m.name }}
+                      </div>
+                      <div
+                        v-if="m.wikiTitle !== (m.enName || m.name)"
+                        class="text-xs text-info"
+                      >
+                        wiki : {{ m.wikiTitle }}
                       </div>
                     </div>
                   </div>
@@ -771,6 +792,10 @@ async function applyAiAnswer() {
                 :alt="n.enName || n.name"
               />
               {{ n.enName || n.name }}
+              <span
+                v-if="n.wikiTitle !== (n.enName || n.name)"
+                class="text-xs text-info"
+              >wiki : {{ n.wikiTitle }}</span>
               <UBadge
                 size="xs"
                 variant="subtle"
@@ -852,6 +877,11 @@ async function applyAiAnswer() {
                 />
                 <span class="font-medium">{{ w.title }}</span>
                 <span class="text-muted"> · {{ formatChestCost(w.cost) }}</span>
+                <span
+                  v-if="w.variantOf"
+                  class="text-xs text-info"
+                  :title="`Variante : dans le jeu, l'objet s'appelle « ${w.variantOf} »`"
+                >variante de « {{ w.variantOf }} »</span>
               </label>
             </li>
           </ul>

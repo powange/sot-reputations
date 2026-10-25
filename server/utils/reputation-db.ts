@@ -1,6 +1,6 @@
 import { join } from 'path'
 import Database from 'better-sqlite3'
-import { normalizeName, type WikiPrereqs } from './sot-wiki'
+import { looseWikiName, normalizeName, pickByDescription, type WikiPrereqs } from './sot-wiki'
 
 let db: Database.Database | null = null
 
@@ -1471,21 +1471,32 @@ export function importChestData(
   // réutiliser une ligne existante de même nom + catégorie + sous-catégorie pour ne
   // pas créer de doublon (qui éclaterait la possession entre lignes). On vise la plus
   // ancienne (MIN id) si plusieurs subsistent encore.
+  // Description identique exigée (sauf si l'une manque) : les VARIANTES d'un objet
+  // (« Costume du tonneau explosif » avec / sans lunettes…) partagent le même nom mais
+  // pas la description, et ne doivent pas être fusionnées en une seule ligne.
   const getByNameInScope = db.prepare(`
     SELECT id, item_key as itemKey, source FROM chest_items
     WHERE lower(trim(name)) = lower(trim(?)) AND category = ? AND COALESCE(subcategory, '') = COALESCE(?, '')
+      AND (COALESCE(?, '') = '' OR COALESCE(description, '') = '' OR lower(trim(description)) = lower(trim(?)))
     ORDER BY id LIMIT 1
   `)
   // Brouillons « source wiki » par périmètre + nom EN normalisé : un item importé qui ne
   // matche ni par clé ni par nom FR est rattaché au brouillon de même nom anglais.
-  const wikiDrafts = new Map<string, { id: number, itemKey: string }>()
+  // Plusieurs brouillons peuvent partager un nom (variantes d'un même objet) : on
+  // départage par la description anglaise.
+  const wikiDrafts = new Map<string, Array<{ id: number, itemKey: string, description: string | null }>>()
   for (const d of db.prepare(`
-    SELECT ci.id, ci.item_key as itemKey, ci.category, ci.subcategory, COALESCE(NULLIF(t.name, ''), ci.name) as enName
+    SELECT ci.id, ci.item_key as itemKey, ci.category, ci.subcategory, COALESCE(NULLIF(t.name, ''), ci.name) as enName,
+      COALESCE(t.description, ci.description) as description
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.source = 'wiki'
-  `).all() as Array<{ id: number, itemKey: string, category: string, subcategory: string | null, enName: string }>) {
-    wikiDrafts.set(`${d.category}\u0000${d.subcategory ?? ''}\u0000${normalizeName(d.enName)}`, { id: d.id, itemKey: d.itemKey })
+  `).all() as Array<{ id: number, itemKey: string, category: string, subcategory: string | null, enName: string, description: string | null }>) {
+    const key = `${d.category}\u0000${d.subcategory ?? ''}\u0000${normalizeName(d.enName)}`
+    wikiDrafts.set(key, [...(wikiDrafts.get(key) ?? []), { id: d.id, itemKey: d.itemKey, description: d.description }])
+    // Nom souple (qualité de trophée, guillemets) : repli si le nom exact ne matche pas.
+    const looseKey = `${d.category}\u0000${d.subcategory ?? ''}\u0000~${looseWikiName(d.enName)}`
+    wikiDrafts.set(looseKey, [...(wikiDrafts.get(looseKey) ?? []), { id: d.id, itemKey: d.itemKey, description: d.description }])
   }
   // Rattachement d'un brouillon wiki : il prend la clé et l'uid officiels (ses traductions
   // suivent la clé), devient « official » et publié. Nom / description / image officiels
@@ -1543,7 +1554,7 @@ export function importChestData(
         // même périmètre plutôt que d'en créer une nouvelle (anti-doublon).
         let draft: { id: number, itemKey: string } | undefined
         if (!row && item.name) {
-          const byName = getByNameInScope.get(item.name, category, item.subcategory) as { id: number, itemKey: string, source: string } | undefined
+          const byName = getByNameInScope.get(item.name, category, item.subcategory, item.description, item.description) as { id: number, itemKey: string, source: string } | undefined
           if (byName?.source === 'wiki') {
             draft = { id: byName.id, itemKey: byName.itemKey }
           } else if (byName) {
@@ -1554,16 +1565,24 @@ export function importChestData(
         // Toujours rien : brouillon wiki de même nom anglais dans le même périmètre ?
         if (!row && !draft) {
           const enTitle = enByItemKey.get(item.itemKey)
-          if (enTitle) draft = wikiDrafts.get(`${category}\u0000${item.subcategory ?? ''}\u0000${normalizeName(enTitle)}`)
+          const scopeKey = `${category}\u0000${item.subcategory ?? ''}\u0000`
+          const candidates = enTitle
+            ? (wikiDrafts.get(scopeKey + normalizeName(enTitle)) ?? wikiDrafts.get(`${scopeKey}~${looseWikiName(enTitle)}`))
+            : undefined
+          if (candidates?.length) draft = pickByDescription(candidates, enItems?.get(item.itemKey)?.description ?? null)
         }
         if (draft) {
-          adoptDraft.run(item.itemKey, item.uid, draft.id)
-          moveTranslations.run(item.itemKey, draft.itemKey)
-          dropTranslations.run(draft.itemKey)
-          wikiDrafts.forEach((v, k) => {
-            if (v.id === draft.id) wikiDrafts.delete(k)
+          const adopted = draft
+          adoptDraft.run(item.itemKey, item.uid, adopted.id)
+          moveTranslations.run(item.itemKey, adopted.itemKey)
+          dropTranslations.run(adopted.itemKey)
+          // Brouillon rattaché : retiré des candidats (une variante = un seul objet).
+          wikiDrafts.forEach((list, k) => {
+            const rest = list.filter(d => d.id !== adopted.id)
+            if (rest.length) wikiDrafts.set(k, rest)
+            else wikiDrafts.delete(k)
           })
-          row = { id: draft.id }
+          row = { id: adopted.id }
         }
         keyRemap.set(item.itemKey, storedKey)
         let id: number
@@ -2221,10 +2240,10 @@ export function setChestCostWikiMap(category: string, subcategory: string | null
  * Items d'un scope avec leur nom EN (chest_item_translations, repli sur le nom FR) et
  * leur coût actuel — pour rapprocher du wiki par nom anglais.
  */
-export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, image: string | null, cost: ChestItemCost | null, prerequisites: ChestItemPrereqs | null }> {
+export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, enDescription: string | null, image: string | null, cost: ChestItemCost | null, prerequisites: ChestItemPrereqs | null }> {
   const db = getReputationDb()
   const sql = `
-    SELECT ci.id, ci.name, t.name as enName, ci.image, ci.cost, ci.prerequisites
+    SELECT ci.id, ci.name, t.name as enName, t.description as enDescription, ci.image, ci.cost, ci.prerequisites
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.category = ? AND ${subcategory === null ? 'ci.subcategory IS NULL' : 'ci.subcategory = ?'}
@@ -2233,14 +2252,17 @@ export function getChestScopeItemsForCost(category: string, subcategory: string 
   const rows = (subcategory === null
     ? db.prepare(sql).all(category)
     : db.prepare(sql).all(category, subcategory)
-  ) as Array<{ id: number, name: string, enName: string | null, image: string | null, cost: string | null, prerequisites: string | null }>
-  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, image: r.image || null, cost: parseChestItemCost(r.cost), prerequisites: parseChestItemPrereqs(r.prerequisites) }))
+  ) as Array<{ id: number, name: string, enName: string | null, enDescription: string | null, image: string | null, cost: string | null, prerequisites: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, enDescription: r.enDescription, image: r.image || null, cost: parseChestItemCost(r.cost), prerequisites: parseChestItemPrereqs(r.prerequisites) }))
 }
 
 // ---- Items du coffre créés depuis le wiki (brouillons « source wiki ») ----
 
 export interface WikiChestDraftInput {
   title: string
+  // Nom anglais dans le jeu : le titre, ou son nom de base pour une page de variante
+  // « Nom (Précision) » (toutes les variantes portent le même nom dans le jeu).
+  enName: string
   description: string | null
   image: string | null
   cost: ChestItemCost | null
@@ -2277,7 +2299,7 @@ export function createWikiChestDrafts(category: string, subcategory: string | nu
         d.cost ? JSON.stringify(d.cost) : null, d.prereqs ? JSON.stringify(d.prereqs) : null
       )
       if (res.changes > 0) {
-        upsertEn.run(key, d.title, d.description)
+        upsertEn.run(key, d.enName, d.description)
         created++
       }
     }

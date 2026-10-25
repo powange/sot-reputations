@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { createWikiChestDrafts, getChestScopeItemsForCost } from '../../../utils/reputation-db'
-import { describeWikiError, fetchWikiItemsByTitles, normalizeName, type WikiItem } from '../../../utils/sot-wiki'
+import { describeWikiError, fetchWikiItemsByTitles, normalizeName, wikiVariantBase, type WikiItem } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/create-drafts  { category, subcategory, titles: string[] }
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
 
   const created = createWikiChestDrafts(category, subcategory, wiki
     .filter(w => !existing.has(normalizeName(w.title)))
-    .map(w => ({ title: w.title, description: w.description, image: w.image, cost: w.cost, prereqs: w.prereqs })))
+    .map(w => ({ title: w.title, enName: wikiVariantBase(w.title) ?? w.title, description: w.description, image: w.image, cost: w.cost, prereqs: w.prereqs })))
 
   return { created, skipped: titles.length - created }
 })

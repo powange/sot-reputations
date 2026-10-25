@@ -8,7 +8,8 @@ export interface ChestPrereqs { commendations?: Array<{ name: string, grade: num
 export interface ChestCostMatched { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: ChestCost, currentCost: ChestCost | null, prereqs: ChestPrereqs | null, currentPrereqs: ChestPrereqs | null }
 export interface ChestCostNoCost { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: ChestPrereqs | null, currentPrereqs: ChestPrereqs | null }
 export interface ChestCostUnmatched { id: number, name: string, enName: string | null, image: string | null }
-export interface ChestCostWikiOnly { title: string, cost: ChestCost | null, image: string | null }
+// variantOf = nom de base d'une page de variante « Nom (Précision) » (nom de l'objet dans le jeu).
+export interface ChestCostWikiOnly { title: string, cost: ChestCost | null, image: string | null, variantOf: string | null }
 export interface ChestCostFetchResult {
   category: string
   subcategory: string | null

@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestScopeItemsForCost, type ChestItemCost, type ChestItemPrereqs } from '../../../utils/reputation-db'
-import { describeWikiError, fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
+import { describeWikiError, fetchWikiItemCostsMulti, looseWikiName, normalizeName, pickByDescription, wikiDataForItem, wikiVariantBase, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/fetch  { category, subcategory, wikiCategory? }
@@ -43,6 +43,35 @@ export default defineEventHandler(async (event) => {
 
   const wikiByName = new Map(wiki.map(w => [normalizeName(w.title), w]))
   const usedTitles = new Set<string>()
+  // Pages de variantes « Nom (Précision) » par nom de base : dans le jeu, chaque variante
+  // porte le nom sans précision ; on départage par la description anglaise.
+  const variantsByBase = new Map<string, WikiItem[]>()
+  for (const w of wiki) {
+    const base = wikiVariantBase(w.title)
+    if (!base) continue
+    const key = normalizeName(base)
+    variantsByBase.set(key, [...(variantsByBase.get(key) ?? []), w])
+  }
+  // Dernier recours : noms « souples » (qualité de trophée et guillemets retirés). Plusieurs
+  // qualités d'une même plaque partagent ainsi la page unique du wiki.
+  const wikiByLoose = new Map<string, WikiItem>()
+  for (const w of wiki) {
+    const key = looseWikiName(w.title)
+    if (!wikiByLoose.has(key)) wikiByLoose.set(key, w)
+  }
+  const findWikiPage = (it: { name: string, enName: string | null, enDescription: string | null }): WikiItem | undefined => {
+    const name = it.enName || it.name
+    const key = normalizeName(name)
+    const exact = wikiByName.get(key)
+    if (exact) return exact
+    const variants = variantsByBase.get(key)
+    if (variants) {
+      // Une variante déjà prise par un autre item est écartée en priorité.
+      const free = variants.filter(v => !usedTitles.has(normalizeName(v.title)))
+      return pickByDescription(free.length ? free : variants, it.enDescription)
+    }
+    return wikiByLoose.get(looseWikiName(name))
+  }
 
   // image = image du catalogue (site officiel, ou wiki pour un brouillon) ; wikiImage =
   // image de la page wiki rapprochée, en repli d'affichage quand l'item n'en a pas.
@@ -52,22 +81,24 @@ export default defineEventHandler(async (event) => {
   const unmatched: Array<{ id: number, name: string, enName: string | null, image: string | null }> = []
 
   for (const it of items) {
-    const w = wikiByName.get(normalizeName(it.enName || it.name))
+    const w = findWikiPage(it)
     if (!w) {
       unmatched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image })
       continue
     }
     usedTitles.add(normalizeName(w.title))
-    if (!w.cost) {
-      noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs: w.prereqs, currentPrereqs: it.prerequisites })
+    // Trophée avec qualité : coût et prérequis de cette qualité (sinon ceux de la page).
+    const { cost, prereqs } = wikiDataForItem(w, it.enName || it.name)
+    if (!cost) {
+      noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs, currentPrereqs: it.prerequisites })
       continue
     }
-    matched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs, currentPrereqs: it.prerequisites })
+    matched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, cost, currentCost: it.cost, prereqs, currentPrereqs: it.prerequisites })
   }
 
   const wikiOnly = wiki
     .filter(w => !usedTitles.has(normalizeName(w.title)))
-    .map(w => ({ title: w.title, cost: w.cost, image: w.image }))
+    .map(w => ({ title: w.title, cost: w.cost, image: w.image, variantOf: wikiVariantBase(w.title) }))
 
   return {
     category,
