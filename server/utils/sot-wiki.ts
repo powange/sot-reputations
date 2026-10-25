@@ -26,7 +26,9 @@ export interface WikiPrereqs {
   legendary?: boolean
   requires?: string
 }
-export interface WikiItem { title: string, cost: WikiCost | null, prereqs: WikiPrereqs | null }
+// description (EN) et image (original de la page) servent à créer les items absents
+// du catalogue (brouillons « source wiki ») ; null si la page n'en a pas.
+export interface WikiItem { title: string, cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null, image: string | null }
 
 // Champ wiki « *-level » -> clé de faction courte.
 const FACTION_LEVEL_FIELDS: Record<string, string> = {
@@ -51,7 +53,7 @@ interface CategoryMembersResponse {
   continue?: { cmcontinue?: string }
 }
 interface RevisionsResponse {
-  query?: { pages?: Record<string, { title: string, revisions?: Array<{ slots?: { main?: { '*'?: string } } }> }> }
+  query?: { pages?: Record<string, { title: string, revisions?: Array<{ slots?: { main?: { '*'?: string } } }>, original?: { source?: string } }> }
 }
 
 async function wikiApi<T>(params: Record<string, string>): Promise<T> {
@@ -162,9 +164,9 @@ function parseInfoboxFields(body: string): Map<string, string> {
 /**
  * Parse l'infobox {{variant}} d'un wikitext en une passe : coût + prérequis.
  */
-function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null } {
+function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiPrereqs | null, description: string | null } {
   const body = extractVariantBody(wikitext)
-  if (body == null) return { cost: null, prereqs: null }
+  if (body == null) return { cost: null, prereqs: null, description: null }
   const fields = parseInfoboxFields(body)
   const str = (name: string): string | undefined => {
     const v = fields.get(name)
@@ -220,9 +222,12 @@ function parseVariant(wikitext: string): { cost: WikiCost | null, prereqs: WikiP
   const req = str('requires')
   if (req) prereqs.requires = cleanWiki(req)
 
+  const description = str('description')
+
   return {
     cost: Object.keys(cost).length > 0 ? cost : null,
-    prereqs: Object.keys(prereqs).length > 0 ? prereqs : null
+    prereqs: Object.keys(prereqs).length > 0 ? prereqs : null,
+    description: description ? cleanWiki(description) || null : null
   }
 }
 
@@ -266,15 +271,16 @@ export async function fetchWikiItemsByTitles(titles: string[]): Promise<WikiItem
   for (const batch of chunk(titles, 50)) {
     const d = await wikiApi<RevisionsResponse>({
       action: 'query',
-      prop: 'revisions',
+      prop: 'revisions|pageimages',
       rvprop: 'content',
       rvslots: 'main',
+      piprop: 'original',
       titles: batch.join('|')
     })
     for (const p of Object.values(d.query?.pages ?? {})) {
       const wt = p.revisions?.[0]?.slots?.main?.['*'] ?? ''
-      const { cost, prereqs } = parseVariant(wt)
-      out.push({ title: p.title, cost, prereqs })
+      const { cost, prereqs, description } = parseVariant(wt)
+      out.push({ title: p.title, cost, prereqs, description, image: p.original?.source ?? null })
     }
   }
   return out

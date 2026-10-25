@@ -428,6 +428,17 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE chest_items ADD COLUMN prerequisites TEXT')
   }
 
+  // Migration: items créés depuis le wiki (absents des imports de joueurs). source =
+  // 'official' (import du site officiel) ou 'wiki' (brouillon : clé provisoire
+  // « wiki:<titre> », nom EN). published = 0 -> visible uniquement dans l'admin.
+  // Un import qui contient l'item le rattache (clé, nom FR, image officiels) et le publie.
+  if (!chestColorCols.some(col => col.name === 'source')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN source TEXT NOT NULL DEFAULT \'official\'')
+  }
+  if (!chestColorCols.some(col => col.name === 'published')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN published INTEGER NOT NULL DEFAULT 1')
+  }
+
   return db
 }
 
@@ -1461,10 +1472,27 @@ export function importChestData(
   // pas créer de doublon (qui éclaterait la possession entre lignes). On vise la plus
   // ancienne (MIN id) si plusieurs subsistent encore.
   const getByNameInScope = db.prepare(`
-    SELECT id, item_key as itemKey FROM chest_items
+    SELECT id, item_key as itemKey, source FROM chest_items
     WHERE lower(trim(name)) = lower(trim(?)) AND category = ? AND COALESCE(subcategory, '') = COALESCE(?, '')
     ORDER BY id LIMIT 1
   `)
+  // Brouillons « source wiki » par périmètre + nom EN normalisé : un item importé qui ne
+  // matche ni par clé ni par nom FR est rattaché au brouillon de même nom anglais.
+  const wikiDrafts = new Map<string, { id: number, itemKey: string }>()
+  for (const d of db.prepare(`
+    SELECT ci.id, ci.item_key as itemKey, ci.category, ci.subcategory, COALESCE(NULLIF(t.name, ''), ci.name) as enName
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'wiki'
+  `).all() as Array<{ id: number, itemKey: string, category: string, subcategory: string | null, enName: string }>) {
+    wikiDrafts.set(`${d.category}\u0000${d.subcategory ?? ''}\u0000${normalizeName(d.enName)}`, { id: d.id, itemKey: d.itemKey })
+  }
+  // Rattachement d'un brouillon wiki : il prend la clé et l'uid officiels (ses traductions
+  // suivent la clé), devient « official » et publié. Nom / description / image officiels
+  // sont posés ensuite par updateItem ; coût et prérequis du wiki sont conservés.
+  const adoptDraft = db.prepare(`UPDATE chest_items SET item_key = ?, uid = ?, source = 'official', published = 1 WHERE id = ?`)
+  const moveTranslations = db.prepare('UPDATE OR IGNORE chest_item_translations SET item_key = ? WHERE item_key = ?')
+  const dropTranslations = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ?')
   const insertOwnership = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) VALUES (?, ?)')
   const deleteOwnership = db.prepare('DELETE FROM user_chest_items WHERE user_id = ?')
 
@@ -1513,12 +1541,29 @@ export function importChestData(
         let storedKey = item.itemKey
         // Pas de match par clé : réutiliser une ligne existante de même nom dans le
         // même périmètre plutôt que d'en créer une nouvelle (anti-doublon).
+        let draft: { id: number, itemKey: string } | undefined
         if (!row && item.name) {
-          const byName = getByNameInScope.get(item.name, category, item.subcategory) as { id: number, itemKey: string } | undefined
-          if (byName) {
+          const byName = getByNameInScope.get(item.name, category, item.subcategory) as { id: number, itemKey: string, source: string } | undefined
+          if (byName?.source === 'wiki') {
+            draft = { id: byName.id, itemKey: byName.itemKey }
+          } else if (byName) {
             row = { id: byName.id }
             storedKey = byName.itemKey
           }
+        }
+        // Toujours rien : brouillon wiki de même nom anglais dans le même périmètre ?
+        if (!row && !draft) {
+          const enTitle = enByItemKey.get(item.itemKey)
+          if (enTitle) draft = wikiDrafts.get(`${category}\u0000${item.subcategory ?? ''}\u0000${normalizeName(enTitle)}`)
+        }
+        if (draft) {
+          adoptDraft.run(item.itemKey, item.uid, draft.id)
+          moveTranslations.run(item.itemKey, draft.itemKey)
+          dropTranslations.run(draft.itemKey)
+          wikiDrafts.forEach((v, k) => {
+            if (v.id === draft.id) wikiDrafts.delete(k)
+          })
+          row = { id: draft.id }
         }
         keyRemap.set(item.itemKey, storedKey)
         let id: number
@@ -1852,6 +1897,7 @@ export function getChestCatalogForUser(userId: number, locale = 'fr'): ChestItem
     FROM chest_items ci
     LEFT JOIN user_chest_items uci ON uci.item_id = ci.id AND uci.user_id = ?
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
+    WHERE ci.published = 1
   `).all(userId, locale) as Array<{
     id: number
     uid: string
@@ -1912,6 +1958,7 @@ export function getChestCatalogPublic(locale = 'fr'): ChestItem[] {
       ci.image, ci.sort_order as sortOrder, ci.colors, ci.cost, ci.prerequisites
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = ?
+    WHERE ci.published = 1
   `).all(locale) as Array<{
     id: number
     uid: string
@@ -1964,7 +2011,7 @@ function getPrereqCommIndex(db: Database.Database): Map<string, Array<{ id: numb
   const now = Date.now()
   if (prereqCommIndex && now - prereqCommIndexAt < PREREQ_INDEX_TTL) return prereqCommIndex
   const rows = db.prepare(`
-    SELECT id, prerequisites FROM chest_items WHERE prerequisites IS NOT NULL AND prerequisites != ''
+    SELECT id, prerequisites FROM chest_items WHERE published = 1 AND prerequisites IS NOT NULL AND prerequisites != ''
   `).all() as Array<{ id: number, prerequisites: string | null }>
   const idx = new Map<string, Array<{ id: number, grade: number | null }>>()
   for (const r of rows) {
@@ -2188,6 +2235,124 @@ export function getChestScopeItemsForCost(category: string, subcategory: string 
     : db.prepare(sql).all(category, subcategory)
   ) as Array<{ id: number, name: string, enName: string | null, cost: string | null }>
   return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, cost: parseChestItemCost(r.cost) }))
+}
+
+// ---- Items du coffre créés depuis le wiki (brouillons « source wiki ») ----
+
+export interface WikiChestDraftInput {
+  title: string
+  description: string | null
+  image: string | null
+  cost: ChestItemCost | null
+  prereqs: ChestItemPrereqs | null
+}
+
+/**
+ * Crée des items « source wiki » non publiés dans un périmètre (catégorie /
+ * sous-catégorie du catalogue) : clé et uid provisoires « wiki:<titre> », nom de base =
+ * titre EN (le nom FR n'est connu qu'au premier import d'un joueur), traduction EN
+ * (titre + description), image du wiki, coût et prérequis. Placés en fin de catégorie.
+ * Ignore les titres déjà présents (clé existante). Renvoie le nombre d'items créés.
+ */
+export function createWikiChestDrafts(category: string, subcategory: string | null, drafts: WikiChestDraftInput[]): number {
+  const db = getReputationDb()
+  const maxOrder = (db.prepare('SELECT MAX(sort_order) as m FROM chest_items WHERE category = ?').get(category) as { m: number | null }).m ?? 0
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO chest_items (uid, item_key, category, subcategory, name, description, image, sort_order, cost, prerequisites, source, published)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wiki', 0)
+  `)
+  const exists = db.prepare('SELECT 1 FROM chest_items WHERE item_key = ?')
+  const upsertEn = db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name, description)
+    VALUES (?, 'en', ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
+  `)
+  let created = 0
+  db.transaction(() => {
+    for (const d of drafts) {
+      const key = `wiki:${d.title}`
+      if (exists.get(key)) continue
+      const res = insert.run(
+        key, key, category, subcategory, d.title, d.description, d.image, maxOrder + created + 1,
+        d.cost ? JSON.stringify(d.cost) : null, d.prereqs ? JSON.stringify(d.prereqs) : null
+      )
+      if (res.changes > 0) {
+        upsertEn.run(key, d.title, d.description)
+        created++
+      }
+    }
+  })()
+  if (created > 0) invalidatePrereqIndex()
+  return created
+}
+
+export interface WikiChestItem {
+  id: number
+  title: string
+  category: string
+  subcategory: string | null
+  description: string | null
+  image: string | null
+  cost: ChestItemCost | null
+  prerequisites: ChestItemPrereqs | null
+  published: boolean
+}
+
+/** Items « source wiki » (publiés ou non), triés par catégorie (ordre du jeu) puis titre. */
+export function getWikiChestItems(): WikiChestItem[] {
+  const rows = getReputationDb().prepare(`
+    SELECT id, name, category, subcategory, description, image, cost, prerequisites, published
+    FROM chest_items WHERE source = 'wiki'
+  `).all() as Array<{ id: number, name: string, category: string, subcategory: string | null, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, published: number }>
+  return rows
+    .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
+      || a.category.localeCompare(b.category)
+      || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
+      || a.name.localeCompare(b.name))
+    .map(r => ({
+      id: r.id,
+      title: r.name,
+      category: r.category,
+      subcategory: r.subcategory,
+      description: r.description,
+      image: r.image,
+      cost: parseChestItemCost(r.cost),
+      prerequisites: parseChestItemPrereqs(r.prerequisites),
+      published: r.published === 1
+    }))
+}
+
+/** Publie / dépublie des items « source wiki ». Renvoie le nombre de lignes modifiées. */
+export function setWikiChestItemsPublished(ids: number[], published: boolean): number {
+  if (!ids.length) return 0
+  const db = getReputationDb()
+  const stmt = db.prepare(`UPDATE chest_items SET published = ? WHERE id = ? AND source = 'wiki'`)
+  let changed = 0
+  db.transaction(() => {
+    for (const id of ids) changed += stmt.run(published ? 1 : 0, id).changes
+  })()
+  invalidatePrereqIndex()
+  return changed
+}
+
+/** Supprime des items « source wiki » (et leurs traductions). Renvoie le nombre supprimé. */
+export function deleteWikiChestItems(ids: number[]): number {
+  if (!ids.length) return 0
+  const db = getReputationDb()
+  const getKey = db.prepare(`SELECT item_key as itemKey FROM chest_items WHERE id = ? AND source = 'wiki'`)
+  const delTr = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ?')
+  const delItem = db.prepare(`DELETE FROM chest_items WHERE id = ? AND source = 'wiki'`)
+  let deleted = 0
+  db.transaction(() => {
+    for (const id of ids) {
+      const row = getKey.get(id) as { itemKey: string } | undefined
+      if (!row) continue
+      delTr.run(row.itemKey)
+      deleted += delItem.run(id).changes
+    }
+  })()
+  invalidatePrereqIndex()
+  return deleted
 }
 
 /** Écrit le coût d'un item (null/vide = efface). Renvoie true si l'item existe. */
@@ -2463,7 +2628,8 @@ export function getChestCatalog(filter: { category?: string, subcategory?: strin
       ci.image, ci.cost, ci.prerequisites, ci.sort_order as sortOrder
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
-    WHERE (? IS NULL OR LOWER(ci.category) = LOWER(?))
+    WHERE ci.published = 1
+      AND (? IS NULL OR LOWER(ci.category) = LOWER(?))
       AND (? IS NULL OR LOWER(ci.subcategory) = LOWER(?))
   `).all(category, category, subcategory, subcategory) as Array<{
     uid: string

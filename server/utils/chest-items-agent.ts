@@ -63,13 +63,14 @@ function mdLabel(label: ChestLabel, key: string): string {
  */
 export function getChestItemsIndex(): ChestCategorySummary[] {
   const counts = getReputationDb().prepare(`
-    SELECT category, subcategory, COUNT(*) AS count FROM chest_items GROUP BY category, subcategory
+    SELECT category, subcategory, COUNT(*) AS count FROM chest_items WHERE published = 1 GROUP BY category, subcategory
   `).all() as Array<{ category: string, subcategory: string | null, count: number }>
   const countOf = new Map(counts.map(c => [`${c.category}\u0000${c.subcategory ?? ''}`, c.count]))
   const tr = getChestTaxonomyTranslations()
 
+  // Périmètres sans item publié (uniquement des brouillons wiki) : écartés.
   return getChestTaxonomy().map(({ category, subcategories }) => {
-    const subs = subcategories.map(sub => ({
+    const subs = subcategories.filter(sub => countOf.has(`${category}\u0000${sub}`)).map(sub => ({
       key: sub,
       label: subcategoryLabel(tr, category, sub),
       count: countOf.get(`${category}\u0000${sub}`) ?? 0,
@@ -82,7 +83,7 @@ export function getChestItemsIndex(): ChestCategorySummary[] {
       url: chestItemsAgentPath(category),
       subcategories: subs
     }
-  })
+  }).filter(c => c.count > 0)
 }
 
 /** Coût formaté « 1000 pièces d'or / 50 doublons », ou '' si gratuit/non achetable. */

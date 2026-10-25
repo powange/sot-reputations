@@ -129,6 +129,7 @@ async function fetchCosts() {
       body: { category: s.category, subcategory: s.subcategory, wikiCategory: wikiCategory.value.trim() || undefined }
     })
     result.value = res
+    selectedTitles.value = new Set()
     // Par défaut : on coche les matchés dont le coût change réellement.
     selectedIds.value = new Set(res.matched.filter(m => !sameCost(m.cost, m.currentCost)).map(m => m.id))
     toast.add({ title: `Wiki « ${res.wikiCategory} » : ${res.counts.matched} matchés, ${res.counts.unmatched} non matchés`, color: 'info' })
@@ -184,6 +185,52 @@ async function apply() {
 }
 
 // --- Traitement en masse : récupère + applique pour toutes les sous-catégories filtrées ---
+// Pages wiki sans item : création d'items « source wiki » non publiés (brouillons),
+// à publier ensuite depuis /admin/chest-wiki-items.
+const selectedTitles = ref<Set<string>>(new Set())
+const creatingDrafts = ref(false)
+
+function toggleTitle(title: string) {
+  const set = new Set(selectedTitles.value)
+  if (set.has(title)) set.delete(title)
+  else set.add(title)
+  selectedTitles.value = set
+}
+
+async function createDrafts(all: boolean) {
+  const s = selectedScope.value
+  if (!s || !result.value) return
+  const titles = all ? result.value.wikiOnly.map(w => w.title) : [...selectedTitles.value]
+  if (!titles.length) return
+  // Items du site non rapprochés (souvent sans nom anglais) : une page wiki « orpheline »
+  // peut être le même objet sous un autre nom -> doublon si on la crée.
+  if (all && result.value.unmatched.length && !confirm(
+    `${result.value.unmatched.length} item(s) du site ne sont pas rapprochés du wiki (souvent faute de nom anglais). `
+    + 'Certaines pages peuvent correspondre à ces items et créeraient des doublons. Créer quand même les '
+    + `${titles.length} pages ?`
+  )) return
+  creatingDrafts.value = true
+  try {
+    const res = await $fetch<{ created: number, skipped: number }>('/api/admin/chest-costs/create-drafts', {
+      method: 'POST',
+      body: { category: s.category, subcategory: s.subcategory, titles }
+    })
+    toast.add({
+      title: `${res.created} brouillon(s) créé(s)${res.skipped ? `, ${res.skipped} ignoré(s)` : ''}`,
+      description: 'À publier depuis « Items du wiki ».',
+      color: 'success'
+    })
+    selectedTitles.value = new Set()
+    await refreshScopes()
+    await fetchCosts()
+  } catch (e) {
+    const msg = (e as { statusMessage?: string })?.statusMessage || 'Échec de la création'
+    toast.add({ title: msg, color: 'error' })
+  } finally {
+    creatingDrafts.value = false
+  }
+}
+
 const bulkRunning = ref(false)
 const bulkProgress = ref({ done: 0, total: 0, current: '' })
 
@@ -561,20 +608,62 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
       <!-- Pages wiki orphelines -->
       <UCard v-if="result.wikiOnly.length">
         <template #header>
-          <h2 class="font-semibold">
-            Pages wiki sans item ({{ result.wikiOnly.length }})
-          </h2>
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <h2 class="font-semibold">
+              Pages wiki sans item ({{ result.wikiOnly.length }})
+            </h2>
+            <div class="flex gap-2 flex-wrap">
+              <UButton
+                icon="i-lucide-file-plus"
+                :label="`Créer la sélection (${selectedTitles.size})`"
+                size="sm"
+                variant="soft"
+                :loading="creatingDrafts"
+                :disabled="selectedTitles.size === 0 || creatingDrafts"
+                @click="createDrafts(false)"
+              />
+              <UButton
+                icon="i-lucide-files"
+                :label="`Créer tous les manquants (${result.wikiOnly.length})`"
+                size="sm"
+                :loading="creatingDrafts"
+                :disabled="creatingDrafts"
+                @click="createDrafts(true)"
+              />
+            </div>
+          </div>
         </template>
         <p class="text-sm text-muted mb-2">
           Pages du wiki non rapprochées d'un item du catalogue (item non importé, ou écart de nom).
+          Les items créés sont des brouillons non publiés (nom anglais, image du wiki), à publier depuis
+          <NuxtLink
+            to="/admin/chest-wiki-items"
+            class="underline"
+          >Items du wiki</NuxtLink>.
+          Ils se rattachent automatiquement à l'item officiel quand un joueur l'importe.
         </p>
+        <UAlert
+          v-if="result.unmatched.length"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          class="mb-3"
+          :title="`${result.unmatched.length} item(s) du site non rapprochés`"
+          :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Ajoutez d'abord le nom anglais (Traductions des objets) ou décochez la page.`"
+        />
         <ul class="text-sm space-y-1">
           <li
             v-for="w in result.wikiOnly"
             :key="w.title"
           >
-            <span class="font-medium">{{ w.title }}</span>
-            <span class="text-muted"> · {{ formatCost(w.cost) }}</span>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <UCheckbox
+                :model-value="selectedTitles.has(w.title)"
+                @update:model-value="toggleTitle(w.title)"
+              />
+              <span class="font-medium">{{ w.title }}</span>
+              <span class="text-muted"> · {{ formatCost(w.cost) }}</span>
+            </label>
           </li>
         </ul>
       </UCard>

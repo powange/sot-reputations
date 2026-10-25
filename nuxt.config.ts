@@ -111,9 +111,10 @@ export default defineNuxtConfig({
   },
 
   image: {
-    // Optimisation des images distantes du coffre (CDN officiel Sea of Thieves) :
-    // le domaine doit être explicitement autorisé pour passer par IPX.
-    domains: ['athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net'],
+    // Optimisation des images distantes du coffre (CDN officiel Sea of Thieves, et
+    // wiki pour les items créés depuis le wiki puis publiés) : chaque domaine doit être
+    // explicitement autorisé pour passer par IPX.
+    domains: ['athenawebsiteassets-a9awftf5fyfxandj.b01.azurefd.net', 'seaofthieves.wiki.gg'],
     format: ['webp']
   }
 })

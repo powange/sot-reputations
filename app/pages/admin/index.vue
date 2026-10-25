@@ -262,6 +262,27 @@ watchEffect(() => {
             </UCard>
           </NuxtLink>
 
+          <!-- Items du coffre créés depuis le wiki -->
+          <NuxtLink
+            to="/admin/chest-wiki-items"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-book-plus"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Items du wiki</h3>
+                  <p class="text-sm text-muted">Publier les objets du coffre créés depuis le wiki (absents des imports)</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
+
           <!-- Traductions des objets -->
           <NuxtLink
             to="/admin/chest-item-translations"
