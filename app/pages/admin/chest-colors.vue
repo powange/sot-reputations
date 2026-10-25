@@ -17,13 +17,14 @@ watchEffect(() => {
   }
 })
 
-interface ColorStatus { analyzed: number, total: number, remaining: number }
+// noColors = analysés sans couleur (échec de téléchargement), à ré-analyser.
+interface ColorStatus { analyzed: number, total: number, remaining: number, noColors: number }
 interface AnalyzeResult extends ColorStatus { processed: number, failed: number }
 
 const { data: initialStatus } = await useFetch<ColorStatus>('/api/admin/chest-colors/status')
 const { data: palette } = await useFetch<Array<{ name: string, hex: string }>>('/api/chest-colors')
 
-const status = ref<ColorStatus>(initialStatus.value || { analyzed: 0, total: 0, remaining: 0 })
+const status = ref<ColorStatus>(initialStatus.value || { analyzed: 0, total: 0, remaining: 0, noColors: 0 })
 const analyzing = ref(false)
 const stopRequested = ref(false)
 const reclassifying = ref(false)
@@ -73,7 +74,7 @@ const progressPct = computed(() =>
 async function runAnalyzeLoop() {
   while (!stopRequested.value) {
     const res = await $fetch<AnalyzeResult>('/api/admin/chest-colors/analyze', { method: 'POST' })
-    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining }
+    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining, noColors: res.noColors }
     // Fin si plus rien à traiter, ou si un lot n'a rien avancé (évite une boucle infinie).
     if (res.remaining <= 0 || (res.processed === 0 && res.failed === 0)) break
   }
@@ -100,7 +101,7 @@ async function reanalyzeAll() {
   stopRequested.value = false
   try {
     const res = await $fetch<AnalyzeResult & { reset: number }>('/api/admin/chest-colors/reset', { method: 'POST' })
-    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining }
+    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining, noColors: res.noColors }
     await runAnalyzeLoop()
     toast.add({ title: 'Ré-analyse des couleurs terminée', color: 'success' })
   } catch {
@@ -108,6 +109,30 @@ async function reanalyzeAll() {
   } finally {
     analyzing.value = false
   }
+}
+
+// Ré-analyse des seuls items restés sans couleur (échec de téléchargement).
+async function reanalyzeFailed() {
+  analyzing.value = true
+  stopRequested.value = false
+  try {
+    const res = await $fetch<ColorStatus & { reset: number }>('/api/admin/chest-colors/reset-failed', { method: 'POST' })
+    status.value = { analyzed: res.analyzed, total: res.total, remaining: res.remaining, noColors: res.noColors }
+    await runAnalyzeLoop()
+    await refreshStatus()
+    toast.add({
+      title: status.value.noColors ? `Ré-analyse terminée : ${status.value.noColors} item(s) toujours sans couleur` : 'Ré-analyse terminée : plus aucun échec',
+      color: status.value.noColors ? 'warning' : 'success'
+    })
+  } catch {
+    toast.add({ title: 'Erreur pendant la ré-analyse', color: 'error' })
+  } finally {
+    analyzing.value = false
+  }
+}
+
+async function refreshStatus() {
+  status.value = await $fetch<ColorStatus>('/api/admin/chest-colors/status')
 }
 
 function stopAnalyze() {
@@ -258,6 +283,12 @@ async function reanalyzeItem(item: SearchItem) {
             <span class="text-muted">Items analysés</span>
             <span class="font-medium">{{ status.analyzed }} / {{ status.total }}</span>
           </div>
+          <p
+            v-if="status.noColors"
+            class="text-xs text-warning mb-1"
+          >
+            dont {{ status.noColors }} sans couleur (téléchargement de l'image en échec)
+          </p>
           <div class="h-2 bg-muted/30 rounded-full overflow-hidden">
             <div
               class="h-full bg-primary transition-all"
@@ -280,6 +311,13 @@ async function reanalyzeItem(item: SearchItem) {
             label="Arrêter"
             color="warning"
             @click="stopAnalyze"
+          />
+          <UButton
+            v-if="!analyzing && status.noColors"
+            icon="i-lucide-rotate-cw"
+            :label="`Ré-analyser les échecs (${status.noColors})`"
+            color="warning"
+            @click="reanalyzeFailed"
           />
           <UButton
             icon="i-lucide-refresh-cw"

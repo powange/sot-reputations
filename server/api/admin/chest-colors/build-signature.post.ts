@@ -2,28 +2,18 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestItemsForScope, saveChestColorSignature, saveChestItemColors, chestScopeKey } from '../../../utils/reputation-db'
 import { classifyDominantColors } from '../../../utils/chest-colors'
 import { decodeRaw, presentBins, extractFromRaw } from '../../../utils/chest-colors-extract'
+import { fetchChestImage } from '../../../utils/chest-image-fetch'
+import { mapLimit } from '../../../utils/map-limit'
+import { isWikiImage } from '#shared/utils/wiki-image'
 
 // Une couleur doit être présente sur au moins cette fraction d'une image pour compter.
 const PRESENT_FRACTION = 0.01
 // Bac présent dans au moins cette fraction des images du scope = couleur « décor ».
 const SIGNATURE_THRESHOLD = 0.85
-// Téléchargements simultanés (borne la pression réseau / sockets).
+// Téléchargements simultanés (borne la pression réseau / sockets). Images du wiki :
+// beaucoup moins, wiki.gg répondant 429 aux rafales.
 const CONCURRENCY = 12
-
-// map avec limite de concurrence (préserve l'ordre ; les échecs renvoient null).
-async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let idx = 0
-  const worker = async () => {
-    while (true) {
-      const i = idx++
-      if (i >= items.length) break
-      results[i] = await fn(items[i]!)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  return results
-}
+const WIKI_CONCURRENCY = 2
 
 /**
  * POST /api/admin/chest-colors/build-signature  { category, subcategory }
@@ -48,16 +38,18 @@ export default defineEventHandler(async (event) => {
   }
 
   // Télécharge + décode une fois (cache mémoire : ~37 Ko/image à 96×96).
-  const decoded = await mapLimit(items, CONCURRENCY, async (item) => {
+  const load = async (item: typeof items[number]) => {
     try {
-      const res = await fetch(item.image, { signal: AbortSignal.timeout(20000) })
-      if (!res.ok) return null
-      const { data, channels } = await decodeRaw(Buffer.from(await res.arrayBuffer()))
+      const { data, channels } = await decodeRaw(await fetchChestImage(item.image, 20000))
       return { id: item.id, manual: item.manual, data, channels, bins: presentBins(data, channels, PRESENT_FRACTION) }
     } catch {
       return null
     }
-  })
+  }
+  const decoded = (await Promise.all([
+    mapLimit(items.filter(it => !isWikiImage(it.image)), CONCURRENCY, load),
+    mapLimit(items.filter(it => isWikiImage(it.image)), WIKI_CONCURRENCY, load)
+  ])).flat()
   const ok = decoded.filter((d): d is NonNullable<typeof d> => d !== null)
   if (ok.length === 0) {
     throw createError({ statusCode: 502, statusMessage: 'Aucune image téléchargeable pour ce scope' })

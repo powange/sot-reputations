@@ -9,7 +9,7 @@
  */
 
 const WIKI_API = 'https://seaofthieves.wiki.gg/api.php'
-const USER_AGENT = 'sot-reputations (https://achievements-sot.powange.com)'
+export const USER_AGENT = 'sot-reputations (https://achievements-sot.powange.com)'
 
 export interface WikiCost { gold?: number, doubloons?: number, ancientCoins?: number }
 

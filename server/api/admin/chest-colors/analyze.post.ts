@@ -2,9 +2,14 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestItemsForColorAnalysis, saveChestItemColors, getChestColorStatus, getAllChestColorSignatures, chestScopeKey } from '../../../utils/reputation-db'
 import { classifyDominantColors } from '../../../utils/chest-colors'
 import { extractDominantColors } from '../../../utils/chest-colors-extract'
+import { fetchChestImage } from '../../../utils/chest-image-fetch'
+import { mapLimit } from '../../../utils/map-limit'
+import { isWikiImage } from '#shared/utils/wiki-image'
 
 // Lot traité par appel (l'UI rappelle jusqu'à remaining === 0).
 const BATCH_SIZE = 30
+// Images du wiki : peu de téléchargements simultanés (wiki.gg répond 429 aux rafales).
+const WIKI_CONCURRENCY = 2
 
 /**
  * POST /api/admin/chest-colors/analyze
@@ -20,15 +25,13 @@ export default defineEventHandler(async (event) => {
   // Signatures « décor » par scope (coque de bateau, etc.) à exclure de l'extraction.
   const signatures = getAllChestColorSignatures()
 
-  // Téléchargements en parallèle : borne la durée du lot (~ l'image la plus lente)
-  // au lieu de la somme, ce qui évite les timeouts de reverse proxy. Chaque item
-  // avale entièrement ses erreurs : Promise.all ne rejette jamais (pas de 500 en
-  // plein lot).
-  const results = await Promise.all(items.map(async (item): Promise<'ok' | 'failed'> => {
+  // Téléchargements en parallèle (CDN officiel) : borne la durée du lot (~ l'image la
+  // plus lente) au lieu de la somme, ce qui évite les timeouts de reverse proxy. Images
+  // du wiki : par 2, avec nouvelles tentatives sur 429 (cf. fetchChestImage). Chaque item
+  // avale entièrement ses erreurs : rien ne rejette (pas de 500 en plein lot).
+  const analyze = async (item: typeof items[number]): Promise<'ok' | 'failed'> => {
     try {
-      const res = await fetch(item.image, { signal: AbortSignal.timeout(15000) })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const buf = Buffer.from(await res.arrayBuffer())
+      const buf = await fetchChestImage(item.image)
       const excludeBins = signatures.get(chestScopeKey(item.category, item.subcategory))
       const dominant = await extractDominantColors(buf, 4, excludeBins)
       saveChestItemColors(item.id, dominant, classifyDominantColors(dominant))
@@ -42,7 +45,11 @@ export default defineEventHandler(async (event) => {
       } catch { /* repris au prochain lot */ }
       return 'failed'
     }
-  }))
+  }
+  const results = (await Promise.all([
+    Promise.all(items.filter(it => !isWikiImage(it.image)).map(analyze)),
+    mapLimit(items.filter(it => isWikiImage(it.image)), WIKI_CONCURRENCY, analyze)
+  ])).flat()
 
   const processed = results.filter(r => r === 'ok').length
   const failed = results.filter(r => r === 'failed').length

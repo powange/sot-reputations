@@ -2,6 +2,7 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestItemImageById, saveChestItemColors, getChestColorSignature, chestScopeKey } from '../../../utils/reputation-db'
 import { classifyDominantColors } from '../../../utils/chest-colors'
 import { extractDominantColors } from '../../../utils/chest-colors-extract'
+import { fetchChestImage } from '../../../utils/chest-image-fetch'
 
 /**
  * POST /api/admin/chest-colors/analyze-item  { id }
@@ -22,11 +23,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Item introuvable ou sans image' })
   }
 
-  const res = await fetch(item.image, { signal: AbortSignal.timeout(15000) })
-  if (!res.ok) {
-    throw createError({ statusCode: 502, statusMessage: `Téléchargement image : HTTP ${res.status}` })
+  let buf: Buffer
+  try {
+    buf = await fetchChestImage(item.image)
+  } catch (err) {
+    throw createError({ statusCode: 502, statusMessage: `Téléchargement image : ${err instanceof Error ? err.message : 'échec'}` })
   }
-  const buf = Buffer.from(await res.arrayBuffer())
   const sig = getChestColorSignature(chestScopeKey(item.category, item.subcategory))
   const dominant = await extractDominantColors(buf, 4, sig ? new Set(sig.bins) : undefined)
   const colors = classifyDominantColors(dominant)

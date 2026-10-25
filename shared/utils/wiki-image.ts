@@ -1,6 +1,7 @@
-// Images du wiki Sea of Thieves (items du coffre créés depuis le wiki). Elles ne passent
-// PAS par IPX : wiki.gg limite (429) les téléchargements répétés depuis notre serveur.
-// Le navigateur les charge directement, en miniature générée par MediaWiki.
+// Images du wiki Sea of Thieves (items du coffre créés depuis le wiki). Côté client, elles
+// ne passent PAS par IPX : wiki.gg limite (429) les téléchargements répétés depuis notre
+// serveur ; le navigateur les charge directement, en miniature générée par MediaWiki.
+// Côté serveur (analyse des couleurs), cf. server/utils/chest-image-fetch.ts.
 const WIKI_IMAGE_RE = /^https:\/\/seaofthieves\.wiki\.gg\/images\/([^/?#]+)(\?[^#]*)?$/
 
 export function isWikiImage(url: string | null | undefined): boolean {

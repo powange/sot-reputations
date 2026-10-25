@@ -2521,7 +2521,7 @@ export function setChestItemColorsManual(id: number, colors: string[]): boolean 
 }
 
 /** Compteurs d'avancement de l'analyse des couleurs. */
-export function getChestColorStatus(): { analyzed: number, total: number } {
+export function getChestColorStatus(): { analyzed: number, total: number, noColors: number } {
   const db = getReputationDb()
   const total = (db.prepare(
     `SELECT COUNT(*) as c FROM chest_items WHERE image IS NOT NULL AND image != ''`
@@ -2529,7 +2529,25 @@ export function getChestColorStatus(): { analyzed: number, total: number } {
   const analyzed = (db.prepare(
     `SELECT COUNT(*) as c FROM chest_items WHERE dominant_colors IS NOT NULL AND image IS NOT NULL AND image != ''`
   ).get() as { c: number }).c
-  return { analyzed, total }
+  // Analysés sans couleur : échec de téléchargement (ex. 429 du wiki) ou image vide.
+  const noColors = (db.prepare(
+    `SELECT COUNT(*) as c FROM chest_items WHERE dominant_colors = '[]' AND image IS NOT NULL AND image != ''
+     AND (colors_manual IS NULL OR colors_manual = 0)`
+  ).get() as { c: number }).c
+  return { analyzed, total, noColors }
+}
+
+/**
+ * Remet en file d'analyse les items analysés sans couleur (échec de téléchargement :
+ * l'analyse les marque `[]` pour ne pas boucler). Couleurs éditées à la main épargnées.
+ */
+export function resetFailedChestItemColors(): number {
+  const db = getReputationDb()
+  return db.prepare(
+    `UPDATE chest_items SET dominant_colors = NULL, colors = NULL
+     WHERE dominant_colors = '[]' AND image IS NOT NULL AND image != ''
+     AND (colors_manual IS NULL OR colors_manual = 0)`
+  ).run().changes
 }
 
 /**
