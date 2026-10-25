@@ -272,14 +272,15 @@ function formatPrereqs(pr: Prereqs | null): string {
                 :model-value="selectedIds.has(it.id)"
                 @update:model-value="toggle(it.id)"
               />
-              <img
+              <ChestItemImage
                 v-if="it.image"
                 :src="it.image"
                 :alt="it.title"
+                :size="48"
+                format="webp"
                 loading="lazy"
-                decoding="async"
                 class="w-12 h-12 object-contain shrink-0 rounded bg-elevated"
-              >
+              />
               <div
                 v-else
                 class="w-12 h-12 shrink-0 rounded bg-elevated"

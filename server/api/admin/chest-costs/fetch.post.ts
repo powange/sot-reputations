@@ -43,27 +43,29 @@ export default defineEventHandler(async (event) => {
   const wikiByName = new Map(wiki.map(w => [normalizeName(w.title), w]))
   const usedTitles = new Set<string>()
 
-  const matched: Array<{ id: number, name: string, enName: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null }> = []
-  const noCost: Array<{ id: number, name: string, enName: string | null, wikiTitle: string, prereqs: WikiPrereqs | null }> = []
-  const unmatched: Array<{ id: number, name: string, enName: string | null }> = []
+  // image = image du catalogue (site officiel, ou wiki pour un brouillon) ; wikiImage =
+  // image de la page wiki rapprochée, en repli d'affichage quand l'item n'en a pas.
+  const matched: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null }> = []
+  const noCost: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: WikiPrereqs | null }> = []
+  const unmatched: Array<{ id: number, name: string, enName: string | null, image: string | null }> = []
 
   for (const it of items) {
     const w = wikiByName.get(normalizeName(it.enName || it.name))
     if (!w) {
-      unmatched.push({ id: it.id, name: it.name, enName: it.enName })
+      unmatched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image })
       continue
     }
     usedTitles.add(normalizeName(w.title))
     if (!w.cost) {
-      noCost.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title, prereqs: w.prereqs })
+      noCost.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, prereqs: w.prereqs })
       continue
     }
-    matched.push({ id: it.id, name: it.name, enName: it.enName, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs })
+    matched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image, wikiImage: w.image, wikiTitle: w.title, cost: w.cost, currentCost: it.cost, prereqs: w.prereqs })
   }
 
   const wikiOnly = wiki
     .filter(w => !usedTitles.has(normalizeName(w.title)))
-    .map(w => ({ title: w.title, cost: w.cost }))
+    .map(w => ({ title: w.title, cost: w.cost, image: w.image }))
 
   return {
     category,

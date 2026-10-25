@@ -20,10 +20,11 @@ watchEffect(() => {
 interface Scope { category: string, subcategory: string | null, count: number, withCost: number, wikiCategory: string | null }
 interface Cost { gold?: number, doubloons?: number, ancientCoins?: number }
 interface Prereqs { commendations?: Array<{ name: string, grade: number | null }>, factionLevels?: Record<string, number>, legendary?: boolean, requires?: string }
-interface Matched { id: number, name: string, enName: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null, prereqs: Prereqs | null }
-interface NoCost { id: number, name: string, enName: string | null, wikiTitle: string, prereqs: Prereqs | null }
-interface Unmatched { id: number, name: string, enName: string | null }
-interface WikiOnly { title: string, cost: Cost | null }
+// image = image du catalogue ; wikiImage = image de la page wiki rapprochée (repli).
+interface Matched { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: Cost, currentCost: Cost | null, prereqs: Prereqs | null }
+interface NoCost { id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: Prereqs | null }
+interface Unmatched { id: number, name: string, enName: string | null, image: string | null }
+interface WikiOnly { title: string, cost: Cost | null, image: string | null }
 interface FetchResult {
   category: string
   subcategory: string | null
@@ -520,14 +521,23 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
                 />
               </td>
               <td class="py-1.5 pr-2">
-                <div class="font-medium">
-                  {{ m.enName || m.name }}
-                </div>
-                <div
-                  v-if="m.enName && m.enName !== m.name"
-                  class="text-xs text-muted"
-                >
-                  {{ m.name }}
+                <div class="flex items-center gap-2">
+                  <ChestCostThumb
+                    :image="m.image"
+                    :wiki-image="m.wikiImage"
+                    :alt="m.enName || m.name"
+                  />
+                  <div>
+                    <div class="font-medium">
+                      {{ m.enName || m.name }}
+                    </div>
+                    <div
+                      v-if="m.enName && m.enName !== m.name"
+                      class="text-xs text-muted"
+                    >
+                      {{ m.name }}
+                    </div>
+                  </div>
                 </div>
               </td>
               <td class="py-1.5 pr-2 text-muted">
@@ -568,7 +578,12 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           <li
             v-for="u in result.unmatched"
             :key="u.id"
+            class="flex items-center gap-2"
           >
+            <ChestCostThumb
+              :image="u.image"
+              :alt="u.enName || u.name"
+            />
             <span class="font-medium">{{ u.enName || u.name }}</span>
             <span
               v-if="u.enName && u.enName !== u.name"
@@ -599,7 +614,13 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
           <li
             v-for="n in result.noCost"
             :key="n.id"
+            class="flex items-center gap-2"
           >
+            <ChestCostThumb
+              :image="n.image"
+              :wiki-image="n.wikiImage"
+              :alt="n.enName || n.name"
+            />
             {{ n.enName || n.name }}
           </li>
         </ul>
@@ -660,6 +681,10 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
               <UCheckbox
                 :model-value="selectedTitles.has(w.title)"
                 @update:model-value="toggleTitle(w.title)"
+              />
+              <ChestCostThumb
+                :wiki-image="w.image"
+                :alt="w.title"
               />
               <span class="font-medium">{{ w.title }}</span>
               <span class="text-muted"> · {{ formatCost(w.cost) }}</span>

@@ -80,12 +80,11 @@ watch(open, async (isOpen) => {
               :key="it.id"
               class="flex items-center gap-2 text-sm"
             >
-              <NuxtImg
+              <ChestItemImage
                 v-if="it.image"
                 :src="it.image"
                 :alt="it.name"
-                width="40"
-                height="40"
+                :size="40"
                 format="webp"
                 class="w-8 h-8 object-cover rounded bg-muted/20 shrink-0"
               />

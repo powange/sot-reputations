@@ -638,12 +638,11 @@ watch(
               :class="item.image ? 'cursor-pointer' : ''"
               @click="openItem(item)"
             >
-              <NuxtImg
+              <ChestItemImage
                 v-if="item.image"
                 :src="item.image"
                 :alt="item.name"
-                width="200"
-                height="200"
+                :size="200"
                 densities="x1 x2"
                 format="webp"
                 loading="lazy"
@@ -772,14 +771,14 @@ watch(
     >
       <template #content>
         <div class="p-4 flex flex-col items-center max-h-[85vh] overflow-y-auto">
-          <NuxtImg
+          <ChestItemImage
             v-if="selectedItem?.image"
             :src="selectedItem.image"
             :alt="selectedItem.name"
-            width="1024"
-            height="1024"
+            :size="1024"
             format="webp"
             :quality="90"
+            original
             class="max-w-full max-h-[45vh] sm:max-h-[60vh] object-contain"
           />
           <p class="mt-4 text-lg font-medium text-center">

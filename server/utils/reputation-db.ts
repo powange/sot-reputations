@@ -2221,10 +2221,10 @@ export function setChestCostWikiMap(category: string, subcategory: string | null
  * Items d'un scope avec leur nom EN (chest_item_translations, repli sur le nom FR) et
  * leur coût actuel — pour rapprocher du wiki par nom anglais.
  */
-export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, cost: ChestItemCost | null }> {
+export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, image: string | null, cost: ChestItemCost | null }> {
   const db = getReputationDb()
   const sql = `
-    SELECT ci.id, ci.name, t.name as enName, ci.cost
+    SELECT ci.id, ci.name, t.name as enName, ci.image, ci.cost
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.category = ? AND ${subcategory === null ? 'ci.subcategory IS NULL' : 'ci.subcategory = ?'}
@@ -2233,8 +2233,8 @@ export function getChestScopeItemsForCost(category: string, subcategory: string 
   const rows = (subcategory === null
     ? db.prepare(sql).all(category)
     : db.prepare(sql).all(category, subcategory)
-  ) as Array<{ id: number, name: string, enName: string | null, cost: string | null }>
-  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, cost: parseChestItemCost(r.cost) }))
+  ) as Array<{ id: number, name: string, enName: string | null, image: string | null, cost: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, image: r.image || null, cost: parseChestItemCost(r.cost) }))
 }
 
 // ---- Items du coffre créés depuis le wiki (brouillons « source wiki ») ----
