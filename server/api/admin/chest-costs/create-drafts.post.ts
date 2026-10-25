@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { createWikiChestDrafts, getChestScopeItemsForCost } from '../../../utils/reputation-db'
-import { fetchWikiItemsByTitles, normalizeName, type WikiItem } from '../../../utils/sot-wiki'
+import { describeWikiError, fetchWikiItemsByTitles, normalizeName, type WikiItem } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/create-drafts  { category, subcategory, titles: string[] }
@@ -38,8 +38,9 @@ export default defineEventHandler(async (event) => {
   if (wanted.length) {
     try {
       wiki = await fetchWikiItemsByTitles(wanted)
-    } catch {
-      throw createError({ statusCode: 502, statusMessage: 'Échec de récupération du wiki' })
+    } catch (err) {
+      console.error('[chest-costs] échec wiki (brouillons)', err)
+      throw createError({ statusCode: 502, statusMessage: `Échec de récupération du wiki (${describeWikiError(err)})` })
     }
   }
 

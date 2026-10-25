@@ -56,6 +56,18 @@ interface RevisionsResponse {
   query?: { pages?: Record<string, { title: string, revisions?: Array<{ slots?: { main?: { '*'?: string } } }>, original?: { source?: string } }> }
 }
 
+/**
+ * Cause lisible d'un échec d'appel au wiki (code HTTP de wiki.gg, délai dépassé, réseau),
+ * pour la renvoyer à l'admin au lieu d'un message générique.
+ */
+export function describeWikiError(err: unknown): string {
+  const e = err as { statusCode?: number, status?: number, response?: { status?: number }, name?: string, message?: string, cause?: { code?: string } }
+  const status = e?.statusCode ?? e?.status ?? e?.response?.status
+  if (status) return status === 429 ? 'HTTP 429 : le wiki limite les requêtes, réessayez dans un moment' : `HTTP ${status} du wiki`
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError' || /timeout|aborted/i.test(e?.message ?? '')) return 'délai dépassé'
+  return e?.cause?.code || e?.message || 'erreur inconnue'
+}
+
 async function wikiApi<T>(params: Record<string, string>): Promise<T> {
   const url = `${WIKI_API}?${new URLSearchParams({ ...params, format: 'json' }).toString()}`
   // wiki.gg limite les rafales (429) : nouvelles tentatives espacées sur les erreurs

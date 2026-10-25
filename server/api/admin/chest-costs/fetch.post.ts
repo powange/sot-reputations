@@ -1,6 +1,6 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestScopeItemsForCost, type ChestItemCost, type ChestItemPrereqs } from '../../../utils/reputation-db'
-import { fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
+import { describeWikiError, fetchWikiItemCostsMulti, normalizeName, type WikiCost, type WikiItem, type WikiPrereqs } from '../../../utils/sot-wiki'
 
 /**
  * POST /api/admin/chest-costs/fetch  { category, subcategory, wikiCategory? }
@@ -36,8 +36,9 @@ export default defineEventHandler(async (event) => {
   let wiki: WikiItem[]
   try {
     wiki = await fetchWikiItemCostsMulti(wikiCategories)
-  } catch {
-    throw createError({ statusCode: 502, statusMessage: `Échec de récupération du wiki pour « ${wikiCategory} »` })
+  } catch (err) {
+    console.error('[chest-costs] échec wiki', wikiCategory, err)
+    throw createError({ statusCode: 502, statusMessage: `Échec de récupération du wiki pour « ${wikiCategory} » (${describeWikiError(err)})` })
   }
 
   const wikiByName = new Map(wiki.map(w => [normalizeName(w.title), w]))
