@@ -14,16 +14,17 @@ interface EmblemTranslations {
 }
 
 /**
- * Vérifie si un emblème correspond à une recherche
- * Cherche dans le nom et la description en français (par défaut)
- * et dans les traductions de la langue courante si spécifiée
+ * Vérifie si un emblème correspond à une recherche : nom et description en français et
+ * dans TOUTES les traductions disponibles (EN, ES…), quelle que soit la langue affichée,
+ * pour trouver un emblème par n'importe lequel de ses noms.
  */
 export function emblemMatchesSearch(
   emblem: { name: string, description: string | null, key?: string } & EmblemTranslations,
   query: string,
+  // locale : conservé pour compatibilité, la recherche porte sur toutes les langues.
   options: { includeKey?: boolean, locale?: string } = {}
 ): boolean {
-  const { includeKey = false, locale } = options
+  const { includeKey = false } = options
   const q = normalizeForSearch(query)
   if (!q) return true
 
@@ -32,13 +33,10 @@ export function emblemMatchesSearch(
   if (emblem.description && normalizeForSearch(emblem.description).includes(q)) return true
   if (includeKey && emblem.key && normalizeForSearch(emblem.key).includes(q)) return true
 
-  // Chercher dans les traductions de la langue courante
-  if (locale && locale !== 'fr' && emblem.translations) {
-    const translation = emblem.translations[locale]
-    if (translation) {
-      if (translation.name && normalizeForSearch(translation.name).includes(q)) return true
-      if (translation.description && normalizeForSearch(translation.description).includes(q)) return true
-    }
+  // Chercher dans toutes les traductions
+  for (const translation of Object.values(emblem.translations ?? {})) {
+    if (translation.name && normalizeForSearch(translation.name).includes(q)) return true
+    if (translation.description && normalizeForSearch(translation.description).includes(q)) return true
   }
 
   return false
