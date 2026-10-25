@@ -1,10 +1,11 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { setChestItemEnName } from '../../../utils/reputation-db'
+import { setChestItemWikiName } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-costs/en-name  { id, name }
- * Pose le nom anglais d'un item non rapproché du wiki (souvent : traduction EN absente),
- * pour qu'il soit rapproché de sa page wiki au prochain aperçu. Description EN intacte.
+ * POST /api/admin/chest-costs/wiki-name  { id, name }
+ * Pose le nom wiki d'un item non rapproché (titre de sa page sur le wiki), pour qu'il
+ * soit rapproché au prochain aperçu. Le nom anglais officiel n'est pas modifié, sauf s'il
+ * est absent (il prend alors cette valeur).
  */
 export default defineEventHandler(async (event) => {
   await requireAdminOrModerator(event)
@@ -18,7 +19,7 @@ export default defineEventHandler(async (event) => {
   if (name.length > 200) {
     throw createError({ statusCode: 400, statusMessage: 'Nom trop long' })
   }
-  if (!setChestItemEnName(id, name)) {
+  if (!setChestItemWikiName(id, name)) {
     throw createError({ statusCode: 404, statusMessage: 'Item introuvable' })
   }
   return { success: true }

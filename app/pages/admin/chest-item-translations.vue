@@ -28,6 +28,7 @@ interface ApiItem {
   es: string | null
   enDesc: string | null
   esDesc: string | null
+  wikiName: string | null
 }
 interface ItemRow {
   id: number
@@ -39,6 +40,7 @@ interface ItemRow {
   es: string
   enDesc: string
   esDesc: string
+  wikiName: string
 }
 
 const q = ref('')
@@ -68,7 +70,8 @@ async function runSearch() {
       en: i.en || '',
       es: i.es || '',
       enDesc: i.enDesc || '',
-      esDesc: i.esDesc || ''
+      esDesc: i.esDesc || '',
+      wikiName: i.wikiName || ''
     }))
     hasSearched.value = true
   } catch {
@@ -91,7 +94,8 @@ async function saveAll() {
     translations: [
       { locale: 'en', name: r.en, description: r.enDesc },
       { locale: 'es', name: r.es, description: r.esDesc }
-    ]
+    ],
+    wikiName: r.wikiName
   }))
   saving.value = true
   try {
@@ -106,7 +110,7 @@ async function saveAll() {
 
 // --- Réparations en lot (aperçu puis application) ---
 
-interface RestoreResult { updated: number, unchanged: number, unknown: number, samples: Array<{ locale: string, name: string, before: string | null, after: string }> }
+interface RestoreResult { updated: number, unchanged: number, unknown: number, wikiNamesKept: number, samples: Array<{ locale: string, name: string, before: string | null, after: string, keptAsWikiName?: boolean }> }
 interface RepairResult { count: number, samples: Array<{ name: string, before: string, after: string }> }
 
 // Export du bookmarklet ({ chest, chestEn, chestEs, reputation }) : lu dans le navigateur,
@@ -195,7 +199,8 @@ async function runTrophyRepair(apply: boolean) {
         Traductions des objets
       </h1>
       <p class="text-muted mt-2">
-        Corriger les traductions EN / ES (nom et description) des objets du coffre. Le FR
+        Corriger les traductions EN / ES (nom et description) des objets du coffre, et leur
+        nom wiki (titre de leur page sur le wiki quand il diffère du nom anglais). Le FR
         (langue de base, capté à l'import) sert de référence et n'est pas modifiable ici.
       </p>
     </div>
@@ -231,6 +236,13 @@ async function runTrophyRepair(apply: boolean) {
               {{ restorePreview.unknown }} hors catalogue (ignorées)
               <span class="text-muted">— {{ exportName }}</span>
             </p>
+            <p
+              v-if="restorePreview.wikiNamesKept"
+              class="text-xs text-info"
+            >
+              {{ restorePreview.wikiNamesKept }} ancien(s) nom(s) anglais conservé(s) comme nom wiki
+              (ils servaient au rapprochement avec le wiki).
+            </p>
             <ul
               v-if="restorePreview.samples.length"
               class="text-xs space-y-0.5"
@@ -242,6 +254,10 @@ async function runTrophyRepair(apply: boolean) {
                 <span class="text-muted">[{{ sm.locale }}] {{ sm.name }} :</span>
                 <span class="line-through text-muted">{{ sm.before ?? '—' }}</span>
                 → <span class="font-medium">{{ sm.after }}</span>
+                <span
+                  v-if="sm.keptAsWikiName"
+                  class="text-info"
+                > (ancien nom gardé comme nom wiki)</span>
               </li>
             </ul>
             <UButton
@@ -396,6 +412,17 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="item.esDesc"
                   :rows="2"
                   :placeholder="item.descFr || '—'"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Nom wiki"
+                help="Titre de la page sur le wiki s'il diffère du nom anglais (rapprochement). Vide = nom anglais."
+                class="sm:col-span-2"
+              >
+                <UInput
+                  v-model="item.wikiName"
+                  :placeholder="item.en || item.name"
                   class="w-full"
                 />
               </UFormField>

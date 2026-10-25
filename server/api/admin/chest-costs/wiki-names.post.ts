@@ -1,10 +1,10 @@
 import { requireAdminOrModerator } from '../../../utils/admin'
-import { setChestItemEnName } from '../../../utils/reputation-db'
+import { setChestItemWikiName } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-costs/en-names  { items: [{ id, name }] }
- * Pose en lot le nom anglais d'items non rapprochés du wiki (réponse d'une IA collée
- * dans l'aperçu). Description EN intacte. Entrées invalides ignorées.
+ * POST /api/admin/chest-costs/wiki-names  { items: [{ id, name }] }
+ * Pose en lot le nom wiki d'items non rapprochés (réponse d'une IA collée dans
+ * l'aperçu). Nom anglais officiel inchangé sauf s'il est absent. Entrées invalides ignorées.
  */
 export default defineEventHandler(async (event) => {
   await requireAdminOrModerator(event)
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   for (const it of items) {
     const name = typeof it?.name === 'string' ? it.name.trim() : ''
     if (!Number.isInteger(it?.id) || !name || name.length > 200) continue
-    if (setChestItemEnName(it.id as number, name)) updated++
+    if (setChestItemWikiName(it.id as number, name)) updated++
   }
   return { updated }
 })

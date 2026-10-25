@@ -59,8 +59,9 @@ export default defineEventHandler(async (event) => {
     const key = looseWikiName(w.title)
     if (!wikiByLoose.has(key)) wikiByLoose.set(key, w)
   }
-  const findWikiPage = (it: { name: string, enName: string | null, enDescription: string | null }): WikiItem | undefined => {
-    const name = it.enName || it.name
+  // Nom cherché : nom wiki (surcharge) s'il est renseigné, sinon nom anglais, sinon FR.
+  const findWikiPage = (it: { name: string, enName: string | null, wikiName: string | null, enDescription: string | null }): WikiItem | undefined => {
+    const name = it.wikiName || it.enName || it.name
     const key = normalizeName(name)
     const exact = wikiByName.get(key)
     if (exact) return exact
@@ -78,12 +79,12 @@ export default defineEventHandler(async (event) => {
   // currentCost / currentPrereqs = valeurs en base, pour n'appliquer que ce qui change.
   const matched: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, cost: WikiCost, currentCost: ChestItemCost | null, prereqs: WikiPrereqs | null, currentPrereqs: ChestItemPrereqs | null }> = []
   const noCost: Array<{ id: number, name: string, enName: string | null, image: string | null, wikiImage: string | null, wikiTitle: string, prereqs: WikiPrereqs | null, currentPrereqs: ChestItemPrereqs | null }> = []
-  const unmatched: Array<{ id: number, name: string, enName: string | null, image: string | null }> = []
+  const unmatched: Array<{ id: number, name: string, enName: string | null, wikiName: string | null, image: string | null }> = []
 
   for (const it of items) {
     const w = findWikiPage(it)
     if (!w) {
-      unmatched.push({ id: it.id, name: it.name, enName: it.enName, image: it.image })
+      unmatched.push({ id: it.id, name: it.name, enName: it.enName, wikiName: it.wikiName, image: it.image })
       continue
     }
     usedTitles.add(normalizeName(w.title))

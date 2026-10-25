@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Déjà au catalogue dans ce périmètre (item officiel ou brouillon) : on ne recrée pas.
-  const existing = new Set(getChestScopeItemsForCost(category, subcategory).map(it => normalizeName(it.enName || it.name)))
+  const existing = new Set(getChestScopeItemsForCost(category, subcategory).map(it => normalizeName(it.wikiName || it.enName || it.name)))
   const wanted = titles.filter(t => !existing.has(normalizeName(t)))
 
   let wiki: WikiItem[] = []

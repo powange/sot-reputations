@@ -46,7 +46,7 @@ async function fetchCosts() {
       ...res.matched.filter(chestMatchedChanged).map(m => m.id),
       ...res.noCost.filter(chestPrereqsChanged).map(n => n.id)
     ])
-    enNameInputs.value = Object.fromEntries(res.unmatched.map(u => [u.id, u.enName ?? '']))
+    wikiNameInputs.value = Object.fromEntries(res.unmatched.map(u => [u.id, u.wikiName ?? u.enName ?? '']))
     showUnchanged.value = false
   } catch (e) {
     // Détail utile : message du serveur, sinon code HTTP (ex. délai dépassé du proxy).
@@ -198,9 +198,11 @@ async function createDrafts(all: boolean) {
   }
 }
 
-// Non matchés : saisie du nom EN (souvent absent) pour les rapprocher du wiki.
-const enNameInputs = ref<Record<number, string>>({})
-const savingEnName = ref<number | null>(null)
+// Non matchés : saisie du nom wiki (titre de la page) pour les rapprocher du wiki, sans
+// toucher au nom anglais officiel (qui ne prend cette valeur que s'il est absent).
+const wikiNameInputs = ref<Record<number, string>>({})
+const savingWikiName = ref<number | null>(null)
+const currentWikiName = (u: ChestCostUnmatched) => u.wikiName ?? u.enName ?? ''
 
 // Recherche du nom anglais : Google en mode IA (udm=50), requête pré-remplie.
 // Pas d'API publique pour ce mode : on l'ouvre dans le navigateur de l'admin.
@@ -217,33 +219,33 @@ async function copyName(name: string) {
   }
 }
 
-async function saveEnName(u: ChestCostUnmatched) {
-  const name = (enNameInputs.value[u.id] ?? '').trim()
+async function saveWikiName(u: ChestCostUnmatched) {
+  const name = (wikiNameInputs.value[u.id] ?? '').trim()
   if (!name) return
-  savingEnName.value = u.id
+  savingWikiName.value = u.id
   try {
-    await $fetch('/api/admin/chest-costs/en-name', { method: 'POST', body: { id: u.id, name } })
-    toast.add({ title: `Nom anglais enregistré : ${name}`, color: 'success' })
+    await $fetch('/api/admin/chest-costs/wiki-name', { method: 'POST', body: { id: u.id, name } })
+    toast.add({ title: `Nom wiki enregistré : ${name}`, color: 'success' })
     // Nouvel aperçu : l'item doit maintenant être rapproché de sa page wiki.
     await fetchCosts()
   } catch (e) {
     const msg = (e as { statusMessage?: string })?.statusMessage || 'Échec de l\'enregistrement'
     toast.add({ title: msg, color: 'error' })
   } finally {
-    savingEnName.value = null
+    savingWikiName.value = null
   }
 }
 
-// Prompt IA : noms anglais de TOUS les non matchés en une fois. L'IA répond en JSON
-// [{ id, fr, en }] ; l'id garantit l'attribution au bon item même si elle reformule le FR.
+// Prompt IA : titre de la page wiki de TOUS les non matchés en une fois. L'IA répond en
+// JSON [{ id, fr, wiki }] ; l'id garantit l'attribution au bon item même si elle reformule le FR.
 function buildAiPrompt(): string {
   const r = result.value
   if (!r) return ''
-  const items = r.unmatched.map(u => `- id ${u.id} : ${u.name}${u.enName ? ` (nom anglais actuel, sans page wiki correspondante : ${u.enName})` : ''}`)
+  const items = r.unmatched.map(u => `- id ${u.id} : ${u.name}${u.enName ? ` (nom anglais dans le jeu : ${u.enName})` : ''}`)
   const candidates = r.wikiOnly.map(w => `- ${w.title}`)
   return [
     'Tu es un expert du jeu Sea of Thieves.',
-    `Pour chaque objet ci-dessous (catégorie « ${scopeLabel.value} », nom français officiel du jeu), donne son nom anglais officiel exact, tel qu'il apparaît dans le jeu en anglais et sur le wiki https://seaofthieves.wiki.gg.`,
+    `Pour chaque objet ci-dessous (catégorie « ${scopeLabel.value} », nom français officiel du jeu), donne le titre exact de sa page sur le wiki https://seaofthieves.wiki.gg (le plus souvent son nom anglais, parfois légèrement différent).`,
     ...(candidates.length
       ? ['', 'Noms candidats (pages du wiki de cette catégorie encore sans correspondance) ; utilise l\'un d\'eux, à l\'identique, quand il correspond :', ...candidates]
       : []),
@@ -253,7 +255,7 @@ function buildAiPrompt(): string {
     '',
     'Si tu n\'es pas sûr d\'un nom, mets null plutôt que d\'inventer.',
     'Réponds UNIQUEMENT avec un tableau JSON, sans aucun texte autour, au format :',
-    '[{"id": 123, "fr": "nom français", "en": "English name"}]'
+    '[{"id": 123, "fr": "nom français", "wiki": "Wiki page title"}]'
   ].join('\n')
 }
 
@@ -269,10 +271,11 @@ async function copyAiPrompt() {
 }
 
 // Réponse de l'IA collée : on extrait le tableau JSON (même entouré de texte ou d'un bloc
-// de code), en ne gardant que les ids des non matchés et les noms anglais renseignés.
+// de code), en ne gardant que les ids des non matchés et les titres wiki renseignés
+// (clé « wiki », ou « en » pour les réponses à l'ancien prompt).
 const aiAnswer = ref('')
 const savingAi = ref(false)
-interface AiMatch { id: number, fr: string, en: string }
+interface AiMatch { id: number, fr: string, wiki: string }
 const aiParsed = computed<{ matches: AiMatch[], ignored: number, error: string | null }>(() => {
   const text = aiAnswer.value.trim()
   const r = result.value
@@ -292,12 +295,13 @@ const aiParsed = computed<{ matches: AiMatch[], ignored: number, error: string |
   let ignored = 0
   for (const entry of data as Array<Record<string, unknown>>) {
     const u = byId.get(Number(entry?.id))
-    const en = typeof entry?.en === 'string' ? entry.en.trim() : ''
-    if (!u || !en || en === u.enName) {
+    const raw = entry?.wiki ?? entry?.en
+    const wiki = typeof raw === 'string' ? raw.trim() : ''
+    if (!u || !wiki || wiki === currentWikiName(u)) {
       ignored++
       continue
     }
-    matches.push({ id: u.id, fr: u.name, en })
+    matches.push({ id: u.id, fr: u.name, wiki })
   }
   return { matches, ignored, error: null }
 })
@@ -307,11 +311,11 @@ async function applyAiAnswer() {
   if (!matches.length) return
   savingAi.value = true
   try {
-    const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/en-names', {
+    const res = await $fetch<{ updated: number }>('/api/admin/chest-costs/wiki-names', {
       method: 'POST',
-      body: { items: matches.map(m => ({ id: m.id, name: m.en })) }
+      body: { items: matches.map(m => ({ id: m.id, name: m.wiki })) }
     })
-    toast.add({ title: `${res.updated} nom(s) anglais enregistré(s)`, color: 'success' })
+    toast.add({ title: `${res.updated} nom(s) wiki enregistré(s)`, color: 'success' })
     aiAnswer.value = ''
     await fetchCosts()
   } catch {
@@ -616,9 +620,10 @@ async function applyAiAnswer() {
             Non matchés ({{ result.unmatched.length }})
           </h3>
           <p class="text-sm text-muted mb-2">
-            Aucune page wiki ne correspond au nom EN de ces items (écart de nom, traduction EN
-            manquante…). Saisissez le nom anglais (les pages wiki sans item sont proposées) :
-            l'aperçu est relancé et l'item rapproché de sa page.
+            Aucune page wiki ne correspond au nom de ces items (écart de nom, traduction EN
+            manquante…). Saisissez le <strong>nom wiki</strong>, titre de leur page (les pages wiki
+            sans item sont proposées) : l'aperçu est relancé et l'item rapproché de sa page. Le nom
+            anglais officiel n'est pas modifié (sauf s'il est absent).
           </p>
           <div class="flex flex-wrap items-center gap-2 mb-3">
             <UButton
@@ -629,7 +634,7 @@ async function applyAiAnswer() {
               @click="copyAiPrompt"
             />
             <span class="text-xs text-muted">
-              Tous les noms en une fois : collez le prompt dans une IA, puis sa réponse ci-dessous.
+              Tous les noms wiki en une fois : collez le prompt dans une IA, puis sa réponse ci-dessous.
             </span>
           </div>
           <datalist :id="`wiki-only-titles-${uid}`">
@@ -681,14 +686,18 @@ async function applyAiAnswer() {
                   v-else-if="u.enName !== u.name"
                   class="text-muted text-xs"
                 > · EN : {{ u.enName }}</span>
+                <span
+                  v-if="u.wikiName"
+                  class="text-info text-xs"
+                > · wiki : {{ u.wikiName }}</span>
               </div>
               <form
                 class="flex items-center gap-1"
-                @submit.prevent="saveEnName(u)"
+                @submit.prevent="saveWikiName(u)"
               >
                 <UInput
-                  v-model="enNameInputs[u.id]"
-                  placeholder="Nom anglais"
+                  v-model="wikiNameInputs[u.id]"
+                  placeholder="Nom wiki (titre de la page)"
                   size="xs"
                   class="w-64"
                   :ui="{ base: 'w-full' }"
@@ -698,9 +707,9 @@ async function applyAiAnswer() {
                   type="submit"
                   icon="i-lucide-check"
                   size="xs"
-                  aria-label="Enregistrer le nom anglais"
-                  :loading="savingEnName === u.id"
-                  :disabled="!(enNameInputs[u.id] ?? '').trim() || (enNameInputs[u.id] ?? '').trim() === u.enName"
+                  aria-label="Enregistrer le nom wiki"
+                  :loading="savingWikiName === u.id"
+                  :disabled="!(wikiNameInputs[u.id] ?? '').trim() || (wikiNameInputs[u.id] ?? '').trim() === currentWikiName(u)"
                 />
               </form>
             </li>
@@ -712,7 +721,7 @@ async function applyAiAnswer() {
               v-model="aiAnswer"
               :rows="3"
               autoresize
-              placeholder="Collez ici la réponse JSON de l'IA : [{&quot;id&quot;: …, &quot;fr&quot;: &quot;…&quot;, &quot;en&quot;: &quot;…&quot;}]"
+              placeholder="Collez ici la réponse JSON de l'IA : [{&quot;id&quot;: …, &quot;fr&quot;: &quot;…&quot;, &quot;wiki&quot;: &quot;…&quot;}]"
               class="w-full"
             />
             <p
@@ -727,7 +736,7 @@ async function applyAiAnswer() {
                   v-for="m in aiParsed.matches"
                   :key="m.id"
                 >
-                  {{ m.fr }} <span class="text-muted">→</span> <span class="font-medium">{{ m.en }}</span>
+                  {{ m.fr }} <span class="text-muted">→</span> <span class="font-medium">{{ m.wiki }}</span>
                 </li>
               </ul>
               <p
@@ -738,7 +747,7 @@ async function applyAiAnswer() {
               </p>
               <UButton
                 icon="i-lucide-check-check"
-                :label="`Enregistrer les noms anglais (${aiParsed.matches.length})`"
+                :label="`Enregistrer les noms wiki (${aiParsed.matches.length})`"
                 size="sm"
                 color="success"
                 :loading="savingAi"
@@ -856,7 +865,7 @@ async function applyAiAnswer() {
             icon="i-lucide-triangle-alert"
             class="mb-3"
             :title="`${result.unmatched.length} item(s) du site non rapprochés`"
-            :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Ajoutez d'abord le nom anglais (section Non matchés) ou décochez la page.`"
+            :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Renseignez d'abord leur nom wiki (section Non matchés) ou décochez la page.`"
           />
           <label class="flex items-center gap-2 text-sm cursor-pointer mb-2 pb-2 border-b border-muted/20">
             <UCheckbox

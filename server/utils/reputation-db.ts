@@ -439,6 +439,13 @@ export function getReputationDb(): Database.Database {
     db.exec('ALTER TABLE chest_items ADD COLUMN published INTEGER NOT NULL DEFAULT 1')
   }
 
+  // Migration: nom de la page wiki de l'objet, quand il diffère de son nom anglais
+  // officiel (« Wild Rose Shovel » sur le wiki pour « White Rose Shovel » dans le jeu).
+  // Sert uniquement au rapprochement avec le wiki ; NULL = on cherche le nom anglais.
+  if (!chestColorCols.some(col => col.name === 'wiki_name')) {
+    db.exec('ALTER TABLE chest_items ADD COLUMN wiki_name TEXT')
+  }
+
   return db
 }
 
@@ -2246,10 +2253,10 @@ export function setChestCostWikiMap(category: string, subcategory: string | null
  * Items d'un scope avec leur nom EN (chest_item_translations, repli sur le nom FR) et
  * leur coût actuel — pour rapprocher du wiki par nom anglais.
  */
-export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, enDescription: string | null, image: string | null, cost: ChestItemCost | null, prerequisites: ChestItemPrereqs | null }> {
+export function getChestScopeItemsForCost(category: string, subcategory: string | null): Array<{ id: number, name: string, enName: string | null, wikiName: string | null, enDescription: string | null, image: string | null, cost: ChestItemCost | null, prerequisites: ChestItemPrereqs | null }> {
   const db = getReputationDb()
   const sql = `
-    SELECT ci.id, ci.name, t.name as enName, t.description as enDescription, ci.image, ci.cost, ci.prerequisites
+    SELECT ci.id, ci.name, t.name as enName, NULLIF(ci.wiki_name, '') as wikiName, t.description as enDescription, ci.image, ci.cost, ci.prerequisites
     FROM chest_items ci
     LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
     WHERE ci.category = ? AND ${subcategory === null ? 'ci.subcategory IS NULL' : 'ci.subcategory = ?'}
@@ -2258,8 +2265,8 @@ export function getChestScopeItemsForCost(category: string, subcategory: string 
   const rows = (subcategory === null
     ? db.prepare(sql).all(category)
     : db.prepare(sql).all(category, subcategory)
-  ) as Array<{ id: number, name: string, enName: string | null, enDescription: string | null, image: string | null, cost: string | null, prerequisites: string | null }>
-  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, enDescription: r.enDescription, image: r.image || null, cost: parseChestItemCost(r.cost), prerequisites: parseChestItemPrereqs(r.prerequisites) }))
+  ) as Array<{ id: number, name: string, enName: string | null, wikiName: string | null, enDescription: string | null, image: string | null, cost: string | null, prerequisites: string | null }>
+  return rows.map(r => ({ id: r.id, name: r.name, enName: r.enName, wikiName: r.wikiName, enDescription: r.enDescription, image: r.image || null, cost: parseChestItemCost(r.cost), prerequisites: parseChestItemPrereqs(r.prerequisites) }))
 }
 
 // ---- Items du coffre créés depuis le wiki (brouillons « source wiki ») ----
@@ -2457,6 +2464,8 @@ export interface ChestItemTranslationRow {
   es: string | null
   enDesc: string | null
   esDesc: string | null
+  // Nom de la page wiki si différent du nom anglais (rapprochement), sinon null.
+  wikiName: string | null
 }
 
 /**
@@ -2472,7 +2481,8 @@ export function searchChestItemTranslations(query: string, limit: number): Chest
     SELECT
       ci.id, ci.item_key as itemKey, ci.name, ci.description as descFr, ci.image,
       en_t.name as en, es_t.name as es,
-      en_t.description as enDesc, es_t.description as esDesc
+      en_t.description as enDesc, es_t.description as esDesc,
+      NULLIF(ci.wiki_name, '') as wikiName
     FROM chest_items ci
     LEFT JOIN chest_item_translations en_t ON en_t.item_key = ci.item_key AND en_t.locale = 'en'
     LEFT JOIN chest_item_translations es_t ON es_t.item_key = ci.item_key AND es_t.locale = 'es'
@@ -2485,19 +2495,18 @@ export function searchChestItemTranslations(query: string, limit: number): Chest
 export interface ChestItemTranslationInput {
   itemKey: string
   translations: Array<{ locale: string, name?: string | null, description?: string | null }>
+  // Nom wiki (clé présente = mise à jour ; vide = retour au nom anglais).
+  wikiName?: string | null
 }
 
-/**
- * Upsert des traductions d'items (EN/ES uniquement ; nom + description). Une ligne
- * sans aucun override (ni nom ni description) est supprimée. Nom vide mais description
- * présente : nom stocké vide → repli sur le nom FR à l'affichage.
- */
 export interface ChestTranslationRestoreResult {
   updated: number
   unchanged: number
   // Objets de l'export absents du catalogue (ignorés : on ne crée rien ici).
   unknown: number
-  samples: Array<{ locale: string, name: string, before: string | null, after: string }>
+  // Anciens noms EN conservés comme nom wiki (ils servaient au rapprochement).
+  wikiNamesKept: number
+  samples: Array<{ locale: string, name: string, before: string | null, after: string, keptAsWikiName?: boolean }>
 }
 
 /**
@@ -2511,11 +2520,12 @@ export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, 
   // Clé de l'export -> ligne du catalogue. La clé d'un objet (nom du fichier image au 1er
   // import) peut différer de son image ACTUELLE si le jeu a renommé ses assets : on
   // reconnaît donc aussi l'objet au nom de fichier de son image courante.
-  const catalog = new Map<string, { itemKey: string, name: string }>()
-  for (const r of db.prepare(`SELECT item_key AS itemKey, name, image FROM chest_items WHERE source = 'official' AND item_key IS NOT NULL`).all() as Array<{ itemKey: string, name: string, image: string | null }>) {
-    catalog.set(r.itemKey, { itemKey: r.itemKey, name: r.name })
+  const catalog = new Map<string, { itemKey: string, name: string, wikiName: string | null }>()
+  for (const r of db.prepare(`SELECT item_key AS itemKey, name, image, NULLIF(wiki_name, '') AS wikiName FROM chest_items WHERE source = 'official' AND item_key IS NOT NULL`).all() as Array<{ itemKey: string, name: string, image: string | null, wikiName: string | null }>) {
+    const entry = { itemKey: r.itemKey, name: r.name, wikiName: r.wikiName }
+    catalog.set(r.itemKey, entry)
     const file = r.image?.split('/').pop()
-    if (file && !catalog.has(file)) catalog.set(file, { itemKey: r.itemKey, name: r.name })
+    if (file && !catalog.has(file)) catalog.set(file, entry)
   }
   const current = new Map((db.prepare('SELECT item_key AS itemKey, locale, name, description FROM chest_item_translations').all() as Array<{ itemKey: string, locale: string, name: string | null, description: string | null }>).map(r => [`${r.locale}\u0000${r.itemKey}`, r]))
   const upsert = db.prepare(`
@@ -2523,8 +2533,10 @@ export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, 
     VALUES (?, ?, ?, ?)
     ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
   `)
-  const result: ChestTranslationRestoreResult = { updated: 0, unchanged: 0, unknown: 0, samples: [] }
+  const setWiki = db.prepare('UPDATE chest_items SET wiki_name = ? WHERE item_key = ?')
+  const result: ChestTranslationRestoreResult = { updated: 0, unchanged: 0, unknown: 0, wikiNamesKept: 0, samples: [] }
   const writes: Array<[string, string, string, string | null]> = []
+  const wikiWrites: Array<[string, string]> = []
   for (const locale of ['en', 'es'] as const) {
     const items = parseChestTranslations((input[locale] as { chestData?: unknown } | undefined)?.chestData)
     for (const [exportKey, value] of items) {
@@ -2533,7 +2545,7 @@ export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, 
         result.unknown++
         continue
       }
-      const { itemKey, name: frName } = row
+      const { itemKey, name: frName, wikiName } = row
       const cur = current.get(`${locale}\u0000${itemKey}`)
       const description = value.description || cur?.description || null
       if (cur && cur.name === value.name && (cur.description ?? null) === description) {
@@ -2541,8 +2553,16 @@ export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, 
         continue
       }
       result.updated++
+      // Nom EN remplacé (pas une simple qualité de trophée rétablie) : il servait sans
+      // doute au rapprochement avec le wiki -> conservé comme nom wiki s'il n'y en a pas.
+      const keptAsWikiName = locale === 'en' && !!cur?.name && cur.name !== value.name && !wikiName
+        && withTrophyQualityEn(cur.name, frName) !== value.name
+      if (keptAsWikiName) {
+        wikiWrites.push([cur!.name!, itemKey])
+        result.wikiNamesKept++
+      }
       if (result.samples.length < 30 && cur?.name !== value.name) {
-        result.samples.push({ locale, name: frName, before: cur?.name ?? null, after: value.name })
+        result.samples.push({ locale, name: frName, before: cur?.name ?? null, after: value.name, keptAsWikiName })
       }
       writes.push([itemKey, locale, value.name, description])
     }
@@ -2550,6 +2570,7 @@ export function restoreChestTranslations(input: { en?: unknown, es?: unknown }, 
   if (apply && writes.length) {
     db.transaction(() => {
       for (const w of writes) upsert.run(...w)
+      for (const w of wikiWrites) setWiki.run(...w)
     })()
   }
   return result
@@ -2581,21 +2602,29 @@ export function repairTrophyEnNames(apply: boolean): { count: number, samples: A
 }
 
 /**
- * Pose le nom EN d'un item (par id) sans toucher à sa description EN : sert au
- * rapprochement avec le wiki depuis l'aperçu des coûts. Renvoie false si l'item n'existe pas.
+ * Pose le nom wiki d'un item (par id) : titre de sa page sur le wiki quand il diffère du
+ * nom anglais officiel, pour le rapprochement. Si l'item n'a pas encore de nom anglais,
+ * ce nom sert aussi de nom anglais (mieux que rien, réécrit au prochain import). Renvoie
+ * false si l'item n'existe pas.
  */
-export function setChestItemEnName(id: number, name: string): boolean {
+export function setChestItemWikiName(id: number, name: string): boolean {
   const db = getReputationDb()
   const row = db.prepare('SELECT item_key as itemKey FROM chest_items WHERE id = ?').get(id) as { itemKey: string | null } | undefined
   if (!row?.itemKey) return false
+  db.prepare('UPDATE chest_items SET wiki_name = ? WHERE id = ?').run(name, id)
   db.prepare(`
     INSERT INTO chest_item_translations (item_key, locale, name, description)
     VALUES (?, 'en', ?, NULL)
-    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name WHERE COALESCE(name, '') = ''
   `).run(row.itemKey, name)
   return true
 }
 
+/**
+ * Upsert des traductions d'items (EN/ES uniquement ; nom + description). Une ligne
+ * sans aucun override (ni nom ni description) est supprimée. Nom vide mais description
+ * présente : nom stocké vide → repli sur le nom FR à l'affichage.
+ */
 export function setChestItemTranslations(entries: ChestItemTranslationInput[]): void {
   const db = getReputationDb()
   const upsert = db.prepare(`
@@ -2604,11 +2633,13 @@ export function setChestItemTranslations(entries: ChestItemTranslationInput[]): 
     ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
   `)
   const del = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ? AND locale = ?')
+  const setWiki = db.prepare('UPDATE chest_items SET wiki_name = ? WHERE item_key = ?')
 
   const run = db.transaction(() => {
     for (const entry of entries) {
       const itemKey = entry.itemKey?.trim()
       if (!itemKey) continue
+      if ('wikiName' in entry) setWiki.run(entry.wikiName?.trim() || null, itemKey)
       for (const t of entry.translations) {
         // FR est la langue de base (chest_items.name/description) : non gérée ici.
         if (!t.locale || !['en', 'es'].includes(t.locale)) continue
