@@ -242,6 +242,12 @@ function toggleTitle(title: string) {
 const enNameInputs = ref<Record<number, string>>({})
 const savingEnName = ref<number | null>(null)
 
+// Recherche du nom anglais : Google en mode IA (udm=50), requête pré-remplie.
+// Pas d'API publique pour ce mode : on l'ouvre dans le navigateur de l'admin.
+function englishNameSearchUrl(frName: string): string {
+  return `https://www.google.com/search?udm=50&q=${encodeURIComponent(`Sea of Thieves nom en anglais de "${frName}"`)}`
+}
+
 async function copyName(name: string) {
   try {
     await navigator.clipboard.writeText(name)
@@ -718,6 +724,18 @@ async function runBulk(mode: 'all' | 'prereqsOnly' = 'all') {
                 title="Copier le nom français"
                 aria-label="Copier le nom français"
                 @click="copyName(u.name)"
+              />
+              <UButton
+                icon="i-lucide-sparkles"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                class="align-middle"
+                :to="englishNameSearchUrl(u.name)"
+                target="_blank"
+                rel="noopener"
+                title="Chercher le nom anglais (Google, mode IA)"
+                aria-label="Chercher le nom anglais avec Google en mode IA"
               />
               <span
                 v-if="!u.enName"
