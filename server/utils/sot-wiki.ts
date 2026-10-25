@@ -58,7 +58,15 @@ interface RevisionsResponse {
 
 async function wikiApi<T>(params: Record<string, string>): Promise<T> {
   const url = `${WIKI_API}?${new URLSearchParams({ ...params, format: 'json' }).toString()}`
-  return await $fetch(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 20000 }) as T
+  // wiki.gg limite les rafales (429) : nouvelles tentatives espacées sur les erreurs
+  // temporaires et les délais dépassés (récupération de nombreuses sous-catégories).
+  return await $fetch(url, {
+    headers: { 'User-Agent': USER_AGENT },
+    timeout: 20000,
+    retry: 3,
+    retryDelay: 2000,
+    retryStatusCodes: [408, 425, 429, 500, 502, 503, 504]
+  }) as T
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {

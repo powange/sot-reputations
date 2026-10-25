@@ -49,7 +49,10 @@ async function fetchCosts() {
     enNameInputs.value = Object.fromEntries(res.unmatched.map(u => [u.id, u.enName ?? '']))
     showUnchanged.value = false
   } catch (e) {
-    fetchError.value = (e as { statusMessage?: string })?.statusMessage || 'Échec de la récupération'
+    // Détail utile : message du serveur, sinon code HTTP (ex. délai dépassé du proxy).
+    const err = e as { statusCode?: number, statusMessage?: string, data?: { statusMessage?: string, message?: string } }
+    const detail = err.data?.statusMessage || err.data?.message || err.statusMessage
+    fetchError.value = `Échec de la récupération${err.statusCode ? ` (HTTP ${err.statusCode})` : ''}${detail ? ` : ${detail}` : ''}`
   } finally {
     fetching.value = false
   }
@@ -370,12 +373,23 @@ async function applyAiAnswer() {
       />
       Récupération du wiki…
     </p>
-    <p
+    <div
       v-else-if="fetchError"
-      class="text-sm text-error"
+      class="flex flex-wrap items-center gap-3"
     >
-      {{ fetchError }}
-    </p>
+      <p class="text-sm text-error">
+        {{ fetchError }}
+      </p>
+      <UButton
+        icon="i-lucide-rotate-cw"
+        label="Réessayer"
+        size="xs"
+        color="neutral"
+        variant="outline"
+        :loading="fetching"
+        @click="fetchCosts"
+      />
+    </div>
     <p
       v-else-if="!result"
       class="text-sm text-muted"
