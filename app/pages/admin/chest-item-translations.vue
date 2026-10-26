@@ -276,6 +276,57 @@ function pasteOneLine(e: ClipboardEvent) {
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
+// --- Lecture d'une capture du jeu (OCR) : titre + description d'une langue ---
+const NAME_KEY: Record<ItemOcrLang, keyof Fields> = { fr: 'name', en: 'en', es: 'es' }
+const DESC_KEY: Record<ItemOcrLang, keyof Fields> = { fr: 'descFr', en: 'enDesc', es: 'esDesc' }
+const LANG_OF: Partial<Record<keyof Fields, ItemOcrLang>> = { name: 'fr', descFr: 'fr', en: 'en', enDesc: 'en', es: 'es', esDesc: 'es' }
+const ocrBusy = ref<ItemOcrLang | null>(null)
+
+async function ocrInto(image: Blob, fields: Fields, lang: ItemOcrLang) {
+  if (ocrBusy.value) return
+  ocrBusy.value = lang
+  try {
+    const { name, description } = await recognizeItemCapture(image, lang)
+    if (!name && !description) {
+      toast.add({ title: 'Aucun texte reconnu sur la capture', color: 'warning' })
+      return
+    }
+    if (name) fields[NAME_KEY[lang]] = name
+    if (description) fields[DESC_KEY[lang]] = description
+    toast.add({ title: `Capture ${lang.toUpperCase()} lue : ${name || '(sans titre)'}`, description: 'Vérifiez le texte avant de valider.', color: 'success' })
+  } catch {
+    toast.add({ title: 'Lecture de la capture impossible', color: 'error' })
+  } finally {
+    ocrBusy.value = null
+  }
+}
+
+// Collage dans un champ : une image (capture du jeu) est lue par OCR dans la langue du
+// champ ; un texte sur plusieurs lignes est remis sur une ligne.
+function onFieldPaste(e: ClipboardEvent, fields: Fields, key: keyof Fields) {
+  const image = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type.startsWith('image/'))?.getAsFile()
+  const lang = LANG_OF[key]
+  if (image && lang) {
+    e.preventDefault()
+    ocrInto(image, fields, lang)
+    return
+  }
+  pasteOneLine(e)
+}
+
+const ocrFileInput = ref<HTMLInputElement | null>(null)
+const ocrFileLang = ref<ItemOcrLang>('fr')
+function pickOcrFile(lang: ItemOcrLang) {
+  ocrFileLang.value = lang
+  ocrFileInput.value?.click()
+}
+function onOcrFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (file && zoom.value) ocrInto(file, zoom.value.fields, ocrFileLang.value)
+}
+
 function openZoom(r: Row) {
   zoom.value = { row: r, fields: { ...r.fields } }
 }
@@ -1099,7 +1150,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.name"
                   :placeholder="r.item.missing.includes('frName') ? r.item.name : '—'"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'name')"
                 />
               </UFormField>
               <UFormField label="FR — description">
@@ -1109,7 +1160,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.item.missing.includes('frDesc') ? r.item.descFr || '—' : '—'"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'descFr')"
                 />
               </UFormField>
               <UFormField label="EN — nom">
@@ -1117,7 +1168,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.en"
                   :placeholder="r.fields.name || r.item.name"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'en')"
                 />
               </UFormField>
               <UFormField label="EN — description">
@@ -1127,7 +1178,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'enDesc')"
                 />
               </UFormField>
               <UFormField label="ES — nom">
@@ -1135,7 +1186,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.es"
                   :placeholder="r.fields.name || r.item.name"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'es')"
                 />
               </UFormField>
               <UFormField label="ES — description">
@@ -1145,7 +1196,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'esDesc')"
                 />
               </UFormField>
               <UFormField
@@ -1157,7 +1208,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.wikiName"
                   :placeholder="r.fields.en || r.item.en || r.item.name"
                   class="w-full"
-                  @paste="pasteOneLine"
+                  @paste="onFieldPaste($event, r.fields, 'wikiName')"
                 />
               </UFormField>
             </div>
@@ -1321,6 +1372,28 @@ async function runTrophyRepair(apply: boolean) {
             class="w-full max-w-80 md:w-80 aspect-square object-contain rounded bg-elevated self-center md:self-start shrink-0"
           />
           <div class="flex-1 min-w-0 grid gap-2 sm:grid-cols-2">
+            <div class="sm:col-span-2 flex flex-wrap items-center gap-2">
+              <input
+                ref="ocrFileInput"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="onOcrFile"
+              >
+              <UButton
+                v-for="l in (['fr', 'en', 'es'] as const)"
+                :key="l"
+                icon="i-lucide-scan-text"
+                :label="`Capture ${l.toUpperCase()}`"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                :loading="ocrBusy === l"
+                :disabled="!!ocrBusy"
+                @click="pickOcrFile(l)"
+              />
+              <span class="text-xs text-muted">ou collez une capture (Ctrl+V) dans un champ de la langue</span>
+            </div>
             <UFormField
               v-for="f in ZOOM_FIELDS"
               :key="f.key"
@@ -1334,14 +1407,14 @@ async function runTrophyRepair(apply: boolean) {
                 autoresize
                 :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
                 class="w-full"
-                @paste="pasteOneLine"
+                @paste="onFieldPaste($event, zoom.fields, f.key)"
               />
               <UInput
                 v-else
                 v-model="zoom.fields[f.key]"
                 :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
                 class="w-full"
-                @paste="pasteOneLine"
+                @paste="onFieldPaste($event, zoom.fields, f.key)"
               />
             </UFormField>
           </div>
