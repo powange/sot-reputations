@@ -116,12 +116,16 @@ interface RepairResult { count: number, samples: Array<{ name: string, before: s
 // Export du bookmarklet ({ chest, chestEn, chestEs, reputation }) : lu dans le navigateur,
 // seuls les coffres EN / ES sont envoyés.
 const exportData = ref<{ en: unknown, es: unknown } | null>(null)
+// Sélecteur de fichier natif masqué, déclenché par un bouton.
+const exportFileInput = ref<HTMLInputElement | null>(null)
 const exportName = ref('')
 const restorePreview = ref<RestoreResult | null>(null)
 const restoring = ref(false)
 
 async function onExportFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // permet de re-choisir le même fichier
   restorePreview.value = null
   exportData.value = null
   if (!file) return
@@ -224,11 +228,20 @@ async function runTrophyRepair(apply: boolean) {
             navigateur : seuls les coffres EN / ES sont envoyés.
           </p>
           <input
+            ref="exportFileInput"
             type="file"
             accept=".json,application/json"
-            class="text-sm"
+            class="hidden"
             @change="onExportFile"
           >
+          <UButton
+            icon="i-lucide-file-json"
+            label="Choisir l'export (JSON)"
+            size="sm"
+            variant="soft"
+            :loading="restoring && !restorePreview"
+            @click="exportFileInput?.click()"
+          />
           <template v-if="restorePreview">
             <p>
               <strong>{{ restorePreview.updated }}</strong> traduction(s) à restaurer ·

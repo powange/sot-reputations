@@ -172,23 +172,61 @@ const frFileName = ref('')
 const frPreview = ref<FrImportResult | null>(null)
 const frImporting = ref(false)
 
-async function onFrFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+// Fichier choisi via un bouton (l'input natif est masqué), ou JSON collé dans la zone de texte.
+const frFileInput = ref<HTMLInputElement | null>(null)
+const frText = ref('')
+
+async function loadFrEntries(raw: string, label: string) {
   frPreview.value = null
   frEntries.value = null
-  if (!file) return
   try {
-    const json = JSON.parse(await file.text()) as unknown
+    const json = JSON.parse(raw) as unknown
     const entries = Array.isArray(json) ? json : (json as { entries?: unknown })?.entries
     if (!Array.isArray(entries)) {
       toast.add({ title: 'Format inattendu', description: 'Attendu : un tableau [{ key, nameFr, descriptionFr? }].', color: 'error' })
       return
     }
     frEntries.value = entries
-    frFileName.value = file.name
+    frFileName.value = label
     await runFrImport(false)
   } catch {
-    toast.add({ title: 'Fichier JSON illisible', color: 'error' })
+    toast.add({ title: 'JSON illisible', color: 'error' })
+  }
+}
+
+async function onFrFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) await loadFrEntries(await file.text(), file.name)
+  input.value = '' // permet de re-choisir le même fichier
+}
+
+// --- Nom français item par item ---
+const frInputs = ref<Record<number, string>>({})
+const savingFr = ref<number | null>(null)
+const currentFr = (it: WikiChestItem) => it.frNamed ? it.title : ''
+watch(items, (list) => {
+  for (const it of list) {
+    if (frInputs.value[it.id] === undefined) frInputs.value[it.id] = currentFr(it)
+  }
+}, { immediate: true })
+
+async function saveFrName(it: WikiChestItem) {
+  const nameFr = (frInputs.value[it.id] ?? '').trim()
+  if (!nameFr) return
+  savingFr.value = it.id
+  try {
+    await $fetch('/api/admin/chest-wiki-items/import-fr', {
+      method: 'POST',
+      body: { entries: [{ key: it.key, nameFr }], apply: true }
+    })
+    it.title = nameFr
+    it.frNamed = nameFr !== it.wikiTitle
+    toast.add({ title: `Nom français enregistré : ${nameFr}`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Erreur lors de l\'enregistrement', color: 'error' })
+  } finally {
+    savingFr.value = null
   }
 }
 
@@ -204,6 +242,8 @@ async function runFrImport(apply: boolean) {
       toast.add({ title: `${res.updated} item(s) renommé(s) en français`, color: 'success' })
       frPreview.value = null
       frEntries.value = null
+      frText.value = ''
+      frInputs.value = {}
       await refresh()
     } else {
       frPreview.value = res
@@ -305,12 +345,40 @@ function formatPrereqs(pr: Prereqs | null): string {
           la description française remplace la description si elle est fournie. Seuls les items du
           wiki sont modifiés. La clé figure dans l'export de la liste.
         </p>
-        <input
-          type="file"
-          accept=".json,application/json"
-          class="text-sm"
-          @change="onFrFile"
-        >
+        <div class="flex flex-wrap items-center gap-2">
+          <input
+            ref="frFileInput"
+            type="file"
+            accept=".json,application/json"
+            class="hidden"
+            @change="onFrFile"
+          >
+          <UButton
+            icon="i-lucide-file-json"
+            label="Choisir un fichier JSON"
+            size="sm"
+            variant="soft"
+            @click="frFileInput?.click()"
+          />
+          <span class="text-xs text-muted">ou coller le JSON ci-dessous</span>
+        </div>
+        <UTextarea
+          v-model="frText"
+          :rows="3"
+          autoresize
+          :maxrows="12"
+          placeholder="[{ &quot;key&quot;: &quot;wiki:Cursed Ferryman Cutlass&quot;, &quot;nameFr&quot;: &quot;Coutelas du Passeur maudit&quot; }]"
+          class="w-full font-mono"
+        />
+        <UButton
+          icon="i-lucide-scan-search"
+          label="Analyser le JSON collé"
+          size="sm"
+          variant="soft"
+          :disabled="!frText.trim()"
+          :loading="frImporting && !frPreview"
+          @click="loadFrEntries(frText, 'JSON collé')"
+        />
         <template v-if="frPreview">
           <p>
             <strong>{{ frPreview.updated }}</strong> item(s) à renommer · {{ frPreview.unchanged }} déjà à jour
@@ -443,7 +511,7 @@ function formatPrereqs(pr: Prereqs | null): string {
             :key="it.id"
             class="py-2"
           >
-            <label class="flex items-start gap-3 cursor-pointer">
+            <div class="flex items-start gap-3">
               <UCheckbox
                 class="mt-1"
                 :model-value="selectedIds.has(it.id)"
@@ -491,6 +559,26 @@ function formatPrereqs(pr: Prereqs | null): string {
                     doublon probable ({{ it.officialMatches }} officiel{{ it.officialMatches > 1 ? 's' : '' }})
                   </UBadge>
                 </div>
+                <form
+                  class="flex items-center gap-1 my-1"
+                  @submit.prevent="saveFrName(it)"
+                >
+                  <UInput
+                    v-model="frInputs[it.id]"
+                    size="xs"
+                    placeholder="Nom français"
+                    class="w-80 max-w-full"
+                    :ui="{ base: 'w-full' }"
+                  />
+                  <UButton
+                    type="submit"
+                    icon="i-lucide-check"
+                    size="xs"
+                    aria-label="Enregistrer le nom français"
+                    :loading="savingFr === it.id"
+                    :disabled="!(frInputs[it.id] ?? '').trim() || (frInputs[it.id] ?? '').trim() === currentFr(it)"
+                  />
+                </form>
                 <p
                   v-if="it.description"
                   class="text-xs text-muted line-clamp-2"
@@ -540,7 +628,7 @@ function formatPrereqs(pr: Prereqs | null): string {
                   </div>
                 </div>
               </div>
-            </label>
+            </div>
           </li>
         </ul>
 
