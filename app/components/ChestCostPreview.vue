@@ -225,7 +225,7 @@ async function saveWikiName(u: ChestCostUnmatched) {
   savingWikiName.value = u.id
   try {
     await $fetch('/api/admin/chest-costs/wiki-name', { method: 'POST', body: { id: u.id, name } })
-    toast.add({ title: `Nom wiki enregistré : ${name}`, color: 'success' })
+    toast.add({ title: `Nom wiki.gg enregistré : ${name}`, color: 'success' })
     // Nouvel aperçu : l'item doit maintenant être rapproché de sa page wiki.
     await fetchCosts()
   } catch (e) {
@@ -410,7 +410,7 @@ async function applyAiAnswer() {
         icon="i-lucide-triangle-alert"
         class="mb-3"
         title="Aucune page trouvée sur le wiki"
-        :description="`La catégorie « ${result.wikiCategory} » ne contient aucune page d'objet : rien ne peut être rapproché. Vérifiez son nom sur le wiki (singulier, « (pets) »…), corrigez-le dans le champ ci-dessus, puis mémorisez-le.`"
+        :description="`La catégorie « ${result.wikiCategory} » ne contient aucune page d'objet : rien ne peut être rapproché. Vérifiez son nom sur wiki.gg (singulier, « (pets) »…), corrigez-le dans le champ ci-dessus, puis mémorisez-le.`"
       />
       <div class="flex flex-wrap gap-2 text-sm">
         <UBadge
@@ -621,7 +621,7 @@ async function applyAiAnswer() {
           </h3>
           <p class="text-sm text-muted mb-2">
             Aucune page wiki ne correspond au nom de ces items (écart de nom, traduction EN
-            manquante…). Saisissez le <strong>nom wiki</strong>, titre de leur page (les pages wiki
+            manquante…). Saisissez le <strong>nom wiki.gg</strong>, titre de leur page (les pages wiki
             sans item sont proposées) : l'aperçu est relancé et l'item rapproché de sa page. Le nom
             anglais officiel n'est pas modifié (sauf s'il est absent).
           </p>
@@ -634,7 +634,7 @@ async function applyAiAnswer() {
               @click="copyAiPrompt"
             />
             <span class="text-xs text-muted">
-              Tous les noms wiki en une fois : collez le prompt dans une IA, puis sa réponse ci-dessous.
+              Tous les noms wiki.gg en une fois : collez le prompt dans une IA, puis sa réponse ci-dessous.
             </span>
           </div>
           <datalist :id="`wiki-only-titles-${uid}`">
@@ -697,7 +697,7 @@ async function applyAiAnswer() {
               >
                 <UInput
                   v-model="wikiNameInputs[u.id]"
-                  placeholder="Nom wiki (titre de la page)"
+                  placeholder="Nom wiki.gg (titre de la page)"
                   size="xs"
                   class="w-64"
                   :ui="{ base: 'w-full' }"
@@ -707,7 +707,7 @@ async function applyAiAnswer() {
                   type="submit"
                   icon="i-lucide-check"
                   size="xs"
-                  aria-label="Enregistrer le nom wiki"
+                  aria-label="Enregistrer le nom wiki.gg"
                   :loading="savingWikiName === u.id"
                   :disabled="!(wikiNameInputs[u.id] ?? '').trim() || (wikiNameInputs[u.id] ?? '').trim() === currentWikiName(u)"
                 />
@@ -747,7 +747,7 @@ async function applyAiAnswer() {
               </p>
               <UButton
                 icon="i-lucide-check-check"
-                :label="`Enregistrer les noms wiki (${aiParsed.matches.length})`"
+                :label="`Enregistrer les noms wiki.gg (${aiParsed.matches.length})`"
                 size="sm"
                 color="success"
                 :loading="savingAi"
@@ -865,7 +865,7 @@ async function applyAiAnswer() {
             icon="i-lucide-triangle-alert"
             class="mb-3"
             :title="`${result.unmatched.length} item(s) du site non rapprochés`"
-            :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Renseignez d'abord leur nom wiki (section Non matchés) ou décochez la page.`"
+            :description="`Souvent faute de nom anglais (${result.unmatched.slice(0, 5).map(u => u.name).join(', ')}${result.unmatched.length > 5 ? '…' : ''}). Une page ci-dessous peut être le même objet sous un autre nom : la créer ferait un doublon. Renseignez d'abord leur nom wiki.gg (section Non matchés) ou décochez la page.`"
           />
           <label class="flex items-center gap-2 text-sm cursor-pointer mb-2 pb-2 border-b border-muted/20">
             <UCheckbox

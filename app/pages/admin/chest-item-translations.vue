@@ -267,7 +267,7 @@ const FIELD_LABELS: Record<keyof Fields, string> = {
   enDesc: 'EN — description',
   es: 'ES — nom',
   esDesc: 'ES — description',
-  wikiName: 'Nom wiki'
+  wikiName: 'Nom wiki.gg'
 }
 interface BulkChange { key: string, item: ApiItem, before: Fields, after: Fields, changed: Array<keyof Fields>, selected: boolean }
 const bulk = ref<{ title: string, changes: BulkChange[], unknown: string[], invalid: number } | null>(null)
@@ -366,7 +366,7 @@ const CSV_COLUMNS: Array<{ header: string, field?: keyof Fields, get: (i: ApiIte
   { header: 'en_description', field: 'enDesc', get: i => i.enDesc ?? '' },
   { header: 'es_nom', field: 'es', get: i => i.es ?? '' },
   { header: 'es_description', field: 'esDesc', get: i => i.esDesc ?? '' },
-  { header: 'nom_wiki', field: 'wikiName', get: i => i.wikiName ?? '' },
+  { header: 'nom_wiki_gg', field: 'wikiName', get: i => i.wikiName ?? '' },
   { header: 'manques', get: i => i.missing.map(g => GAP_LABELS[g]).join(', ') },
   { header: 'suspects', get: i => i.suspects.map(x => SUSPECT_LABELS[x]).join(', ') }
 ]
@@ -697,8 +697,8 @@ async function runTrophyRepair(apply: boolean) {
             Traductions des objets
           </h1>
           <p class="text-muted mt-2 max-w-3xl">
-            Noms et descriptions FR / EN / ES des objets du coffre, et leur nom wiki (titre de leur
-            page sur le wiki quand il diffère du nom anglais). Le FR des objets officiels est réécrit
+            Noms et descriptions FR / EN / ES des objets du coffre, et leur nom wiki.gg (titre de leur
+            page sur wiki.gg quand il diffère du nom anglais). Le FR des objets officiels est réécrit
             par le jeu au prochain import d'un joueur qui les possède.
           </p>
         </div>
@@ -849,7 +849,7 @@ async function runTrophyRepair(apply: boolean) {
         <UInput
           v-model="q"
           icon="i-lucide-search"
-          placeholder="Rechercher par nom (FR, EN, ES ou nom wiki)…"
+          placeholder="Rechercher par nom (FR, EN, ES ou nom wiki.gg)…"
           class="w-full"
           :loading="loading"
         />
@@ -1047,8 +1047,8 @@ async function runTrophyRepair(apply: boolean) {
                 />
               </UFormField>
               <UFormField
-                label="Nom wiki"
-                help="Titre de la page sur le wiki s'il diffère du nom anglais (rapprochement). Vide = nom anglais."
+                label="Nom wiki.gg"
+                help="Titre de la page sur wiki.gg s'il diffère du nom anglais (rapprochement). Vide = nom anglais."
                 class="sm:col-span-2"
               >
                 <UInput
@@ -1119,7 +1119,7 @@ async function runTrophyRepair(apply: boolean) {
                 v-if="restorePreview.wikiNamesKept"
                 class="text-xs text-info"
               >
-                {{ restorePreview.wikiNamesKept }} ancien(s) nom(s) anglais conservé(s) comme nom wiki
+                {{ restorePreview.wikiNamesKept }} ancien(s) nom(s) anglais conservé(s) comme nom wiki.gg
                 (ils servaient au rapprochement avec le wiki).
               </p>
               <ul
@@ -1136,7 +1136,7 @@ async function runTrophyRepair(apply: boolean) {
                   <span
                     v-if="sm.keptAsWikiName"
                     class="text-info"
-                  > (ancien nom gardé comme nom wiki)</span>
+                  > (ancien nom gardé comme nom wiki.gg)</span>
                 </li>
               </ul>
               <UButton
