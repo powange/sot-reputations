@@ -2597,6 +2597,135 @@ export interface ChestItemTranslationRow {
   wikiName: string | null
 }
 
+// ---- Vue d'ensemble des traductions (page admin « Traductions des objets ») ----
+
+// Champs manquants d'un item : noms EN/ES, descriptions FR/EN/ES (seulement si une autre
+// langue en a une), nom / description FR des items wiki (encore le texte anglais du wiki).
+export type ChestTranslationGap = 'frName' | 'enName' | 'esName' | 'frDesc' | 'enDesc' | 'esDesc'
+
+export interface ChestTranslationOverviewItem {
+  id: number
+  itemKey: string
+  source: 'official' | 'wiki'
+  published: boolean
+  category: string
+  subcategory: string | null
+  name: string
+  descFr: string | null
+  image: string | null
+  en: string | null
+  es: string | null
+  enDesc: string | null
+  esDesc: string | null
+  wikiName: string | null
+  missing: ChestTranslationGap[]
+}
+
+export interface ChestTranslationFilters {
+  // incomplete : au moins un manque ; names / descriptions : manque de ce type ; all : tout.
+  status?: 'incomplete' | 'names' | 'descriptions' | 'all'
+  source?: 'official' | 'wiki' | 'all'
+  // Langues dont il manque quelque chose (nom ou description) ; vide = toutes.
+  langs?: Array<'fr' | 'en' | 'es'>
+  categories?: string[]
+  subcategories?: string[]
+  q?: string
+}
+
+const NAME_GAPS: ChestTranslationGap[] = ['frName', 'enName', 'esName']
+const DESC_GAPS: ChestTranslationGap[] = ['frDesc', 'enDesc', 'esDesc']
+
+function translationGaps(r: { source: string, itemKey: string, name: string, descFr: string | null, en: string | null, es: string | null, enDesc: string | null, esDesc: string | null }): ChestTranslationGap[] {
+  const gaps: ChestTranslationGap[] = []
+  if (r.source === 'wiki' && r.itemKey.startsWith('wiki:') && r.name === r.itemKey.slice(5)) gaps.push('frName')
+  if (!r.en) gaps.push('enName')
+  if (!r.es) gaps.push('esName')
+  const anyDesc = !!(r.descFr || r.enDesc || r.esDesc)
+  // Item wiki : sa description de base est le texte anglais du wiki tant qu'aucune
+  // description française n'a été importée -> manquante si identique à l'anglaise.
+  if (anyDesc && (!r.descFr || (r.source === 'wiki' && r.descFr === r.enDesc))) gaps.push('frDesc')
+  if (anyDesc && !r.enDesc) gaps.push('enDesc')
+  if (anyDesc && !r.esDesc) gaps.push('esDesc')
+  return gaps
+}
+
+/**
+ * Items du coffre avec leurs traductions et leurs manques, filtrés (état, source,
+ * catégories, sous-catégories, recherche sur tous les noms) et paginés, plus des
+ * statistiques (globales et du périmètre filtré hors état / recherche) et des facettes
+ * par catégorie / sous-catégorie.
+ */
+export function getChestTranslationOverview(filters: ChestTranslationFilters, offset: number, limit: number) {
+  const db = getReputationDb()
+  const rows = (db.prepare(`
+    SELECT ci.id, ci.item_key AS itemKey, ci.source, ci.published, ci.category, ci.subcategory,
+      ci.name, ci.description AS descFr, ci.image, NULLIF(ci.wiki_name, '') AS wikiName,
+      NULLIF(en.name, '') AS en, NULLIF(es.name, '') AS es,
+      NULLIF(en.description, '') AS enDesc, NULLIF(es.description, '') AS esDesc
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations en ON en.item_key = ci.item_key AND en.locale = 'en'
+    LEFT JOIN chest_item_translations es ON es.item_key = ci.item_key AND es.locale = 'es'
+    WHERE ci.item_key IS NOT NULL
+  `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'published'> & { published: number }>)
+    .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r) }) as ChestTranslationOverviewItem)
+    .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
+      || a.category.localeCompare(b.category)
+      || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
+      || a.name.localeCompare(b.name))
+
+  const source = filters.source ?? 'all'
+  const cats = new Set(filters.categories ?? [])
+  const subs = new Set(filters.subcategories ?? [])
+  // Périmètre (source + catégories + sous-catégories), avant état et recherche.
+  const scoped = rows.filter(r => (source === 'all' || r.source === source)
+    && (!cats.size || cats.has(r.category))
+    && (!subs.size || subs.has(r.subcategory ?? '')))
+  const status = filters.status ?? 'incomplete'
+  const langs = filters.langs ?? []
+  const q = normalizeName(filters.q ?? '')
+  const filtered = scoped.filter((r) => {
+    // Manques restreints aux langues choisies (« frName » -> « fr »…).
+    const gaps = langs.length ? r.missing.filter(g => langs.includes(g.slice(0, 2) as 'fr' | 'en' | 'es')) : r.missing
+    if ((status === 'incomplete' || (status === 'all' && langs.length)) && !gaps.length) return false
+    if (status === 'names' && !gaps.some(g => NAME_GAPS.includes(g))) return false
+    if (status === 'descriptions' && !gaps.some(g => DESC_GAPS.includes(g))) return false
+    return !q || [r.name, r.en, r.es, r.wikiName].some(n => n && normalizeName(n).includes(q))
+  })
+
+  const stats = (list: ChestTranslationOverviewItem[]) => {
+    const missing = Object.fromEntries([...NAME_GAPS, ...DESC_GAPS].map(g => [g, 0])) as Record<ChestTranslationGap, number>
+    for (const r of list) for (const g of r.missing) missing[g]++
+    return { total: list.length, incomplete: list.filter(r => r.missing.length).length, missing }
+  }
+  // Facettes : catégories et sous-catégories (libellé FR), total et incomplets (selon la source).
+  const tr = getChestTaxonomyTranslations()
+  const facetMap = new Map<string, { category: string, label: string, total: number, incomplete: number, subcategories: Map<string, { subcategory: string, label: string, total: number, incomplete: number }> }>()
+  for (const r of rows) {
+    if (source !== 'all' && r.source !== source) continue
+    let f = facetMap.get(r.category)
+    if (!f) {
+      f = { category: r.category, label: tr.categories[r.category]?.fr || r.category, total: 0, incomplete: 0, subcategories: new Map() }
+      facetMap.set(r.category, f)
+    }
+    f.total++
+    if (r.missing.length) f.incomplete++
+    const sk = r.subcategory ?? ''
+    let sf = f.subcategories.get(sk)
+    if (!sf) {
+      sf = { subcategory: sk, label: (sk && tr.subcategories[r.category]?.[sk]?.fr) || sk || '—', total: 0, incomplete: 0 }
+      f.subcategories.set(sk, sf)
+    }
+    sf.total++
+    if (r.missing.length) sf.incomplete++
+  }
+  return {
+    items: filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    stats: { global: stats(rows), scope: stats(scoped) },
+    facets: [...facetMap.values()].map(f => ({ ...f, subcategories: [...f.subcategories.values()] }))
+  }
+}
+
 /**
  * Recherche d'items du coffre par nom FR (nom de base) avec leurs traductions EN/ES
  * actuelles (nom + description), pour l'éditeur d'administration. Le FR sert de
@@ -2626,6 +2755,9 @@ export interface ChestItemTranslationInput {
   translations: Array<{ locale: string, name?: string | null, description?: string | null }>
   // Nom wiki (clé présente = mise à jour ; vide = retour au nom anglais).
   wikiName?: string | null
+  // Nom / description FR (langue de base). Nom vide ignoré (un item garde toujours un nom).
+  // Un import d'un joueur réécrit le FR des items officiels avec celui du jeu.
+  fr?: { name?: string | null, description?: string | null }
 }
 
 export interface ChestTranslationRestoreResult {
@@ -2763,14 +2895,17 @@ export function setChestItemTranslations(entries: ChestItemTranslationInput[]): 
   `)
   const del = db.prepare('DELETE FROM chest_item_translations WHERE item_key = ? AND locale = ?')
   const setWiki = db.prepare('UPDATE chest_items SET wiki_name = ? WHERE item_key = ?')
+  const setFr = db.prepare('UPDATE chest_items SET name = ?, description = ? WHERE item_key = ?')
 
   const run = db.transaction(() => {
     for (const entry of entries) {
       const itemKey = entry.itemKey?.trim()
       if (!itemKey) continue
       if ('wikiName' in entry) setWiki.run(entry.wikiName?.trim() || null, itemKey)
-      for (const t of entry.translations) {
-        // FR est la langue de base (chest_items.name/description) : non gérée ici.
+      const frName = entry.fr?.name?.trim()
+      if (entry.fr && frName) setFr.run(frName, entry.fr.description?.trim() || null, itemKey)
+      for (const t of entry.translations ?? []) {
+        // FR : géré ci-dessus (champ fr), pas via les traductions.
         if (!t.locale || !['en', 'es'].includes(t.locale)) continue
         const name = t.name?.trim() || ''
         const description = t.description?.trim() || null
