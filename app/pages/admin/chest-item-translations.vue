@@ -61,14 +61,21 @@ interface ListResult { items: ApiItem[], total: number, stats: { global: Stats, 
 // Champs éditables d'une fiche ; `original` sert à détecter les modifications.
 interface Fields { name: string, descFr: string, en: string, enDesc: string, es: string, esDesc: string, wikiName: string }
 interface Row { item: ApiItem, fields: Fields, original: Fields }
+// FR manquant : un objet du wiki garde en base son nom (et sa description) anglais faute
+// de FR ; le champ est alors présenté vide, la valeur anglaise en indication.
 const toFields = (i: ApiItem): Fields => ({
-  name: i.name,
-  descFr: i.descFr || '',
+  name: i.missing.includes('frName') ? '' : i.name,
+  descFr: i.missing.includes('frDesc') ? '' : i.descFr || '',
   en: i.en || '',
   enDesc: i.enDesc || '',
   es: i.es || '',
   esDesc: i.esDesc || '',
   wikiName: i.wikiName || ''
+})
+// FR envoyé à l'enregistrement : un champ FR manquant laissé vide garde la valeur en base.
+const frPayload = (i: ApiItem, f: Fields) => ({
+  name: f.name || i.name,
+  description: f.descFr || (i.missing.includes('frDesc') ? i.descFr ?? '' : '')
 })
 const isDirty = (r: Row) => (Object.keys(r.fields) as Array<keyof Fields>).some(k => r.fields[k] !== r.original[k])
 
@@ -199,7 +206,7 @@ async function save(list: Row[]) {
   if (!list.length) return
   const entries = list.map(r => ({
     itemKey: r.item.itemKey,
-    fr: { name: r.fields.name, description: r.fields.descFr },
+    fr: frPayload(r.item, r.fields),
     translations: [
       { locale: 'en', name: r.fields.en, description: r.fields.enDesc },
       { locale: 'es', name: r.fields.es, description: r.fields.esDesc }
@@ -228,7 +235,7 @@ async function saveOne(r: Row) {
   savingId.value = r.item.id
   try {
     await save([r])
-    toast.add({ title: `Enregistré : ${r.fields.name}`, color: 'success' })
+    toast.add({ title: `Enregistré : ${r.fields.name || r.item.name}`, color: 'success' })
   } catch {
     toast.add({ title: 'Erreur lors de l\'enregistrement', color: 'error' })
   } finally {
@@ -296,8 +303,10 @@ async function openBulkPreview(title: string, patches: Map<string, Partial<Field
     for (const [f, v] of Object.entries(patch) as Array<[keyof Fields, string | undefined]>) {
       if (typeof v === 'string') after[f] = v.trim()
     }
-    // Un objet garde toujours un nom FR : un nom FR vide est ignoré.
-    if (!after.name) after.name = before.name
+    // Un objet garde toujours un nom FR : un nom FR vide est ignoré. Un FR manquant
+    // (présenté vide) qui reçoit sa valeur actuelle en base (l'anglais) reste manquant.
+    if (!after.name || after.name === item.name) after.name = before.name
+    if (!before.descFr && after.descFr === (item.descFr ?? '')) after.descFr = before.descFr
     const changed = (Object.keys(FIELD_LABELS) as Array<keyof Fields>).filter(f => after[f] !== before[f])
     if (changed.length) changes.push({ key, item, before, after, changed, selected: true })
   }
@@ -312,7 +321,7 @@ async function applyBulk() {
     for (let i = 0; i < list.length; i += 500) {
       const entries = list.slice(i, i + 500).map(c => ({
         itemKey: c.key,
-        fr: { name: c.after.name, description: c.after.descFr },
+        fr: frPayload(c.item, c.after),
         translations: [
           { locale: 'en', name: c.after.en, description: c.after.enDesc },
           { locale: 'es', name: c.after.es, description: c.after.esDesc }
@@ -360,8 +369,8 @@ const CSV_COLUMNS: Array<{ header: string, field?: keyof Fields, get: (i: ApiIte
   { header: 'categorie', get: i => i.category },
   { header: 'sous_categorie', get: i => i.subcategory ?? '' },
   { header: 'source', get: i => i.source },
-  { header: 'fr_nom', field: 'name', get: i => i.name },
-  { header: 'fr_description', field: 'descFr', get: i => i.descFr ?? '' },
+  { header: 'fr_nom', field: 'name', get: i => toFields(i).name },
+  { header: 'fr_description', field: 'descFr', get: i => toFields(i).descFr },
   { header: 'en_nom', field: 'en', get: i => i.en ?? '' },
   { header: 'en_description', field: 'enDesc', get: i => i.enDesc ?? '' },
   { header: 'es_nom', field: 'es', get: i => i.es ?? '' },
@@ -528,7 +537,7 @@ function buildAiPrompt(): string {
   const objects = aiCurrent.value.map(i => ({
     key: i.itemKey,
     categorie: scopeLabel(i),
-    fr: { name: i.name, description: i.descFr },
+    fr: { name: toFields(i).name || null, description: toFields(i).descFr || null },
     en: { name: i.en, description: i.enDesc },
     es: { name: i.es, description: i.esDesc },
     a_completer: requested(i).map(f => `${f.lang}.${f.part}`)
@@ -1002,6 +1011,7 @@ async function runTrophyRepair(apply: boolean) {
               <UFormField label="FR — nom">
                 <UInput
                   v-model="r.fields.name"
+                  :placeholder="r.item.missing.includes('frName') ? r.item.name : '—'"
                   class="w-full"
                 />
               </UFormField>
@@ -1010,14 +1020,14 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.descFr"
                   :rows="2"
                   autoresize
-                  placeholder="—"
+                  :placeholder="r.item.missing.includes('frDesc') ? r.item.descFr || '—' : '—'"
                   class="w-full"
                 />
               </UFormField>
               <UFormField label="EN — nom">
                 <UInput
                   v-model="r.fields.en"
-                  :placeholder="r.fields.name"
+                  :placeholder="r.fields.name || r.item.name"
                   class="w-full"
                 />
               </UFormField>
@@ -1026,14 +1036,14 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.enDesc"
                   :rows="2"
                   autoresize
-                  :placeholder="r.fields.descFr || '—'"
+                  :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
                 />
               </UFormField>
               <UFormField label="ES — nom">
                 <UInput
                   v-model="r.fields.es"
-                  :placeholder="r.fields.name"
+                  :placeholder="r.fields.name || r.item.name"
                   class="w-full"
                 />
               </UFormField>
@@ -1042,7 +1052,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.esDesc"
                   :rows="2"
                   autoresize
-                  :placeholder="r.fields.descFr || '—'"
+                  :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
                 />
               </UFormField>
@@ -1053,7 +1063,7 @@ async function runTrophyRepair(apply: boolean) {
               >
                 <UInput
                   v-model="r.fields.wikiName"
-                  :placeholder="r.fields.en || r.fields.name"
+                  :placeholder="r.fields.en || r.item.en || r.item.name"
                   class="w-full"
                 />
               </UFormField>
@@ -1326,7 +1336,7 @@ async function runTrophyRepair(apply: boolean) {
               <ChestItemImage
                 v-if="c.item.image"
                 :src="c.item.image"
-                :alt="c.before.name"
+                :alt="c.item.name"
                 :size="40"
                 format="webp"
                 loading="lazy"
@@ -1334,7 +1344,7 @@ async function runTrophyRepair(apply: boolean) {
               />
               <div class="min-w-0 flex-1">
                 <p class="font-medium">
-                  {{ c.before.name }} <span class="text-xs text-muted font-normal">· {{ scopeLabel(c.item) }}</span>
+                  {{ c.item.name }} <span class="text-xs text-muted font-normal">· {{ scopeLabel(c.item) }}</span>
                 </p>
                 <div
                   v-for="f in c.changed"
