@@ -79,8 +79,14 @@ const frPayload = (i: ApiItem, f: Fields) => ({
 })
 const isDirty = (r: Row) => (Object.keys(r.fields) as Array<keyof Fields>).some(k => r.fields[k] !== r.original[k])
 
-// --- Filtres ---
-const status = ref<'incomplete' | 'names' | 'descriptions' | 'suspicious' | 'all'>('incomplete')
+// --- Filtres (conservés dans l'URL) ---
+const route = useRoute()
+const router = useRouter()
+const queryText = (k: string) => typeof route.query[k] === 'string' ? route.query[k] as string : ''
+const queryList = (k: string) => queryText(k).split(',').filter(Boolean)
+const pick = <T extends string>(v: string, allowed: readonly T[], fallback: T): T => (allowed as readonly string[]).includes(v) ? v as T : fallback
+
+const status = ref(pick(queryText('status'), ['incomplete', 'names', 'descriptions', 'suspicious', 'all'] as const, 'incomplete'))
 const statusOptions = [
   { value: 'incomplete' as const, label: 'Incomplets' },
   { value: 'names' as const, label: 'Noms manquants' },
@@ -88,14 +94,14 @@ const statusOptions = [
   { value: 'suspicious' as const, label: 'Suspects' },
   { value: 'all' as const, label: 'Tous' }
 ]
-const source = ref<'all' | 'official' | 'wiki'>('all')
+const source = ref(pick(queryText('source'), ['all', 'official', 'wiki'] as const, 'all'))
 const sourceOptions = [
   { value: 'all', label: 'Toutes les sources' },
   { value: 'official', label: 'Officiels (imports)' },
   { value: 'wiki', label: 'Items du wiki' }
 ]
 // Langues dont il manque quelque chose (nom ou description) : FR, EN, ES, cumulables.
-const langs = ref<Array<'fr' | 'en' | 'es'>>([])
+const langs = ref(queryList('langs').filter((l): l is 'fr' | 'en' | 'es' => ['fr', 'en', 'es'].includes(l)))
 const langOptions = [
   { value: 'fr' as const, label: 'FR' },
   { value: 'en' as const, label: 'EN' },
@@ -105,10 +111,10 @@ function toggleLang(l: 'fr' | 'en' | 'es') {
   if (!confirmDiscard()) return
   langs.value = langs.value.includes(l) ? langs.value.filter(x => x !== l) : [...langs.value, l]
 }
-const categories = ref<string[]>([])
-const subcategories = ref<string[]>([])
-const q = ref('')
-const page = ref(1)
+const categories = ref<string[]>(queryList('categories'))
+const subcategories = ref<string[]>(queryList('subcategories'))
+const q = ref(queryText('q'))
+const page = ref(Math.max(1, Number(queryText('page')) || 1))
 const PAGE_SIZE = 50
 
 const data = ref<ListResult | null>(null)
@@ -130,7 +136,21 @@ const subcategoryOptions = computed(() => (data.value?.facets ?? [])
 
 const dirtyRows = computed(() => rows.value.filter(isDirty))
 
+// URL de la page = filtres courants (valeurs par défaut omises), sans ajouter d'historique.
+function syncUrl() {
+  const query: Record<string, string> = {}
+  if (status.value !== 'incomplete') query.status = status.value
+  if (source.value !== 'all') query.source = source.value
+  if (langs.value.length) query.langs = langs.value.join(',')
+  if (categories.value.length) query.categories = categories.value.join(',')
+  if (subcategories.value.length) query.subcategories = subcategories.value.join(',')
+  if (q.value.trim()) query.q = q.value.trim()
+  if (page.value > 1) query.page = String(page.value)
+  router.replace({ query })
+}
+
 async function load() {
+  syncUrl()
   loading.value = true
   try {
     const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', {
