@@ -1,6 +1,8 @@
 // Lecture d'une capture d'un objet du jeu (titre + description), entièrement dans le
 // navigateur (tesseract.js chargé à la demande). Le titre est écrit plus gros que la
-// description : on les sépare par la hauteur des lignes.
+// description : on les sépare par la hauteur typographique des lignes (rowHeight de
+// Tesseract, indépendante des lettres présentes ; le cadre d'une ligne sans jambage, comme
+// « dorée », est presque aussi bas que celui d'une ligne de description).
 
 export type ItemOcrLang = 'fr' | 'en' | 'es'
 const TESSERACT_LANG: Record<ItemOcrLang, string> = { fr: 'fra', en: 'eng', es: 'spa' }
@@ -13,7 +15,8 @@ export function splitItemOcrLines(lines: ItemOcrLine[]): { name: string, descrip
   const kept = lines.filter(l => l.text.trim().length > 1 && l.confidence >= 40)
   if (!kept.length) return { name: '', description: '' }
   const maxHeight = Math.max(...kept.map(l => l.height))
-  const isBig = (l: ItemOcrLine) => l.height >= maxHeight * 0.75
+  // Mesuré : titre ~62 px, description ~47 px (rapport ~0,76).
+  const isBig = (l: ItemOcrLine) => l.height >= maxHeight * 0.85
   // Titre = premier bloc de grandes lignes (ce qui le précède est du bruit de cadrage).
   const start = kept.findIndex(isBig)
   let end = kept.findIndex((l, i) => i > start && !isBig(l))
@@ -32,7 +35,7 @@ export async function recognizeItemCapture(image: Blob, lang: ItemOcrLang): Prom
     const { data } = await worker.recognize(image, {}, { blocks: true })
     const lines = (data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).map(l => ({
       text: l.text,
-      height: l.bbox.y1 - l.bbox.y0,
+      height: l.rowAttributes?.rowHeight || l.bbox.y1 - l.bbox.y0,
       confidence: l.confidence
     }))
     return splitItemOcrLines(lines)

@@ -26,6 +26,15 @@ describe('splitItemOcrLines', () => {
     ])).toEqual({ name: 'Canons du Grand Large', description: 'Une description.' })
   })
 
+  it('titre sur deux lignes de même hauteur typographique (captures réelles)', () => {
+    expect(splitItemOcrLines([
+      line('Perruche de la malédiction', 62.2),
+      line('dorée', 62.7),
+      line('D\'accord, tu as gagné. Tu es une très belle', 47),
+      line('perruche !', 48)
+    ])).toEqual({ name: 'Perruche de la malédiction dorée', description: 'D\'accord, tu as gagné. Tu es une très belle perruche !' })
+  })
+
   it('lignes de même taille : la première est le titre', () => {
     expect(splitItemOcrLines([line('Titre', 50), line('Texte', 50)])).toEqual({ name: 'Titre', description: 'Texte' })
     expect(splitItemOcrLines([line('Titre seul', 50)])).toEqual({ name: 'Titre seul', description: '' })
