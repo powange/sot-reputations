@@ -34,3 +34,6 @@ data/
 
 # Export du bookmarklet déposé localement pour analyse (données de compte)
 import.json
+
+# Copie locale des données de sotfr.net (propriété de SoTFR, usage interne uniquement)
+sotfr-data/
