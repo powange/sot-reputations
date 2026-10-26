@@ -164,9 +164,63 @@ interface FrImportResult {
   unchanged: number
   unknown: string[]
   invalid: number
-  changes: Array<{ key: string, before: string, after: string, descriptionBefore: string | null, descriptionAfter: string | null }>
+  changes: FrChange[]
 }
-// Fichier attendu : [{ key: "wiki:<titre>", nameFr, descriptionFr? }] (ou { entries: [...] }).
+interface FrChange {
+  key: string
+  before: string
+  after: string
+  descriptionBefore: string | null
+  descriptionAfter: string | null
+  // Image de l'item, nom / description anglais, et image de comparaison (champ compareImage).
+  image: string | null
+  enName: string | null
+  enDescription: string | null
+  compareImage: string | null
+}
+// Comparaison en grand (modale) d'une ligne de l'aperçu.
+const compareChange = ref<FrChange | null>(null)
+const compareOpen = computed({
+  get: () => !!compareChange.value,
+  set: (v: boolean) => { if (!v) compareChange.value = null }
+})
+// Ligne suivante de l'aperçu (après celle affichée dans la modale), ou null.
+function nextChange(c: FrChange): FrChange | null {
+  const list = frPreview.value?.changes ?? []
+  const i = list.findIndex(x => x.key === c.key)
+  return i >= 0 && i + 1 < list.length ? list[i + 1]! : null
+}
+
+// Valide UNE ligne depuis la modale : import de cet item seul, retrait de l'aperçu, puis
+// passage à la ligne suivante (vérification à la chaîne).
+const validatingOne = ref(false)
+async function validateOne(c: FrChange) {
+  validatingOne.value = true
+  try {
+    const entry = { key: c.key, nameFr: c.after, ...(c.descriptionAfter !== c.descriptionBefore ? { descriptionFr: c.descriptionAfter } : {}) }
+    await $fetch('/api/admin/chest-wiki-items/import-fr', { method: 'POST', body: { entries: [entry], apply: true } })
+    toast.add({ title: `Validé : ${c.after}`, color: 'success' })
+    const next = nextChange(c)
+    if (frPreview.value) {
+      frPreview.value.changes = frPreview.value.changes.filter(x => x.key !== c.key)
+      frPreview.value.updated--
+    }
+    frEntries.value = (frEntries.value ?? []).filter(e => (e as { key?: string })?.key !== c.key)
+    const it = items.value.find(x => x.key === c.key)
+    if (it) {
+      it.title = c.after
+      it.frNamed = c.after !== it.wikiTitle
+      frInputs.value[it.id] = c.after
+      if (entry.descriptionFr) it.description = entry.descriptionFr
+    }
+    compareChange.value = next
+  } catch {
+    toast.add({ title: 'Erreur lors de la validation', color: 'error' })
+  } finally {
+    validatingOne.value = false
+  }
+}
+// Fichier attendu : [{ key: "wiki:<titre>", nameFr, descriptionFr?, compareImage? }] (ou { entries: [...] }).
 const frEntries = ref<unknown[] | null>(null)
 const frFileName = ref('')
 const frPreview = ref<FrImportResult | null>(null)
@@ -340,10 +394,12 @@ function formatPrereqs(pr: Prereqs | null): string {
       </template>
       <div class="space-y-2 text-sm">
         <p class="text-muted">
-          Importer un fichier JSON <code>[{ "key": "wiki:&lt;titre&gt;", "nameFr": "…", "descriptionFr": "…" }]</code> :
+          Importer un fichier JSON <code>[{ "key": "wiki:&lt;titre&gt;", "nameFr": "…", "descriptionFr": "…", "compareImage": "https://…" }]</code> :
           le nom français devient le nom de l'item (le nom anglais reste dans les traductions),
           la description française remplace la description si elle est fournie. Seuls les items du
-          wiki sont modifiés. La clé figure dans l'export de la liste.
+          wiki sont modifiés. La clé figure dans l'export de la liste. <code>compareImage</code> (facultatif)
+          est l'image d'une autre source, affichée à côté de celle de l'item dans l'aperçu pour vérifier
+          la correspondance (clic sur les images pour comparer en grand) ; elle n'est pas enregistrée.
         </p>
         <div class="flex flex-wrap items-center gap-2">
           <input
@@ -393,13 +449,44 @@ function formatPrereqs(pr: Prereqs | null): string {
             <li
               v-for="c in frPreview.changes"
               :key="c.key"
+              class="flex items-start gap-2"
             >
-              <span class="line-through text-muted">{{ c.before }}</span>
-              → <span class="font-medium">{{ c.after }}</span>
-              <span
-                v-if="c.descriptionAfter !== c.descriptionBefore"
-                class="block text-muted pl-3"
-              >{{ c.descriptionAfter }}</span>
+              <!-- Image de l'item wiki / image de comparaison : clic = comparaison en grand -->
+              <button
+                type="button"
+                class="flex gap-1 shrink-0 cursor-zoom-in"
+                :title="`Comparer les images : ${c.enName || c.before}`"
+                @click="compareChange = c"
+              >
+                <ChestItemImage
+                  v-if="c.image"
+                  :src="c.image"
+                  :alt="c.enName || c.before"
+                  :size="40"
+                  format="webp"
+                  loading="lazy"
+                  class="w-10 h-10 object-contain rounded bg-elevated"
+                />
+                <span
+                  v-else
+                  class="w-10 h-10 rounded bg-elevated"
+                />
+                <img
+                  v-if="c.compareImage"
+                  :src="c.compareImage"
+                  :alt="c.after"
+                  loading="lazy"
+                  class="w-10 h-10 object-contain rounded bg-elevated ring-1 ring-info/40"
+                >
+              </button>
+              <div class="min-w-0">
+                <span class="line-through text-muted">{{ c.before }}</span>
+                → <span class="font-medium">{{ c.after }}</span>
+                <span
+                  v-if="c.descriptionAfter !== c.descriptionBefore"
+                  class="block text-muted"
+                >{{ c.descriptionAfter }}</span>
+              </div>
             </li>
           </ul>
           <p
@@ -645,5 +732,106 @@ function formatPrereqs(pr: Prereqs | null): string {
         </div>
       </template>
     </UCard>
+    <!-- Comparaison d'une ligne de l'aperçu : images côte à côte, noms et descriptions -->
+    <UModal
+      v-model:open="compareOpen"
+      title="Comparer avant import"
+      :ui="{ content: 'sm:max-w-3xl' }"
+    >
+      <template #body>
+        <div
+          v-if="compareChange"
+          class="space-y-4"
+        >
+          <div class="grid grid-cols-2 gap-4">
+            <figure class="text-center">
+              <ChestItemImage
+                v-if="compareChange.image"
+                :src="compareChange.image"
+                :alt="compareChange.enName || compareChange.before"
+                :size="320"
+                format="webp"
+                class="mx-auto w-full max-w-80 aspect-square object-contain rounded bg-elevated"
+              />
+              <figcaption class="text-xs text-muted mt-1">
+                Image de l'item (wiki)
+              </figcaption>
+            </figure>
+            <figure class="text-center">
+              <img
+                v-if="compareChange.compareImage"
+                :src="compareChange.compareImage"
+                :alt="compareChange.after"
+                class="mx-auto w-full max-w-80 aspect-square object-contain rounded bg-elevated"
+              >
+              <div
+                v-else
+                class="mx-auto w-full max-w-80 aspect-square rounded bg-elevated flex items-center justify-center text-xs text-muted"
+              >
+                Pas d'image de comparaison
+              </div>
+              <figcaption class="text-xs text-muted mt-1">
+                Image de la source proposée
+              </figcaption>
+            </figure>
+          </div>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-muted">
+                Nom anglais
+              </p>
+              <p class="font-medium">
+                {{ compareChange.enName || compareChange.before }}
+              </p>
+              <p class="text-xs text-muted mt-2">
+                Description anglaise
+              </p>
+              <p>{{ compareChange.enDescription || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted">
+                Nom français proposé
+              </p>
+              <p class="font-medium">
+                {{ compareChange.after }}
+              </p>
+              <p class="text-xs text-muted mt-2">
+                Description française proposée
+              </p>
+              <p>{{ compareChange.descriptionAfter !== compareChange.descriptionBefore ? compareChange.descriptionAfter : '— (inchangée)' }}</p>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div
+          v-if="compareChange"
+          class="flex w-full flex-wrap items-center justify-between gap-2"
+        >
+          <span class="text-xs text-muted">
+            {{ (frPreview?.changes.findIndex(x => x.key === compareChange?.key) ?? 0) + 1 }} / {{ frPreview?.changes.length ?? 0 }}
+          </span>
+          <div class="flex gap-2">
+            <UButton
+              label="Suivant"
+              icon="i-lucide-skip-forward"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :disabled="!nextChange(compareChange)"
+              @click="compareChange = nextChange(compareChange)"
+            />
+            <UButton
+              label="Valider cet item"
+              icon="i-lucide-check"
+              color="success"
+              size="sm"
+              :loading="validatingOne"
+              @click="validateOne(compareChange)"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
   </UContainer>
 </template>

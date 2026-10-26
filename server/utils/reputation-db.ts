@@ -2421,7 +2421,9 @@ export function getWikiChestItems(): WikiChestItem[] {
     .map(it => ({ ...it, officialMatches: it.officialDuplicates.length }))
 }
 
-export interface WikiFrNameEntry { key: string, nameFr: string, descriptionFr?: string | null }
+// compareImage : image d'une autre source (ex. sotfr) affichée à côté de celle de l'item dans
+// l'aperçu, pour vérifier visuellement la correspondance. Jamais enregistrée.
+export interface WikiFrNameEntry { key: string, nameFr: string, descriptionFr?: string | null, compareImage?: string | null }
 
 export interface WikiFrNameImportResult {
   updated: number
@@ -2429,7 +2431,18 @@ export interface WikiFrNameImportResult {
   // Clés absentes ou ne désignant pas un brouillon wiki (un item officiel n'est jamais touché).
   unknown: string[]
   invalid: number
-  changes: Array<{ key: string, before: string, after: string, descriptionBefore: string | null, descriptionAfter: string | null }>
+  changes: Array<{
+    key: string
+    before: string
+    after: string
+    descriptionBefore: string | null
+    descriptionAfter: string | null
+    // Pour l'aperçu : image de l'item, nom et description anglais, image de comparaison.
+    image: string | null
+    enName: string | null
+    enDescription: string | null
+    compareImage: string | null
+  }>
 }
 
 /**
@@ -2440,7 +2453,12 @@ export interface WikiFrNameImportResult {
  */
 export function importWikiChestFrNames(entries: WikiFrNameEntry[], apply: boolean): WikiFrNameImportResult {
   const db = getReputationDb()
-  const get = db.prepare(`SELECT id, name, description FROM chest_items WHERE item_key = ? AND source = 'wiki'`)
+  const get = db.prepare(`
+    SELECT ci.id, ci.name, ci.description, ci.image, t.name AS enName, t.description AS enDescription
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.item_key = ? AND ci.source = 'wiki'
+  `)
   const update = db.prepare('UPDATE chest_items SET name = ?, description = ? WHERE id = ?')
   const result: WikiFrNameImportResult = { updated: 0, unchanged: 0, unknown: [], invalid: 0, changes: [] }
   const writes: Array<[string, string | null, number]> = []
@@ -2451,7 +2469,7 @@ export function importWikiChestFrNames(entries: WikiFrNameEntry[], apply: boolea
       result.invalid++
       continue
     }
-    const row = get.get(key) as { id: number, name: string, description: string | null } | undefined
+    const row = get.get(key) as { id: number, name: string, description: string | null, image: string | null, enName: string | null, enDescription: string | null } | undefined
     if (!row) {
       result.unknown.push(key)
       continue
@@ -2463,7 +2481,18 @@ export function importWikiChestFrNames(entries: WikiFrNameEntry[], apply: boolea
       continue
     }
     result.updated++
-    result.changes.push({ key, before: row.name, after: nameFr, descriptionBefore: row.description, descriptionAfter: description })
+    const compareImage = typeof e.compareImage === 'string' && /^https:\/\/\S+$/.test(e.compareImage.trim()) ? e.compareImage.trim() : null
+    result.changes.push({
+      key,
+      before: row.name,
+      after: nameFr,
+      descriptionBefore: row.description,
+      descriptionAfter: description,
+      image: row.image,
+      enName: row.enName,
+      enDescription: row.enDescription ?? row.description,
+      compareImage
+    })
     writes.push([nameFr, description, row.id])
   }
   if (apply && writes.length) {
