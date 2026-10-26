@@ -2421,8 +2421,8 @@ export function getWikiChestItems(): WikiChestItem[] {
     .map(it => ({ ...it, officialMatches: it.officialDuplicates.length }))
 }
 
-// compareImage : image d'une autre source (ex. sotfr) affichée à côté de celle de l'item dans
-// l'aperçu, pour vérifier visuellement la correspondance. Jamais enregistrée.
+// compareImage : image d'une autre source (ex. sotfr), URL https ou image intégrée (data URI),
+// affichée à côté de celle de l'item dans l'aperçu pour vérifier la correspondance. Jamais enregistrée.
 export interface WikiFrNameEntry { key: string, nameFr: string, descriptionFr?: string | null, compareImage?: string | null }
 
 export interface WikiFrNameImportResult {
@@ -2481,7 +2481,10 @@ export function importWikiChestFrNames(entries: WikiFrNameEntry[], apply: boolea
       continue
     }
     result.updated++
-    const compareImage = typeof e.compareImage === 'string' && /^https:\/\/\S+$/.test(e.compareImage.trim()) ? e.compareImage.trim() : null
+    // URL https, ou image intégrée (data URI) : évite d'interroger le site source depuis le
+    // navigateur (sotfr refuse l'affichage de ses PNG sur un autre site). 300 Ko max.
+    const rawImage = typeof e.compareImage === 'string' ? e.compareImage.trim() : ''
+    const compareImage = /^https:\/\/\S+$/.test(rawImage) || (/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(rawImage) && rawImage.length <= 300_000) ? rawImage : null
     result.changes.push({
       key,
       before: row.name,
