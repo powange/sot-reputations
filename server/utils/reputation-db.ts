@@ -2619,11 +2619,18 @@ export interface ChestTranslationOverviewItem {
   esDesc: string | null
   wikiName: string | null
   missing: ChestTranslationGap[]
+  // Traductions suspectes (probablement une copie non traduite de l'anglais).
+  suspects: ChestTranslationSuspect[]
 }
 
+// esName : nom ES = nom EN (alors que le FR diffère) ; frName : nom FR d'un item officiel = nom EN
+// (alors que l'ES diffère) ; idem pour les descriptions.
+export type ChestTranslationSuspect = 'esName' | 'frName' | 'esDesc' | 'frDesc'
+
 export interface ChestTranslationFilters {
-  // incomplete : au moins un manque ; names / descriptions : manque de ce type ; all : tout.
-  status?: 'incomplete' | 'names' | 'descriptions' | 'all'
+  // incomplete : au moins un manque ; names / descriptions : manque de ce type ;
+  // suspicious : traduction suspecte ; all : tout.
+  status?: 'incomplete' | 'names' | 'descriptions' | 'suspicious' | 'all'
   source?: 'official' | 'wiki' | 'all'
   // Langues dont il manque quelque chose (nom ou description) ; vide = toutes.
   langs?: Array<'fr' | 'en' | 'es'>
@@ -2649,6 +2656,15 @@ function translationGaps(r: { source: string, itemKey: string, name: string, des
   return gaps
 }
 
+function translationSuspects(r: { source: string, name: string, descFr: string | null, en: string | null, es: string | null, enDesc: string | null, esDesc: string | null }): ChestTranslationSuspect[] {
+  const out: ChestTranslationSuspect[] = []
+  if (r.es && r.en && r.es === r.en && r.en !== r.name) out.push('esName')
+  if (r.source === 'official' && r.en && r.name === r.en && r.es && r.es !== r.en) out.push('frName')
+  if (r.esDesc && r.enDesc && r.esDesc === r.enDesc && r.enDesc !== r.descFr) out.push('esDesc')
+  if (r.source === 'official' && r.enDesc && r.descFr === r.enDesc && r.esDesc && r.esDesc !== r.enDesc) out.push('frDesc')
+  return out
+}
+
 /**
  * Items du coffre avec leurs traductions et leurs manques, filtrés (état, source,
  * catégories, sous-catégories, recherche sur tous les noms) et paginés, plus des
@@ -2666,8 +2682,8 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     LEFT JOIN chest_item_translations en ON en.item_key = ci.item_key AND en.locale = 'en'
     LEFT JOIN chest_item_translations es ON es.item_key = ci.item_key AND es.locale = 'es'
     WHERE ci.item_key IS NOT NULL
-  `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'published'> & { published: number }>)
-    .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r) }) as ChestTranslationOverviewItem)
+  `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'suspects' | 'published'> & { published: number }>)
+    .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r), suspects: translationSuspects(r) }) as ChestTranslationOverviewItem)
     .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
       || a.category.localeCompare(b.category)
       || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
@@ -2689,13 +2705,14 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     if ((status === 'incomplete' || (status === 'all' && langs.length)) && !gaps.length) return false
     if (status === 'names' && !gaps.some(g => NAME_GAPS.includes(g))) return false
     if (status === 'descriptions' && !gaps.some(g => DESC_GAPS.includes(g))) return false
+    if (status === 'suspicious' && !(langs.length ? r.suspects.filter(x => langs.includes(x.slice(0, 2) as 'fr' | 'en' | 'es')) : r.suspects).length) return false
     return !q || [r.name, r.en, r.es, r.wikiName].some(n => n && normalizeName(n).includes(q))
   })
 
   const stats = (list: ChestTranslationOverviewItem[]) => {
     const missing = Object.fromEntries([...NAME_GAPS, ...DESC_GAPS].map(g => [g, 0])) as Record<ChestTranslationGap, number>
     for (const r of list) for (const g of r.missing) missing[g]++
-    return { total: list.length, incomplete: list.filter(r => r.missing.length).length, missing }
+    return { total: list.length, incomplete: list.filter(r => r.missing.length).length, suspicious: list.filter(r => r.suspects.length).length, missing }
   }
   // Facettes : catégories et sous-catégories (libellé FR), total et incomplets (selon la source).
   const tr = getChestTaxonomyTranslations()
