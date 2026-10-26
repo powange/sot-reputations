@@ -316,7 +316,19 @@ function onFieldPaste(e: ClipboardEvent, fields: Fields, key: keyof Fields) {
 
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 const ocrFileLang = ref<ItemOcrLang>('fr')
-function pickOcrFile(lang: ItemOcrLang) {
+// Bouton « Capture » : l'image du presse-papier (capture Win+Maj+S…) si le navigateur la
+// donne, sinon choix d'un fichier.
+async function captureFromClipboard(lang: ItemOcrLang) {
+  if (!zoom.value) return
+  try {
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find(t => t.startsWith('image/'))
+      if (type) return ocrInto(await item.getType(type), zoom.value.fields, lang)
+    }
+    toast.add({ title: 'Pas d\'image dans le presse-papier', description: 'Choisissez un fichier.', color: 'info' })
+  } catch {
+    // Accès au presse-papier refusé ou non pris en charge : choix d'un fichier.
+  }
   ocrFileLang.value = lang
   ocrFileInput.value?.click()
 }
@@ -1384,15 +1396,15 @@ async function runTrophyRepair(apply: boolean) {
                 v-for="l in (['fr', 'en', 'es'] as const)"
                 :key="l"
                 icon="i-lucide-scan-text"
-                :label="`Capture ${l.toUpperCase()}`"
+                :label="`Coller capture ${l.toUpperCase()}`"
                 size="xs"
                 color="neutral"
                 variant="outline"
                 :loading="ocrBusy === l"
                 :disabled="!!ocrBusy"
-                @click="pickOcrFile(l)"
+                @click="captureFromClipboard(l)"
               />
-              <span class="text-xs text-muted">ou collez une capture (Ctrl+V) dans un champ de la langue</span>
+              <span class="text-xs text-muted">image du presse-papier (sinon choix d'un fichier), ou Ctrl+V d'une capture dans un champ de la langue</span>
             </div>
             <UFormField
               v-for="f in ZOOM_FIELDS"
