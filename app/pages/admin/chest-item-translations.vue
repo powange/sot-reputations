@@ -265,6 +265,17 @@ function placeholderFor(i: ApiItem, f: Fields, k: keyof Fields): string {
   if (k === 'wikiName') return f.en || i.en || i.name
   return f.descFr || i.descFr || '—'
 }
+// Collage d'un texte sur plusieurs lignes (OCR d'une capture du jeu) : les retours à la
+// ligne deviennent une espace, pour obtenir le nom ou la description d'une seule ligne.
+function pasteOneLine(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text/plain')
+  const el = e.target as HTMLInputElement | HTMLTextAreaElement | null
+  if (!text || !/[\r\n]/.test(text) || !el || !('setRangeText' in el)) return
+  e.preventDefault()
+  el.setRangeText(text.replace(/\s*[\r\n]+\s*/g, ' ').trim(), el.selectionStart ?? el.value.length, el.selectionEnd ?? el.value.length, 'end')
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 function openZoom(r: Row) {
   zoom.value = { row: r, fields: { ...r.fields } }
 }
@@ -1088,6 +1099,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.name"
                   :placeholder="r.item.missing.includes('frName') ? r.item.name : '—'"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField label="FR — description">
@@ -1097,6 +1109,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.item.missing.includes('frDesc') ? r.item.descFr || '—' : '—'"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField label="EN — nom">
@@ -1104,6 +1117,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.en"
                   :placeholder="r.fields.name || r.item.name"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField label="EN — description">
@@ -1113,6 +1127,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField label="ES — nom">
@@ -1120,6 +1135,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.es"
                   :placeholder="r.fields.name || r.item.name"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField label="ES — description">
@@ -1129,6 +1145,7 @@ async function runTrophyRepair(apply: boolean) {
                   autoresize
                   :placeholder="r.fields.descFr || r.item.descFr || '—'"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
               <UFormField
@@ -1140,6 +1157,7 @@ async function runTrophyRepair(apply: boolean) {
                   v-model="r.fields.wikiName"
                   :placeholder="r.fields.en || r.item.en || r.item.name"
                   class="w-full"
+                  @paste="pasteOneLine"
                 />
               </UFormField>
             </div>
@@ -1316,12 +1334,14 @@ async function runTrophyRepair(apply: boolean) {
                 autoresize
                 :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
                 class="w-full"
+                @paste="pasteOneLine"
               />
               <UInput
                 v-else
                 v-model="zoom.fields[f.key]"
                 :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
                 class="w-full"
+                @paste="pasteOneLine"
               />
             </UFormField>
           </div>
