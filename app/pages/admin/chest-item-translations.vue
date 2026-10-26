@@ -243,6 +243,74 @@ async function saveOne(r: Row) {
   }
 }
 
+// --- Modale d'édition (clic sur l'image) : image en grand + champs, sur une copie ---
+const zoom = ref<{ row: Row, fields: Fields } | null>(null)
+const zoomOpen = computed({
+  get: () => !!zoom.value,
+  set: (v) => {
+    if (!v) zoom.value = null
+  }
+})
+const ZOOM_FIELDS: Array<{ key: keyof Fields, long: boolean }> = [
+  { key: 'name', long: false }, { key: 'descFr', long: true },
+  { key: 'en', long: false }, { key: 'enDesc', long: true },
+  { key: 'es', long: false }, { key: 'esDesc', long: true },
+  { key: 'wikiName', long: false }
+]
+// Indication grisée d'un champ vide (mêmes règles que sur la fiche).
+function placeholderFor(i: ApiItem, f: Fields, k: keyof Fields): string {
+  if (k === 'name') return i.missing.includes('frName') ? i.name : '—'
+  if (k === 'descFr') return i.missing.includes('frDesc') ? i.descFr || '—' : '—'
+  if (k === 'en' || k === 'es') return f.name || i.name
+  if (k === 'wikiName') return f.en || i.en || i.name
+  return f.descFr || i.descFr || '—'
+}
+function openZoom(r: Row) {
+  zoom.value = { row: r, fields: { ...r.fields } }
+}
+const zoomIndex = computed(() => zoom.value ? rows.value.indexOf(zoom.value.row) : -1)
+const zoomChanged = computed(() => !!zoom.value && (Object.keys(zoom.value.fields) as Array<keyof Fields>).some(k => zoom.value!.fields[k] !== zoom.value!.row.fields[k]))
+const zoomHasNext = computed(() => zoomIndex.value < rows.value.length - 1 || page.value * PAGE_SIZE < (data.value?.total ?? 0))
+
+// Objet précédent / suivant de la liste (page suivante ou précédente au besoin).
+async function zoomGo(step: 1 | -1, force = false) {
+  if (!zoom.value) return
+  if (!force && zoomChanged.value && !confirm('Abandonner les modifications de cet objet ?')) return
+  const i = zoomIndex.value + step
+  if (i >= 0 && i < rows.value.length) return openZoom(rows.value[i]!)
+  if (!confirmDiscard()) return
+  if (step === 1) {
+    // Les objets complétés sortent du filtre et décalent la liste : on recharge d'abord la
+    // page courante, où ont pu remonter des objets pas encore vus.
+    const seen = new Set(rows.value.map(r => r.item.itemKey))
+    await load()
+    const fresh = rows.value.find(r => !seen.has(r.item.itemKey))
+    if (fresh) return openZoom(fresh)
+    if (page.value * PAGE_SIZE >= (data.value?.total ?? 0)) {
+      zoom.value = null
+      return
+    }
+  } else if (page.value === 1) {
+    return
+  }
+  page.value += step
+  await load()
+  const next = step === 1 ? rows.value[0] : rows.value[rows.value.length - 1]
+  if (next) openZoom(next)
+  else zoom.value = null
+}
+
+async function validateZoom(thenNext = false) {
+  const z = zoom.value
+  if (!z) return
+  Object.assign(z.row.fields, z.fields)
+  if (isDirty(z.row)) await saveOne(z.row)
+  // Erreur d'enregistrement (déjà signalée) : la modale reste ouverte.
+  if (isDirty(z.row)) return
+  if (thenNext && zoomHasNext.value) await zoomGo(1, true)
+  else zoom.value = null
+}
+
 function scopeLabel(i: ApiItem): string {
   const f = data.value?.facets.find(x => x.category === i.category)
   const s = f?.subcategories.find(x => x.subcategory === (i.subcategory ?? ''))
@@ -947,15 +1015,22 @@ async function runTrophyRepair(apply: boolean) {
         :class="isDirty(r) ? 'ring-2 ring-primary/60' : ''"
       >
         <div class="flex items-start gap-3">
-          <ChestItemImage
+          <button
             v-if="r.item.image"
-            :src="r.item.image"
-            :alt="r.item.name"
-            :size="56"
-            format="webp"
-            loading="lazy"
-            class="w-14 h-14 rounded object-contain bg-elevated shrink-0"
-          />
+            type="button"
+            class="shrink-0 rounded cursor-zoom-in hover:ring-2 hover:ring-primary"
+            title="Agrandir et éditer"
+            @click="openZoom(r)"
+          >
+            <ChestItemImage
+              :src="r.item.image"
+              :alt="r.item.name"
+              :size="56"
+              format="webp"
+              loading="lazy"
+              class="w-14 h-14 rounded object-contain bg-elevated"
+            />
+          </button>
           <div
             v-else
             class="w-14 h-14 rounded bg-elevated shrink-0 flex items-center justify-center"
@@ -1207,6 +1282,99 @@ async function runTrophyRepair(apply: boolean) {
         </div>
       </template>
     </UModal>
+    <!-- Édition d'un objet avec son image en grand -->
+    <UModal
+      v-model:open="zoomOpen"
+      :title="zoom ? zoom.row.item.name : ''"
+      :description="zoom ? scopeLabel(zoom.row.item) : ''"
+      :ui="{ content: 'sm:max-w-5xl' }"
+    >
+      <template #body>
+        <div
+          v-if="zoom"
+          class="flex flex-col md:flex-row gap-4"
+        >
+          <ChestItemImage
+            v-if="zoom.row.item.image"
+            :src="zoom.row.item.image"
+            :alt="zoom.row.item.name"
+            :size="320"
+            format="webp"
+            class="w-full max-w-80 md:w-80 aspect-square object-contain rounded bg-elevated self-center md:self-start shrink-0"
+          />
+          <div class="flex-1 min-w-0 grid gap-2 sm:grid-cols-2">
+            <UFormField
+              v-for="f in ZOOM_FIELDS"
+              :key="f.key"
+              :label="FIELD_LABELS[f.key]"
+              :class="f.key === 'wikiName' ? 'sm:col-span-2' : ''"
+            >
+              <UTextarea
+                v-if="f.long"
+                v-model="zoom.fields[f.key]"
+                :rows="3"
+                autoresize
+                :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
+                class="w-full"
+              />
+              <UInput
+                v-else
+                v-model="zoom.fields[f.key]"
+                :placeholder="placeholderFor(zoom.row.item, zoom.fields, f.key)"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full flex-wrap items-center gap-2">
+          <UButton
+            icon="i-lucide-chevron-left"
+            label="Précédent"
+            color="neutral"
+            variant="outline"
+            :disabled="zoomIndex <= 0 && page === 1"
+            @click="zoomGo(-1)"
+          />
+          <UButton
+            trailing-icon="i-lucide-chevron-right"
+            label="Suivant"
+            color="neutral"
+            variant="outline"
+            :disabled="!zoomHasNext"
+            @click="zoomGo(1)"
+          />
+          <span class="text-xs text-muted">
+            {{ (page - 1) * PAGE_SIZE + zoomIndex + 1 }} / {{ data?.total ?? 0 }}
+          </span>
+          <div class="flex-1" />
+          <UButton
+            label="Annuler"
+            color="neutral"
+            variant="outline"
+            @click="zoom = null"
+          />
+          <UButton
+            icon="i-lucide-check"
+            label="Valider"
+            color="success"
+            variant="soft"
+            :loading="!!zoom && savingId === zoom.row.item.id"
+            @click="validateZoom()"
+          />
+          <UButton
+            icon="i-lucide-check-check"
+            label="Valider et suivant"
+            color="success"
+            :disabled="!zoomHasNext"
+            :loading="!!zoom && savingId === zoom.row.item.id"
+            @click="validateZoom(true)"
+          />
+        </div>
+      </template>
+    </UModal>
+
     <!-- Traduction par IA -->
     <UModal
       v-model:open="aiOpen"
