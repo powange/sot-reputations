@@ -2347,7 +2347,14 @@ export function createWikiChestDrafts(category: string, subcategory: string | nu
 
 export interface WikiChestItem {
   id: number
+  // Clé « wiki:<titre de la page> », stable (identique en dev et en prod).
+  key: string
+  // Titre de la page wiki (tiré de la clé) ; title = nom de base affiché en FR (titre
+  // wiki tant qu'aucun nom français n'a été importé).
+  wikiTitle: string
   title: string
+  enName: string | null
+  frNamed: boolean
   category: string
   subcategory: string | null
   description: string | null
@@ -2365,9 +2372,12 @@ export interface WikiChestItem {
 /** Items « source wiki » (publiés ou non), triés par catégorie (ordre du jeu) puis titre. */
 export function getWikiChestItems(): WikiChestItem[] {
   const rows = getReputationDb().prepare(`
-    SELECT id, name, category, subcategory, description, image, cost, prerequisites, published
-    FROM chest_items WHERE source = 'wiki'
-  `).all() as Array<{ id: number, name: string, category: string, subcategory: string | null, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, published: number }>
+    SELECT ci.id, ci.item_key AS itemKey, ci.name, ci.category, ci.subcategory, ci.description, ci.image, ci.cost, ci.prerequisites, ci.published,
+      t.name AS enName
+    FROM chest_items ci
+    LEFT JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'wiki'
+  `).all() as Array<{ id: number, itemKey: string, name: string, category: string, subcategory: string | null, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, published: number, enName: string | null }>
   // Items officiels (et leurs possesseurs) par périmètre + nom souple EN.
   const official = new Map<string, WikiChestItem['officialDuplicates']>()
   for (const o of getReputationDb().prepare(`
@@ -2385,9 +2395,17 @@ export function getWikiChestItems(): WikiChestItem[] {
       || a.category.localeCompare(b.category)
       || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
       || a.name.localeCompare(b.name))
-    .map(r => ({
+    .map((r) => {
+      const wikiTitle = r.itemKey.startsWith('wiki:') ? r.itemKey.slice(5) : r.name
+      return { r, wikiTitle }
+    })
+    .map(({ r, wikiTitle }) => ({
       id: r.id,
+      key: r.itemKey,
+      wikiTitle,
       title: r.name,
+      enName: r.enName,
+      frNamed: r.name !== wikiTitle,
       category: r.category,
       subcategory: r.subcategory,
       description: r.description,
@@ -2396,9 +2414,64 @@ export function getWikiChestItems(): WikiChestItem[] {
       prerequisites: parseChestItemPrereqs(r.prerequisites),
       published: r.published === 1,
       officialMatches: 0,
-      officialDuplicates: official.get(`${r.category}\u0000${r.subcategory ?? ''}\u0000${looseWikiName(r.name)}`) ?? []
+      // Titre wiki (pas le nom de base, qui peut être devenu français ; pas le nom EN, qui
+      // pour une variante est le nom de base et la confondrait avec la variante officielle).
+      officialDuplicates: official.get(`${r.category}\u0000${r.subcategory ?? ''}\u0000${looseWikiName(wikiTitle)}`) ?? []
     }))
     .map(it => ({ ...it, officialMatches: it.officialDuplicates.length }))
+}
+
+export interface WikiFrNameEntry { key: string, nameFr: string, descriptionFr?: string | null }
+
+export interface WikiFrNameImportResult {
+  updated: number
+  unchanged: number
+  // Clés absentes ou ne désignant pas un brouillon wiki (un item officiel n'est jamais touché).
+  unknown: string[]
+  invalid: number
+  changes: Array<{ key: string, before: string, after: string, descriptionBefore: string | null, descriptionAfter: string | null }>
+}
+
+/**
+ * Nom (et description) français des items « source wiki », en lot, par clé
+ * « wiki:<titre> ». Le nom français devient le nom de base (affiché en FR, comparé à
+ * l'import d'un joueur pour le rattachement) ; le nom anglais reste dans les traductions.
+ * Seuls les brouillons wiki sont modifiés. `apply` = false : aperçu sans écriture.
+ */
+export function importWikiChestFrNames(entries: WikiFrNameEntry[], apply: boolean): WikiFrNameImportResult {
+  const db = getReputationDb()
+  const get = db.prepare(`SELECT id, name, description FROM chest_items WHERE item_key = ? AND source = 'wiki'`)
+  const update = db.prepare('UPDATE chest_items SET name = ?, description = ? WHERE id = ?')
+  const result: WikiFrNameImportResult = { updated: 0, unchanged: 0, unknown: [], invalid: 0, changes: [] }
+  const writes: Array<[string, string | null, number]> = []
+  for (const e of entries) {
+    const key = typeof e?.key === 'string' ? e.key.trim() : ''
+    const nameFr = typeof e?.nameFr === 'string' ? e.nameFr.trim() : ''
+    if (!key || !nameFr || nameFr.length > 300) {
+      result.invalid++
+      continue
+    }
+    const row = get.get(key) as { id: number, name: string, description: string | null } | undefined
+    if (!row) {
+      result.unknown.push(key)
+      continue
+    }
+    const descriptionFr = typeof e.descriptionFr === 'string' && e.descriptionFr.trim() ? e.descriptionFr.trim() : null
+    const description = descriptionFr ?? row.description
+    if (row.name === nameFr && row.description === description) {
+      result.unchanged++
+      continue
+    }
+    result.updated++
+    result.changes.push({ key, before: row.name, after: nameFr, descriptionBefore: row.description, descriptionAfter: description })
+    writes.push([nameFr, description, row.id])
+  }
+  if (apply && writes.length) {
+    db.transaction(() => {
+      for (const w of writes) update.run(...w)
+    })()
+  }
+  return result
 }
 
 /** Publie / dépublie des items « source wiki ». Renvoie le nombre de lignes modifiées. */

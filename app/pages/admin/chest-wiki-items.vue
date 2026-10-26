@@ -21,7 +21,13 @@ interface Cost { gold?: number, doubloons?: number, ancientCoins?: number }
 interface Prereqs { commendations?: Array<{ name: string, grade: number | null }>, factionLevels?: Record<string, number>, legendary?: boolean, requires?: string }
 interface WikiChestItem {
   id: number
+  // Clé « wiki:<titre> » (identique en dev et en prod) et titre de la page wiki.
+  key: string
+  wikiTitle: string
+  // Nom de base (français une fois importé, sinon titre wiki) et nom anglais.
   title: string
+  enName: string | null
+  frNamed: boolean
   category: string
   subcategory: string | null
   description: string | null
@@ -37,14 +43,30 @@ interface WikiChestItem {
 const { data: items, status, refresh } = await useFetch<WikiChestItem[]>('/api/admin/chest-wiki-items', { default: () => [] })
 
 // Filtres : statut, périmètre (catégorie / sous-catégorie), recherche par titre.
-const statusFilter = ref<'draft' | 'published' | 'all' | 'duplicates'>('draft')
+const statusFilter = ref<'draft' | 'published' | 'all' | 'duplicates' | 'nofr'>('draft')
 const statusOptions = [
   { value: 'draft' as const, label: 'Non publiés' },
   { value: 'published' as const, label: 'Publiés' },
   { value: 'all' as const, label: 'Tous' },
-  { value: 'duplicates' as const, label: 'Doublons probables' }
+  { value: 'duplicates' as const, label: 'Doublons probables' },
+  { value: 'nofr' as const, label: 'Sans nom français' }
 ]
 const duplicateCount = computed(() => items.value.filter(it => it.officialMatches > 0).length)
+const noFrCount = computed(() => items.value.filter(it => !it.frNamed).length)
+const statusLabel = (opt: typeof statusOptions[number]) => {
+  if (opt.value === 'draft') return `${opt.label} (${draftCount.value})`
+  if (opt.value === 'duplicates') return `${opt.label} (${duplicateCount.value})`
+  if (opt.value === 'nofr') return `${opt.label} (${noFrCount.value})`
+  return opt.label
+}
+function matchesStatus(it: WikiChestItem): boolean {
+  switch (statusFilter.value) {
+    case 'all': return true
+    case 'duplicates': return it.officialMatches > 0
+    case 'nofr': return !it.frNamed
+    default: return it.published === (statusFilter.value === 'published')
+  }
+}
 // 'all' plutôt que '' : un SelectItem ne peut pas avoir une valeur vide.
 const scopeFilter = ref('all')
 const search = ref('')
@@ -67,10 +89,9 @@ const draftCount = computed(() => items.value.filter(it => !it.published).length
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return items.value.filter(it =>
-    (statusFilter.value === 'all'
-      || (statusFilter.value === 'duplicates' ? it.officialMatches > 0 : it.published === (statusFilter.value === 'published')))
+    matchesStatus(it)
     && (scopeFilter.value === 'all' || scopeOf(it) === scopeFilter.value)
-    && (!q || it.title.toLowerCase().includes(q))
+    && (!q || [it.title, it.enName, it.wikiTitle].some(n => n?.toLowerCase().includes(q)))
   )
 })
 
@@ -113,6 +134,84 @@ async function setPublished(published: boolean) {
     toast.add({ title: 'Erreur lors de la mise à jour', color: 'error' })
   } finally {
     acting.value = false
+  }
+}
+
+// --- Noms français en lot (JSON) ---
+
+// Export de la liste (pour produire le JSON des noms français hors ligne).
+function exportList() {
+  const data = items.value.map(it => ({
+    key: it.key,
+    wikiTitle: it.wikiTitle,
+    enName: it.enName,
+    nameFr: it.frNamed ? it.title : null,
+    category: it.category,
+    subcategory: it.subcategory,
+    image: it.image,
+    published: it.published
+  }))
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `items-wiki-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+interface FrImportResult {
+  updated: number
+  unchanged: number
+  unknown: string[]
+  invalid: number
+  changes: Array<{ key: string, before: string, after: string, descriptionBefore: string | null, descriptionAfter: string | null }>
+}
+// Fichier attendu : [{ key: "wiki:<titre>", nameFr, descriptionFr? }] (ou { entries: [...] }).
+const frEntries = ref<unknown[] | null>(null)
+const frFileName = ref('')
+const frPreview = ref<FrImportResult | null>(null)
+const frImporting = ref(false)
+
+async function onFrFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  frPreview.value = null
+  frEntries.value = null
+  if (!file) return
+  try {
+    const json = JSON.parse(await file.text()) as unknown
+    const entries = Array.isArray(json) ? json : (json as { entries?: unknown })?.entries
+    if (!Array.isArray(entries)) {
+      toast.add({ title: 'Format inattendu', description: 'Attendu : un tableau [{ key, nameFr, descriptionFr? }].', color: 'error' })
+      return
+    }
+    frEntries.value = entries
+    frFileName.value = file.name
+    await runFrImport(false)
+  } catch {
+    toast.add({ title: 'Fichier JSON illisible', color: 'error' })
+  }
+}
+
+async function runFrImport(apply: boolean) {
+  if (!frEntries.value) return
+  frImporting.value = true
+  try {
+    const res = await $fetch<FrImportResult>('/api/admin/chest-wiki-items/import-fr', {
+      method: 'POST',
+      body: { entries: frEntries.value, apply }
+    })
+    if (apply) {
+      toast.add({ title: `${res.updated} item(s) renommé(s) en français`, color: 'success' })
+      frPreview.value = null
+      frEntries.value = null
+      await refresh()
+    } else {
+      frPreview.value = res
+    }
+  } catch {
+    toast.add({ title: 'Erreur lors de l\'import', color: 'error' })
+  } finally {
+    frImporting.value = false
   }
 }
 
@@ -182,13 +281,85 @@ function formatPrereqs(pr: Prereqs | null): string {
       </p>
     </div>
 
+    <!-- Noms français en lot -->
+    <UCard class="mb-6">
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="font-semibold">
+            Noms français en lot
+          </h2>
+          <UButton
+            icon="i-lucide-download"
+            label="Exporter la liste (JSON)"
+            size="sm"
+            variant="soft"
+            :disabled="!items.length"
+            @click="exportList"
+          />
+        </div>
+      </template>
+      <div class="space-y-2 text-sm">
+        <p class="text-muted">
+          Importer un fichier JSON <code>[{ "key": "wiki:&lt;titre&gt;", "nameFr": "…", "descriptionFr": "…" }]</code> :
+          le nom français devient le nom de l'item (le nom anglais reste dans les traductions),
+          la description française remplace la description si elle est fournie. Seuls les items du
+          wiki sont modifiés. La clé figure dans l'export de la liste.
+        </p>
+        <input
+          type="file"
+          accept=".json,application/json"
+          class="text-sm"
+          @change="onFrFile"
+        >
+        <template v-if="frPreview">
+          <p>
+            <strong>{{ frPreview.updated }}</strong> item(s) à renommer · {{ frPreview.unchanged }} déjà à jour
+            <span v-if="frPreview.unknown.length"> · {{ frPreview.unknown.length }} clé(s) inconnue(s)</span>
+            <span v-if="frPreview.invalid"> · {{ frPreview.invalid }} entrée(s) invalide(s)</span>
+            <span class="text-muted">— {{ frFileName }}</span>
+          </p>
+          <ul
+            v-if="frPreview.changes.length"
+            class="text-xs space-y-1 max-h-80 overflow-y-auto"
+          >
+            <li
+              v-for="c in frPreview.changes"
+              :key="c.key"
+            >
+              <span class="line-through text-muted">{{ c.before }}</span>
+              → <span class="font-medium">{{ c.after }}</span>
+              <span
+                v-if="c.descriptionAfter !== c.descriptionBefore"
+                class="block text-muted pl-3"
+              >{{ c.descriptionAfter }}</span>
+            </li>
+          </ul>
+          <p
+            v-if="frPreview.unknown.length"
+            class="text-xs text-warning"
+          >
+            Clés inconnues (item absent ou non issu du wiki) : {{ frPreview.unknown.slice(0, 10).join(', ') }}{{ frPreview.unknown.length > 10 ? '…' : '' }}
+          </p>
+          <UButton
+            icon="i-lucide-check-check"
+            :label="`Importer (${frPreview.updated})`"
+            color="success"
+            size="sm"
+            :loading="frImporting"
+            :disabled="!frPreview.updated"
+            @click="runFrImport(true)"
+          />
+        </template>
+      </div>
+    </UCard>
+
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center gap-2">
           <UButton
             v-for="opt in statusOptions"
             :key="opt.value"
-            :label="opt.value === 'draft' ? `${opt.label} (${draftCount})` : opt.value === 'duplicates' ? `${opt.label} (${duplicateCount})` : opt.label"
+            :label="statusLabel(opt)"
             size="xs"
             :color="statusFilter === opt.value ? 'primary' : 'neutral'"
             :variant="statusFilter === opt.value ? 'solid' : 'outline'"
@@ -294,6 +465,14 @@ function formatPrereqs(pr: Prereqs | null): string {
               <div class="min-w-0 flex-1 text-sm">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-medium">{{ it.title }}</span>
+                  <span
+                    v-if="it.frNamed"
+                    class="text-xs text-muted"
+                  >EN : {{ it.enName || it.wikiTitle }}</span>
+                  <span
+                    v-else
+                    class="text-xs text-warning"
+                  >pas de nom FR</span>
                   <UBadge
                     :color="it.published ? 'success' : 'neutral'"
                     variant="subtle"
