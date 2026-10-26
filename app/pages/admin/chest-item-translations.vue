@@ -107,6 +107,7 @@ const langOptions = [
   { value: 'en' as const, label: 'EN' },
   { value: 'es' as const, label: 'ES' }
 ]
+const gapLang = (g: Gap) => g.slice(0, 2) as 'fr' | 'en' | 'es'
 function toggleLang(l: 'fr' | 'en' | 'es') {
   if (!confirmDiscard()) return
   langs.value = langs.value.includes(l) ? langs.value.filter(x => x !== l) : [...langs.value, l]
@@ -927,13 +928,21 @@ async function runTrophyRepair(apply: boolean) {
         :key="gap"
         :ui="{ body: 'p-3 sm:p-3' }"
         class="cursor-pointer hover:ring-2 hover:ring-primary/40"
-        :class="isStatActive(gap) ? 'ring-2 ring-primary' : ''"
+        :class="[isStatActive(gap) ? 'ring-2 ring-primary' : '', langs.length && !langs.includes(gapLang(gap)) ? 'opacity-50' : '']"
         @click="applyStat(gap)"
       >
         <p class="text-xs text-muted">
           {{ label }} manquant{{ gap.endsWith('Desc') ? 'e' : '' }}
         </p>
         <p
+          v-if="langs.length && !langs.includes(gapLang(gap))"
+          class="text-xl font-semibold text-muted"
+          title="Langue hors du filtre « Traduction manquante »"
+        >
+          —
+        </p>
+        <p
+          v-else
           class="text-xl font-semibold"
           :class="data.stats.scope.missing[gap] ? '' : 'text-success'"
         >
