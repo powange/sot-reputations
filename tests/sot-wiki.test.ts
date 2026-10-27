@@ -47,8 +47,11 @@ describe('looseWikiName', () => {
     expect(looseWikiName('Dire Dark Warsmith Costume')).not.toBe(looseWikiName('Dark Warsmith Costume'))
   })
 
-  it('ignore le suffixe « Emote » des pages d\'attitudes du wiki', () => {
+  it('ignore le suffixe de type des attitudes, coiffures et maquillages du wiki', () => {
     expect(looseWikiName('Victorious Dragon\'s Breath Emote')).toBe(looseWikiName('Victorious Dragon\'s Breath'))
+    expect(looseWikiName('Short Afro Hair')).toBe(looseWikiName('Short Afro'))
+    expect(looseWikiName('Mystic Makeup')).toBe(looseWikiName('Mystic'))
+    expect(looseWikiName('Damned Dark Warsmith Cutlass')).not.toBe(looseWikiName('Dark Warsmith Cutlass'))
     expect(looseWikiName('Emote Wheel')).toBe('emote wheel')
   })
 })

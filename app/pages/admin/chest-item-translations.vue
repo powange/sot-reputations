@@ -1423,7 +1423,7 @@ async function runWikiMerge(apply: boolean) {
             </p>
             <p class="text-muted">
               Items créés depuis le wiki qui existent déjà en objet officiel sous un nom proche
-              (le wiki ajoute « Emote » aux attitudes, omet la qualité des trophées…). L'objet
+              (le wiki ajoute « Emote », « Hair » ou « Makeup » aux attitudes, coiffures et maquillages, omet la qualité des trophées…). L'objet
               officiel récupère ce qui lui manque (coût, prérequis, traduction ES, possesseurs) et
               le titre de la page wiki comme nom wiki.gg, puis l'item wiki est supprimé.
             </p>

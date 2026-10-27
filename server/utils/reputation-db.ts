@@ -2952,7 +2952,7 @@ export function mergeWikiDuplicates(apply: boolean): WikiDuplicateMerge {
   return {
     count: plans.length,
     ambiguous: drafts.length - merges.length,
-    samples: plans.slice(0, 200).map(p => ({ wikiTitle: p.d.wikiTitle, official: p.o.name, officialEn: p.o.enName, image: p.o.image, transferred: p.transferred }))
+    samples: plans.slice(0, 1000).map(p => ({ wikiTitle: p.d.wikiTitle, official: p.o.name, officialEn: p.o.enName, image: p.o.image, transferred: p.transferred }))
   }
 }
 

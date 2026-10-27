@@ -134,9 +134,10 @@ const QUALITY_PREFIX_RE = /^(admired|cherished|treasured|prized) /
 /**
  * Nom « souple » pour un dernier rapprochement nom du jeu <-> titre wiki : normalisé, sans
  * qualité de trophée en tête ni guillemets (« ‘Below Wonderlit Skies’ » dans le jeu,
- * « Below Wonderlit Skies » sur le wiki), ni suffixe « Emote » que le wiki ajoute aux
- * attitudes (« Victorious Dragon's Breath Emote », « Victorious Dragon's Breath » dans le
- * jeu). Limité à ces écarts connus : retirer n'importe
+ * « Below Wonderlit Skies » sur le wiki), ni suffixe de type que le wiki ajoute aux
+ * attitudes, coiffures et maquillages (« Victorious Dragon's Breath Emote », « Short Afro
+ * Hair », « Mystic Makeup » ; sans suffixe dans le jeu). Les préfixes, eux, distinguent de
+ * vraies variantes (« Damned Dark Warsmith… », « Fallen Sea Dog… ») et sont gardés. Limité à ces écarts connus : retirer n'importe
  * quel premier mot rapprocherait des objets distincts (« Dire Dark Warsmith Costume »).
  */
 export function looseWikiName(s: string): string {
@@ -145,7 +146,7 @@ export function looseWikiName(s: string): string {
     .replace(/['"“”]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/ emote$/, '')
+    .replace(/ (emote|hair|makeup)$/, '')
 }
 
 /**
