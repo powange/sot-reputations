@@ -28,17 +28,54 @@ export function splitItemOcrLines(lines: ItemOcrLine[]): { name: string, descrip
 
 const joinLines = (lines: ItemOcrLine[]) => lines.map(l => l.text.trim()).join(' ').replace(/\s+/g, ' ').trim()
 
+// Texte du jeu : crème clair, peu saturé. Ne garder que ces pixels (en noir sur blanc) efface
+// l'objet dessiné derrière le titre, qui faisait lire « Keècdlas » pour « Coutelas ».
+const TEXT_MIN_LIGHTNESS = 160
+const TEXT_MAX_SATURATION = 0.3
+
+async function isolateGameText(image: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(image)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(bitmap, 0, 0)
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d = pixels.data
+  for (let i = 0; i < d.length; i += 4) {
+    const max = Math.max(d[i]!, d[i + 1]!, d[i + 2]!)
+    const min = Math.min(d[i]!, d[i + 1]!, d[i + 2]!)
+    const isText = (max + min) / 2 >= TEXT_MIN_LIGHTNESS && (max ? (max - min) / max : 0) <= TEXT_MAX_SATURATION
+    d[i] = d[i + 1] = d[i + 2] = isText ? 0 : 255
+    d[i + 3] = 255
+  }
+  ctx.putImageData(pixels, 0, 0)
+  return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas')), 'image/png'))
+}
+
 export async function recognizeItemCapture(image: Blob, lang: ItemOcrLang): Promise<{ name: string, description: string }> {
   const { createWorker } = await import('tesseract.js')
   const worker = await createWorker(TESSERACT_LANG[lang])
-  try {
-    const { data } = await worker.recognize(image, {}, { blocks: true })
-    const lines = (data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).map(l => ({
+  const read = async (img: Blob) => {
+    const { data } = await worker.recognize(img, {}, { blocks: true })
+    return (data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).map(l => ({
       text: l.text,
       height: l.rowAttributes?.rowHeight || l.bbox.y1 - l.bbox.y0,
       confidence: l.confidence
     }))
-    return splitItemOcrLines(lines)
+  }
+  // Confiance moyenne des lignes utiles (pondérée par leur longueur).
+  const score = (lines: ItemOcrLine[]) => {
+    const kept = lines.filter(l => l.text.trim().length > 1)
+    const chars = kept.reduce((n, l) => n + l.text.length, 0)
+    return chars ? kept.reduce((n, l) => n + l.confidence * l.text.length, 0) / chars : 0
+  }
+  try {
+    // Lecture de l'image nettoyée et de l'image brute (au cas où un texte serait coloré) :
+    // la plus sûre l'emporte.
+    const cleaned = await read(await isolateGameText(image)).catch(() => [])
+    const raw = await read(image)
+    return splitItemOcrLines(score(cleaned) >= score(raw) ? cleaned : raw)
   } finally {
     await worker.terminate()
   }
