@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { looseWikiName, pickByDescription, wikiDataForItem, wikiVariantBase, withTrophyQualityEn } from '../server/utils/sot-wiki'
+import { looseWikiName, pickByDescription, stripWikiTypeSuffix, wikiDataForItem, wikiVariantBase, withTrophyQualityEn } from '../server/utils/sot-wiki'
 
 describe('wikiVariantBase', () => {
   it('retire la précision finale entre parenthèses', () => {
@@ -101,5 +101,15 @@ describe('withTrophyQualityEn', () => {
   it('laisse un nom anglais qui a déjà sa qualité, ou un objet sans qualité', () => {
     expect(withTrophyQualityEn('Admired Raven Islehopper Plaque', 'Plaque admirable d’écumeur des îles de jais')).toBe('Admired Raven Islehopper Plaque')
     expect(withTrophyQualityEn('Spartan Wheel', 'Barre Spartan')).toBe('Spartan Wheel')
+  })
+})
+
+describe('stripWikiTypeSuffix', () => {
+  it('retire le suffixe de type de la sous-catégorie seulement', () => {
+    expect(stripWikiTypeSuffix('Short Afro Hair', 'Hair')).toBe('Short Afro')
+    expect(stripWikiTypeSuffix('Victorious Dragon\'s Breath Emote', 'Emote')).toBe('Victorious Dragon\'s Breath')
+    expect(stripWikiTypeSuffix('Mystic Makeup', 'Liv_Makeup_Shop')).toBe('Mystic')
+    expect(stripWikiTypeSuffix('Short Afro Hair', 'Hat')).toBe('Short Afro Hair')
+    expect(stripWikiTypeSuffix('Emote', 'Emote')).toBe('Emote')
   })
 })

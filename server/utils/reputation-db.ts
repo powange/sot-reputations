@@ -1,6 +1,6 @@
 import { join } from 'path'
 import Database from 'better-sqlite3'
-import { looseWikiName, normalizeName, pickByDescription, withTrophyQualityEn, type WikiPrereqs } from './sot-wiki'
+import { WIKI_TYPE_SUFFIX, looseWikiName, normalizeName, pickByDescription, stripWikiTypeSuffix, withTrophyQualityEn, type WikiPrereqs } from './sot-wiki'
 
 let db: Database.Database | null = null
 
@@ -2317,8 +2317,8 @@ export function createWikiChestDrafts(category: string, subcategory: string | nu
   const db = getReputationDb()
   const maxOrder = (db.prepare('SELECT MAX(sort_order) as m FROM chest_items WHERE category = ?').get(category) as { m: number | null }).m ?? 0
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO chest_items (uid, item_key, category, subcategory, name, description, image, sort_order, cost, prerequisites, source, published)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wiki', 0)
+    INSERT OR IGNORE INTO chest_items (uid, item_key, category, subcategory, name, description, image, sort_order, cost, prerequisites, wiki_name, source, published)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wiki', 0)
   `)
   const exists = db.prepare('SELECT 1 FROM chest_items WHERE item_key = ?')
   const upsertEn = db.prepare(`
@@ -2331,12 +2331,16 @@ export function createWikiChestDrafts(category: string, subcategory: string | nu
     for (const d of drafts) {
       const key = `wiki:${d.title}`
       if (exists.get(key)) continue
+      // Nom du jeu sans le suffixe de type du wiki (« Short Afro Hair » -> « Short Afro ») ;
+      // le titre exact de la page est alors gardé comme nom wiki.gg.
+      const enName = stripWikiTypeSuffix(d.enName, subcategory)
       const res = insert.run(
         key, key, category, subcategory, d.title, d.description, d.image, maxOrder + created + 1,
-        d.cost ? JSON.stringify(d.cost) : null, d.prereqs ? JSON.stringify(d.prereqs) : null
+        d.cost ? JSON.stringify(d.cost) : null, d.prereqs ? JSON.stringify(d.prereqs) : null,
+        enName !== d.enName ? d.title : null
       )
       if (res.changes > 0) {
-        upsertEn.run(key, d.enName, d.description)
+        upsertEn.run(key, enName, d.description)
         created++
       }
     }
@@ -2880,6 +2884,36 @@ export function repairTrophyEnNames(apply: boolean): { count: number, samples: A
     })()
   }
   return { count: fixes.length, samples: fixes.slice(0, 30).map(f => ({ name: f.name, before: f.en, after: f.fixed })) }
+}
+
+/**
+ * Items wiki des attitudes, coiffures et maquillages : nom EN sans le suffixe de type que le
+ * wiki ajoute (« Short Afro Hair » -> « Short Afro », comme dans le jeu), titre exact de la
+ * page gardé comme nom wiki.gg. apply = false : aperçu sans écriture.
+ */
+export function repairWikiTypeSuffixes(apply: boolean): { count: number, samples: Array<{ name: string, before: string, after: string, wikiName: string }> } {
+  const db = getReputationDb()
+  const subs = Object.keys(WIKI_TYPE_SUFFIX)
+  const rows = db.prepare(`
+    SELECT ci.id, ci.item_key AS itemKey, ci.name, ci.subcategory, ci.wiki_name AS wikiName, t.name AS en
+    FROM chest_items ci
+    JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'wiki' AND ci.subcategory IN (${subs.map(() => '?').join(', ')})
+  `).all(...subs) as Array<{ id: number, itemKey: string, name: string, subcategory: string, wikiName: string | null, en: string }>
+  const fixes = rows
+    .map(r => ({ ...r, fixed: stripWikiTypeSuffix(r.en, r.subcategory), title: r.itemKey.startsWith('wiki:') ? r.itemKey.slice(5) : r.en }))
+    .filter(r => r.fixed !== r.en)
+  if (apply && fixes.length) {
+    const setEn = db.prepare(`UPDATE chest_item_translations SET name = ? WHERE item_key = ? AND locale = 'en'`)
+    const setWikiName = db.prepare('UPDATE chest_items SET wiki_name = ? WHERE id = ? AND wiki_name IS NULL')
+    db.transaction(() => {
+      for (const f of fixes) {
+        setEn.run(f.fixed, f.itemKey)
+        setWikiName.run(f.title, f.id)
+      }
+    })()
+  }
+  return { count: fixes.length, samples: fixes.slice(0, 1000).map(f => ({ name: f.name, before: f.en, after: f.fixed, wikiName: f.wikiName ?? f.title })) }
 }
 
 export interface WikiDuplicateMerge {

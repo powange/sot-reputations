@@ -149,6 +149,18 @@ export function looseWikiName(s: string): string {
     .replace(/ (emote|hair|makeup)$/, '')
 }
 
+// Suffixe de type que le wiki ajoute au titre des pages, par sous-catégorie du coffre
+// (« Short Afro Hair » sur le wiki, « Short Afro » dans le jeu).
+export const WIKI_TYPE_SUFFIX: Record<string, string> = { Emote: 'Emote', Hair: 'Hair', Liv_Makeup_Shop: 'Makeup' }
+
+/** Nom du jeu tiré d'un titre wiki : sans le suffixe de type de sa sous-catégorie. */
+export function stripWikiTypeSuffix(title: string, subcategory: string | null): string {
+  const suffix = subcategory ? WIKI_TYPE_SUFFIX[subcategory] : undefined
+  if (!suffix) return title
+  const stripped = title.replace(new RegExp(`\\s+${suffix}$`, 'i'), '').trim()
+  return stripped || title
+}
+
 /**
  * Page de variante du wiki : « Nom (Précision) » (ex. « Barrel Bombardier Costume
  * (Goggles) »). Dans le jeu, chaque variante est un objet distinct qui porte le nom SANS

@@ -852,6 +852,31 @@ async function runTrophyRepair(apply: boolean) {
   }
 }
 
+// Suffixe de type du wiki (« Emote », « Hair », « Makeup ») retiré des noms EN des items wiki.
+const suffixPreview = ref<{ count: number, samples: Array<{ name: string, before: string, after: string, wikiName: string }> } | null>(null)
+const fixingSuffixes = ref(false)
+
+async function runSuffixRepair(apply: boolean) {
+  fixingSuffixes.value = true
+  try {
+    const res = await $fetch<NonNullable<typeof suffixPreview.value>>('/api/admin/chest-item-translations/repair-wiki-suffixes', {
+      method: 'POST',
+      body: { apply }
+    })
+    if (apply) {
+      toast.add({ title: `${res.count} nom(s) anglais corrigé(s)`, color: 'success' })
+      suffixPreview.value = null
+      await load()
+    } else {
+      suffixPreview.value = res
+    }
+  } catch {
+    toast.add({ title: 'Erreur lors de la correction', color: 'error' })
+  } finally {
+    fixingSuffixes.value = false
+  }
+}
+
 // Doublons wiki / officiel (« X Emote » du wiki = « X » du jeu…) : fusion dans l'officiel.
 interface WikiDuplicateMerge { count: number, ambiguous: number, samples: Array<{ wikiTitle: string, official: string, officialEn: string, image: string | null, transferred: string[] }> }
 const mergePreview = ref<WikiDuplicateMerge | null>(null)
@@ -1413,6 +1438,50 @@ async function runWikiMerge(apply: boolean) {
                 :loading="repairing"
                 :disabled="!trophyPreview.count"
                 @click="runTrophyRepair(true)"
+              />
+            </template>
+          </div>
+
+          <div class="space-y-2 pt-4 border-t border-muted/20">
+            <p class="font-medium">
+              Noms anglais des attitudes, coiffures et maquillages du wiki
+            </p>
+            <p class="text-muted">
+              Le wiki ajoute « Emote », « Hair » ou « Makeup » au titre de ces pages, pas le jeu.
+              Le nom anglais perd ce suffixe (« Short Afro Hair » → « Short Afro ») et le titre
+              exact de la page est gardé comme nom wiki.gg.
+            </p>
+            <UButton
+              icon="i-lucide-search"
+              label="Voir les noms à corriger"
+              size="sm"
+              variant="soft"
+              :loading="fixingSuffixes && !suffixPreview"
+              @click="runSuffixRepair(false)"
+            />
+            <template v-if="suffixPreview">
+              <p><strong>{{ suffixPreview.count }}</strong> nom(s) à corriger</p>
+              <ul
+                v-if="suffixPreview.samples.length"
+                class="text-xs space-y-0.5 max-h-60 overflow-y-auto"
+              >
+                <li
+                  v-for="(sm, i) in suffixPreview.samples"
+                  :key="i"
+                >
+                  <span class="line-through text-muted">{{ sm.before }}</span>
+                  → <span class="font-medium">{{ sm.after }}</span>
+                  <span class="text-muted"> · nom wiki.gg : {{ sm.wikiName }}</span>
+                </li>
+              </ul>
+              <UButton
+                icon="i-lucide-check-check"
+                :label="`Corriger (${suffixPreview.count})`"
+                color="success"
+                size="sm"
+                :loading="fixingSuffixes"
+                :disabled="!suffixPreview.count"
+                @click="runSuffixRepair(true)"
               />
             </template>
           </div>
