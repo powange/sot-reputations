@@ -851,6 +851,33 @@ async function runTrophyRepair(apply: boolean) {
     repairing.value = false
   }
 }
+
+// Doublons wiki / officiel (« X Emote » du wiki = « X » du jeu…) : fusion dans l'officiel.
+interface WikiDuplicateMerge { count: number, ambiguous: number, samples: Array<{ wikiTitle: string, official: string, officialEn: string, image: string | null, transferred: string[] }> }
+const mergePreview = ref<WikiDuplicateMerge | null>(null)
+const merging = ref(false)
+
+async function runWikiMerge(apply: boolean) {
+  if (apply && !confirm(`Fusionner ${mergePreview.value?.count ?? 0} item(s) wiki dans leur objet officiel puis les supprimer ?`)) return
+  merging.value = true
+  try {
+    const res = await $fetch<WikiDuplicateMerge>('/api/admin/chest-item-translations/merge-wiki-duplicates', {
+      method: 'POST',
+      body: { apply }
+    })
+    if (apply) {
+      toast.add({ title: `${res.count} doublon(s) fusionné(s)`, color: 'success' })
+      mergePreview.value = null
+      await load()
+    } else {
+      mergePreview.value = res
+    }
+  } catch {
+    toast.add({ title: 'Erreur lors de la fusion', color: 'error' })
+  } finally {
+    merging.value = false
+  }
+}
 </script>
 
 <template>
@@ -1386,6 +1413,79 @@ async function runTrophyRepair(apply: boolean) {
                 :loading="repairing"
                 :disabled="!trophyPreview.count"
                 @click="runTrophyRepair(true)"
+              />
+            </template>
+          </div>
+
+          <div class="space-y-2 pt-4 border-t border-muted/20">
+            <p class="font-medium">
+              Fusionner les doublons wiki / officiels
+            </p>
+            <p class="text-muted">
+              Items créés depuis le wiki qui existent déjà en objet officiel sous un nom proche
+              (le wiki ajoute « Emote » aux attitudes, omet la qualité des trophées…). L'objet
+              officiel récupère ce qui lui manque (coût, prérequis, traduction ES, possesseurs) et
+              le titre de la page wiki comme nom wiki.gg, puis l'item wiki est supprimé.
+            </p>
+            <UButton
+              icon="i-lucide-search"
+              label="Voir les doublons"
+              size="sm"
+              variant="soft"
+              :loading="merging && !mergePreview"
+              @click="runWikiMerge(false)"
+            />
+            <template v-if="mergePreview">
+              <p>
+                <strong>{{ mergePreview.count }}</strong> doublon(s) à fusionner
+                <span
+                  v-if="mergePreview.ambiguous"
+                  class="text-muted"
+                > · {{ mergePreview.ambiguous }} ambigu(s) (plusieurs objets officiels possibles), à traiter sur la page des items du wiki</span>
+              </p>
+              <ul
+                v-if="mergePreview.samples.length"
+                class="text-xs space-y-1 max-h-72 overflow-y-auto"
+              >
+                <li
+                  v-for="(sm, i) in mergePreview.samples"
+                  :key="i"
+                  class="flex items-center gap-2"
+                >
+                  <ChestItemImage
+                    v-if="sm.image"
+                    :src="sm.image"
+                    :alt="sm.official"
+                    :size="28"
+                    format="webp"
+                    loading="lazy"
+                    class="w-7 h-7 object-contain rounded bg-elevated shrink-0"
+                  />
+                  <span>
+                    <span class="text-muted">{{ sm.wikiTitle }}</span>
+                    → <span class="font-medium">{{ sm.official }}</span>
+                    <span class="text-muted"> ({{ sm.officialEn }})</span>
+                    <span
+                      v-if="sm.transferred.length"
+                      class="text-success"
+                    > · reprend : {{ sm.transferred.join(', ') }}</span>
+                  </span>
+                </li>
+              </ul>
+              <p
+                v-if="mergePreview.count > mergePreview.samples.length"
+                class="text-xs text-muted"
+              >
+                … et {{ mergePreview.count - mergePreview.samples.length }} autre(s).
+              </p>
+              <UButton
+                icon="i-lucide-merge"
+                :label="`Fusionner (${mergePreview.count})`"
+                color="success"
+                size="sm"
+                :loading="merging"
+                :disabled="!mergePreview.count"
+                @click="runWikiMerge(true)"
               />
             </template>
           </div>

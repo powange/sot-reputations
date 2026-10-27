@@ -46,6 +46,11 @@ describe('looseWikiName', () => {
   it('ne retire pas un autre premier mot', () => {
     expect(looseWikiName('Dire Dark Warsmith Costume')).not.toBe(looseWikiName('Dark Warsmith Costume'))
   })
+
+  it('ignore le suffixe « Emote » des pages d\'attitudes du wiki', () => {
+    expect(looseWikiName('Victorious Dragon\'s Breath Emote')).toBe(looseWikiName('Victorious Dragon\'s Breath'))
+    expect(looseWikiName('Emote Wheel')).toBe('emote wheel')
+  })
 })
 
 describe('wikiDataForItem (qualités de trophées)', () => {

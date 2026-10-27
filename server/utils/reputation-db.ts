@@ -2882,6 +2882,80 @@ export function repairTrophyEnNames(apply: boolean): { count: number, samples: A
   return { count: fixes.length, samples: fixes.slice(0, 30).map(f => ({ name: f.name, before: f.en, after: f.fixed })) }
 }
 
+export interface WikiDuplicateMerge {
+  count: number
+  // Brouillons ressemblant à plusieurs objets officiels : laissés tels quels (à trancher à la main).
+  ambiguous: number
+  samples: Array<{ wikiTitle: string, official: string, officialEn: string, image: string | null, transferred: string[] }>
+}
+
+/**
+ * Fusionne les items wiki qui doublonnent un objet officiel (même périmètre, même nom souple :
+ * « X Emote » du wiki = « X » du jeu…) : l'objet officiel récupère ce qui lui manque (coût,
+ * prérequis, nom wiki.gg, traduction ES, possesseurs), puis le brouillon est supprimé.
+ * apply = false : aperçu sans écriture.
+ */
+export function mergeWikiDuplicates(apply: boolean): WikiDuplicateMerge {
+  const db = getReputationDb()
+  const drafts = getWikiChestItems().filter(d => d.officialDuplicates.length > 0)
+  const merges = drafts.filter(d => d.officialDuplicates.length === 1)
+  const getOfficial = db.prepare(`
+    SELECT ci.item_key AS itemKey, ci.cost, ci.prerequisites, ci.wiki_name AS wikiName,
+      (SELECT name FROM chest_item_translations WHERE item_key = ci.item_key AND locale = 'es') AS es
+    FROM chest_items ci WHERE ci.id = ?
+  `)
+  const getDraftEs = db.prepare(`SELECT name, description FROM chest_item_translations WHERE item_key = ? AND locale = 'es'`)
+  const countOwners = db.prepare('SELECT COUNT(*) AS n FROM user_chest_items WHERE item_id = ?')
+  const setCost = db.prepare('UPDATE chest_items SET cost = ? WHERE id = ?')
+  const setPrereqs = db.prepare('UPDATE chest_items SET prerequisites = ? WHERE id = ?')
+  const setWikiName = db.prepare('UPDATE chest_items SET wiki_name = ? WHERE id = ?')
+  const upsertEs = db.prepare(`
+    INSERT INTO chest_item_translations (item_key, locale, name, description) VALUES (?, 'es', ?, ?)
+    ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
+  `)
+  const moveOwners = db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) SELECT user_id, ? FROM user_chest_items WHERE item_id = ?')
+
+  const plans = merges.map((d) => {
+    const o = d.officialDuplicates[0]!
+    const cur = getOfficial.get(o.id) as { itemKey: string, cost: string | null, prerequisites: string | null, wikiName: string | null, es: string | null }
+    const draftEs = getDraftEs.get(d.key) as { name: string, description: string | null } | undefined
+    const owners = (countOwners.get(d.id) as { n: number }).n
+    const plan = {
+      d, o, cur, owners,
+      cost: !cur.cost && d.cost ? JSON.stringify(d.cost) : null,
+      prereqs: !cur.prerequisites && d.prerequisites ? JSON.stringify(d.prerequisites) : null,
+      // Titre exact de la page wiki : rapprochement direct, sans passer par le nom souple.
+      wikiName: !cur.wikiName && normalizeName(d.wikiTitle) !== normalizeName(o.enName) ? d.wikiTitle : null,
+      es: !cur.es && draftEs?.name ? draftEs : null
+    }
+    return {
+      ...plan,
+      transferred: [
+        plan.cost && 'coût', plan.prereqs && 'prérequis', plan.wikiName && 'nom wiki.gg',
+        plan.es && 'traduction ES', owners && `${owners} possesseur(s)`
+      ].filter((x): x is string => !!x)
+    }
+  })
+
+  if (apply && plans.length) {
+    db.transaction(() => {
+      for (const p of plans) {
+        if (p.cost) setCost.run(p.cost, p.o.id)
+        if (p.prereqs) setPrereqs.run(p.prereqs, p.o.id)
+        if (p.wikiName) setWikiName.run(p.wikiName, p.o.id)
+        if (p.es) upsertEs.run(p.cur.itemKey, p.es.name, p.es.description)
+        if (p.owners) moveOwners.run(p.o.id, p.d.id)
+      }
+      deleteWikiChestItems(plans.map(p => p.d.id))
+    })()
+  }
+  return {
+    count: plans.length,
+    ambiguous: drafts.length - merges.length,
+    samples: plans.slice(0, 200).map(p => ({ wikiTitle: p.d.wikiTitle, official: p.o.name, officialEn: p.o.enName, image: p.o.image, transferred: p.transferred }))
+  }
+}
+
 /**
  * Pose le nom wiki d'un item (par id) : titre de sa page sur le wiki quand il diffère du
  * nom anglais officiel, pour le rapprochement. Si l'item n'a pas encore de nom anglais,
