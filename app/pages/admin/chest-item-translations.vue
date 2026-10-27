@@ -225,6 +225,11 @@ const savingId = ref<number | null>(null)
 
 async function save(list: Row[]) {
   if (!list.length) return
+  // Espaces de début et de fin retirés dans les champs eux-mêmes (le serveur les retire aussi) :
+  // ce qui est affiché après l'enregistrement est ce qui est en base.
+  for (const r of list) {
+    for (const k of Object.keys(r.fields) as Array<keyof Fields>) r.fields[k] = r.fields[k].trim()
+  }
   const entries = list.map(r => ({
     itemKey: r.item.itemKey,
     fr: frPayload(r.item, r.fields),

@@ -1,22 +1,24 @@
 // Lecture d'une capture d'un objet du jeu (titre + description), entièrement dans le
 // navigateur (tesseract.js chargé à la demande). Le titre est écrit plus gros que la
-// description : on les sépare par la hauteur typographique des lignes (rowHeight de
-// Tesseract, indépendante des lettres présentes ; le cadre d'une ligne sans jambage, comme
-// « dorée », est presque aussi bas que celui d'une ligne de description).
+// description : on les sépare par la taille du texte, mesurée en largeur moyenne par
+// caractère (titres 26-33 px, descriptions 16-19 px sur de vraies captures). La hauteur des
+// lignes trompe : elle dépend des jambages (« dorée ») et Tesseract l'estime mal (titre à
+// 56 px contre 48 pour la description sur « Tromblon de l'éclipse »).
 
 export type ItemOcrLang = 'fr' | 'en' | 'es'
 const TESSERACT_LANG: Record<ItemOcrLang, string> = { fr: 'fra', en: 'eng', es: 'spa' }
 
-export interface ItemOcrLine { text: string, height: number, confidence: number }
+// size : largeur moyenne d'un caractère de la ligne (px).
+export interface ItemOcrLine { text: string, size: number, confidence: number }
 
 /** Sépare les lignes lues en titre (lignes les plus grandes, en tête) et description. */
 export function splitItemOcrLines(lines: ItemOcrLine[]): { name: string, description: string } {
   // Bruit (bords de la capture, icônes) : lignes vides ou très peu sûres.
   const kept = lines.filter(l => l.text.trim().length > 1 && l.confidence >= 40)
   if (!kept.length) return { name: '', description: '' }
-  const maxHeight = Math.max(...kept.map(l => l.height))
-  // Mesuré : titre ~62 px, description ~47 px (rapport ~0,76).
-  const isBig = (l: ItemOcrLine) => l.height >= maxHeight * 0.85
+  const maxSize = Math.max(...kept.map(l => l.size))
+  // Rapport description / titre mesuré : 0,55 à 0,70.
+  const isBig = (l: ItemOcrLine) => l.size >= maxSize * 0.8
   // Titre = premier bloc de grandes lignes (ce qui le précède est du bruit de cadrage).
   const start = kept.findIndex(isBig)
   let end = kept.findIndex((l, i) => i > start && !isBig(l))
@@ -60,7 +62,7 @@ export async function recognizeItemCapture(image: Blob, lang: ItemOcrLang): Prom
     const { data } = await worker.recognize(img, {}, { blocks: true })
     return (data.blocks ?? []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).map(l => ({
       text: l.text,
-      height: l.rowAttributes?.rowHeight || l.bbox.y1 - l.bbox.y0,
+      size: (l.bbox.x1 - l.bbox.x0) / Math.max(1, l.text.trim().length),
       confidence: l.confidence
     }))
   }
