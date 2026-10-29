@@ -44,10 +44,11 @@ interface ApiItem {
   esDesc: string | null
   wikiName: string | null
   owners: number
+  duplicates: number
   missing: Gap[]
   suspects: Suspect[]
 }
-interface Stats { total: number, incomplete: number, suspicious: number, missing: Record<Gap, number> }
+interface Stats { total: number, incomplete: number, suspicious: number, duplicates: number, missing: Record<Gap, number> }
 // Traductions suspectes : copie probable de l'anglais.
 type Suspect = 'esName' | 'frName' | 'esDesc' | 'frDesc'
 const SUSPECT_LABELS: Record<Suspect, string> = {
@@ -87,12 +88,13 @@ const queryText = (k: string) => typeof route.query[k] === 'string' ? route.quer
 const queryList = (k: string) => queryText(k).split(',').filter(Boolean)
 const pick = <T extends string>(v: string, allowed: readonly T[], fallback: T): T => (allowed as readonly string[]).includes(v) ? v as T : fallback
 
-const status = ref(pick(queryText('status'), ['incomplete', 'names', 'descriptions', 'suspicious', 'all'] as const, 'incomplete'))
+const status = ref(pick(queryText('status'), ['incomplete', 'names', 'descriptions', 'suspicious', 'duplicates', 'all'] as const, 'incomplete'))
 const statusOptions = [
   { value: 'incomplete' as const, label: 'Incomplets' },
   { value: 'names' as const, label: 'Noms manquants' },
   { value: 'descriptions' as const, label: 'Descriptions manquantes' },
   { value: 'suspicious' as const, label: 'Suspects' },
+  { value: 'duplicates' as const, label: 'Doublons' },
   { value: 'all' as const, label: 'Tous' }
 ]
 const source = ref(pick(queryText('source'), ['all', 'official', 'wiki'] as const, 'all'))
@@ -419,9 +421,9 @@ function scopeLabel(i: ApiItem): string {
 }
 
 // --- Statistiques cliquables : appliquent le filtre correspondant ---
-type StatKey = 'all' | 'incomplete' | 'suspicious' | Gap
+type StatKey = 'all' | 'incomplete' | 'suspicious' | 'duplicates' | Gap
 function statFilter(k: StatKey): { status: typeof status.value, langs: Array<'fr' | 'en' | 'es'> } {
-  if (k === 'all' || k === 'incomplete' || k === 'suspicious') return { status: k, langs: [] }
+  if (k === 'all' || k === 'incomplete' || k === 'suspicious' || k === 'duplicates') return { status: k, langs: [] }
   return { status: k.endsWith('Desc') ? 'descriptions' : 'names', langs: [k.slice(0, 2) as 'fr' | 'en' | 'es'] }
 }
 function isStatActive(k: StatKey): boolean {
@@ -939,7 +941,9 @@ async function searchMerge() {
   mergeSearching.value = true
   try {
     const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', { query: { status: 'all', q, page: 1, pageSize: 30 } })
-    mergeResults.value = res.items.filter(i => i.id !== from.id)
+    // Même nom anglais que l'objet de départ en tête (doublon le plus probable).
+    const sameEn = (i: ApiItem) => !!from.en && i.en?.toLowerCase() === from.en.toLowerCase() && i.subcategory === from.subcategory
+    mergeResults.value = res.items.filter(i => i.id !== from.id).sort((a, b) => Number(sameEn(b)) - Number(sameEn(a)))
   } catch {
     mergeResults.value = []
   } finally {
@@ -1067,7 +1071,7 @@ async function runWikiMerge(apply: boolean) {
     <!-- Statistiques (périmètre filtré : source + catégories + sous-catégories) -->
     <div
       v-if="data"
-      class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2 mb-6"
+      class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 mb-6"
     >
       <UCard
         :ui="{ body: 'p-3 sm:p-3' }"
@@ -1145,6 +1149,24 @@ async function runWikiMerge(apply: boolean) {
             :class="data.stats.scope.suspicious ? 'text-error' : 'text-success'"
           >
             {{ data.stats.scope.suspicious }}
+          </p>
+        </UCard>
+      </UTooltip>
+      <UTooltip text="Objets de même nom et même description en anglais dans la même sous-catégorie : à fusionner">
+        <UCard
+          :ui="{ body: 'p-3 sm:p-3' }"
+          class="cursor-pointer hover:ring-2 hover:ring-primary/40"
+          :class="isStatActive('duplicates') ? 'ring-2 ring-primary' : ''"
+          @click="applyStat('duplicates')"
+        >
+          <p class="text-xs text-muted">
+            Doublons
+          </p>
+          <p
+            class="text-xl font-semibold"
+            :class="data.stats.scope.duplicates ? 'text-error' : 'text-success'"
+          >
+            {{ data.stats.scope.duplicates }}
           </p>
         </UCard>
       </UTooltip>
@@ -1355,6 +1377,16 @@ async function runWikiMerge(apply: boolean) {
               >
                 {{ SUSPECT_LABELS[x] }}
               </UBadge>
+              <UButton
+                v-if="r.item.duplicates"
+                icon="i-lucide-copy"
+                :label="`Doublon probable (${r.item.duplicates})`"
+                color="error"
+                variant="soft"
+                size="xs"
+                title="Même nom et même description en anglais qu'un autre objet : fusionner"
+                @click="openMerge(r.item)"
+              />
               <UBadge
                 color="neutral"
                 variant="subtle"

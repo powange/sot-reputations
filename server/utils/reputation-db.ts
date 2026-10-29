@@ -1508,6 +1508,26 @@ export function importChestData(
     const looseKey = `${d.category}\u0000${d.subcategory ?? ''}\u0000~${looseWikiName(d.enName)}`
     wikiDrafts.set(looseKey, [...(wikiDrafts.get(looseKey) ?? []), { id: d.id, itemKey: d.itemKey, description: d.description }])
   }
+  // Objets officiels par périmètre + nom EN normalisé : quand ni la clé (nom de fichier de
+  // l'image, renommé par le jeu entre deux versions) ni le nom FR (traduction revue :
+  // « Voile de Pégase fumant » -> « incandescent ») ne correspondent, l'objet est retrouvé
+  // par son nom anglais au lieu d'être recréé en double.
+  const officialByEn = new Map<string, Array<{ id: number, itemKey: string, description: string | null }>>()
+  for (const o of db.prepare(`
+    SELECT ci.id, ci.item_key AS itemKey, ci.category, ci.subcategory, t.name AS enName, t.description
+    FROM chest_items ci
+    JOIN chest_item_translations t ON t.item_key = ci.item_key AND t.locale = 'en'
+    WHERE ci.source = 'official' AND t.name != ''
+  `).all() as Array<{ id: number, itemKey: string, category: string, subcategory: string | null, enName: string, description: string | null }>) {
+    const key = `${o.category}\u0000${o.subcategory ?? ''}\u0000${normalizeName(o.enName)}`
+    officialByEn.set(key, [...(officialByEn.get(key) ?? []), { id: o.id, itemKey: o.itemKey, description: o.description }])
+  }
+  // Clés présentes dans cet import : un objet officiel importé sous sa propre clé n'est pas
+  // un candidat (deux variantes de même nom anglais possédées toutes les deux).
+  const importedKeys = new Set(parsed.flatMap(c => c.items.map(i => i.itemKey)))
+  const matchedByEn = new Set<number>()
+  const sameText = (a: string | null | undefined, b: string | null | undefined) => !a || !b || normalizeName(a) === normalizeName(b)
+
   // Rattachement d'un brouillon wiki : il prend la clé et l'uid officiels (ses traductions
   // suivent la clé), devient « official » et publié. Nom / description / image officiels
   // sont posés ensuite par updateItem ; coût et prérequis du wiki sont conservés.
@@ -1570,6 +1590,20 @@ export function importChestData(
           } else if (byName) {
             row = { id: byName.id }
             storedKey = byName.itemKey
+          }
+        }
+        // Toujours rien : objet officiel de même nom anglais dans le même périmètre, à
+        // description anglaise identique (ou absente), sans ambiguïté.
+        if (!row && !draft) {
+          const en = enItems?.get(item.itemKey)
+          const candidates = en?.name
+            ? (officialByEn.get(`${category}\u0000${item.subcategory ?? ''}\u0000${normalizeName(en.name)}`) ?? [])
+                .filter(o => !importedKeys.has(o.itemKey) && !matchedByEn.has(o.id) && sameText(o.description, en.description))
+            : []
+          if (candidates.length === 1) {
+            row = { id: candidates[0]!.id }
+            storedKey = candidates[0]!.itemKey
+            matchedByEn.add(candidates[0]!.id)
           }
         }
         // Toujours rien : brouillon wiki de même nom anglais dans le même périmètre ?
@@ -2624,6 +2658,9 @@ export interface ChestTranslationOverviewItem {
   wikiName: string | null
   // Joueurs possédant l'objet (coffre importé).
   owners: number
+  // Autres objets du même périmètre de même nom anglais et même description anglaise (ou
+  // sans description) : doublons probables, à fusionner.
+  duplicates: number
   missing: ChestTranslationGap[]
   // Traductions suspectes (probablement une copie non traduite de l'anglais).
   suspects: ChestTranslationSuspect[]
@@ -2635,8 +2672,8 @@ export type ChestTranslationSuspect = 'esName' | 'frName' | 'esDesc' | 'frDesc'
 
 export interface ChestTranslationFilters {
   // incomplete : au moins un manque ; names / descriptions : manque de ce type ;
-  // suspicious : traduction suspecte ; all : tout.
-  status?: 'incomplete' | 'names' | 'descriptions' | 'suspicious' | 'all'
+  // suspicious : traduction suspecte ; duplicates : doublon probable ; all : tout.
+  status?: 'incomplete' | 'names' | 'descriptions' | 'suspicious' | 'duplicates' | 'all'
   source?: 'official' | 'wiki' | 'all'
   // Langues dont il manque quelque chose (nom ou description) ; vide = toutes.
   langs?: Array<'fr' | 'en' | 'es'>
@@ -2690,12 +2727,26 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     LEFT JOIN chest_item_translations es ON es.item_key = ci.item_key AND es.locale = 'es'
     LEFT JOIN (SELECT item_id, COUNT(*) AS n FROM user_chest_items GROUP BY item_id) o ON o.item_id = ci.id
     WHERE ci.item_key IS NOT NULL
-  `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'suspects' | 'published'> & { published: number }>)
-    .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r), suspects: translationSuspects(r) }) as ChestTranslationOverviewItem)
+  `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'suspects' | 'published' | 'duplicates'> & { published: number }>)
+    .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r), suspects: translationSuspects(r), duplicates: 0 }) as ChestTranslationOverviewItem)
     .sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
       || a.category.localeCompare(b.category)
       || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
       || a.name.localeCompare(b.name))
+
+  // Doublons probables : même périmètre + même nom anglais, descriptions anglaises identiques
+  // (ou absentes). Les variantes d'un objet (même nom, descriptions différentes) n'en sont pas.
+  const byEn = new Map<string, ChestTranslationOverviewItem[]>()
+  for (const r of rows) {
+    if (!r.en) continue
+    const key = `${r.category}\u0000${r.subcategory ?? ''}\u0000${normalizeName(r.en)}`
+    byEn.set(key, [...(byEn.get(key) ?? []), r])
+  }
+  const sameText = (a: string | null, b: string | null) => !a || !b || normalizeName(a) === normalizeName(b)
+  for (const group of byEn.values()) {
+    if (group.length < 2) continue
+    for (const r of group) r.duplicates = group.filter(o => o !== r && sameText(o.enDesc, r.enDesc)).length
+  }
 
   const source = filters.source ?? 'all'
   const cats = new Set(filters.categories ?? [])
@@ -2715,15 +2766,24 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     if ((status === 'incomplete' || (status === 'all' && langs.length)) && !gaps.length) return false
     if (status === 'names' && !gaps.some(g => NAME_GAPS.includes(g))) return false
     if (status === 'descriptions' && !gaps.some(g => DESC_GAPS.includes(g))) return false
+    if (status === 'duplicates') return r.duplicates > 0
     return status !== 'suspicious' || inLangs(r.suspects).length > 0
   })
+  // Doublons : les objets d'un même groupe côte à côte.
+  if (status === 'duplicates') {
+    filtered.sort((a, b) => (chestCategoryRank(a.category) - chestCategoryRank(b.category))
+      || a.category.localeCompare(b.category)
+      || (a.subcategory ?? '').localeCompare(b.subcategory ?? '')
+      || normalizeName(a.en ?? '').localeCompare(normalizeName(b.en ?? ''))
+      || a.id - b.id)
+  }
 
   const stats = (list: ChestTranslationOverviewItem[], byLangs: boolean) => {
     const gapsOf = (r: ChestTranslationOverviewItem) => byLangs ? inLangs(r.missing) : r.missing
     const suspectsOf = (r: ChestTranslationOverviewItem) => byLangs ? inLangs(r.suspects) : r.suspects
     const missing = Object.fromEntries([...NAME_GAPS, ...DESC_GAPS].map(g => [g, 0])) as Record<ChestTranslationGap, number>
     for (const r of list) for (const g of gapsOf(r)) missing[g]++
-    return { total: list.length, incomplete: list.filter(r => gapsOf(r).length).length, suspicious: list.filter(r => suspectsOf(r).length).length, missing }
+    return { total: list.length, incomplete: list.filter(r => gapsOf(r).length).length, suspicious: list.filter(r => suspectsOf(r).length).length, duplicates: list.filter(r => r.duplicates > 0).length, missing }
   }
   // Facettes : catégories et sous-catégories (libellé FR), total et incomplets (selon la source).
   const tr = getChestTaxonomyTranslations()
