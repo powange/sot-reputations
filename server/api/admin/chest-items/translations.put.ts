@@ -1,9 +1,9 @@
-import { requireAdminOrModerator } from '../../utils/admin'
-import { setChestItemTranslations } from '../../utils/reputation-db'
-import type { ChestItemTranslationInput } from '../../utils/reputation-db'
+import { requireAdminOrModerator } from '../../../utils/admin'
+import { setChestItemTranslations } from '../../../utils/reputation-db'
+import type { ChestItemTranslationInput } from '../../../utils/reputation-db'
 
 /**
- * PUT /api/admin/chest-item-translations
+ * PUT /api/admin/chest-items/translations
  * Enregistre les traductions EN/ES de noms d'items du coffre.
  * Body: { entries: [{ itemKey, translations: [{locale, name}] }] }
  */

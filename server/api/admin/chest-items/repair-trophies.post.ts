@@ -2,7 +2,7 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { repairTrophyEnNames } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-item-translations/repair-trophies  { apply }
+ * POST /api/admin/chest-items/repair-trophies  { apply }
  * Rétablit la qualité (Admired / Prized / Treasured / Cherished) dans le nom EN des
  * trophées qui l'ont perdue. apply = false : aperçu sans écriture.
  */

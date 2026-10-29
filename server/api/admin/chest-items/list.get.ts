@@ -4,7 +4,7 @@ import { getChestTranslationOverview, type ChestTranslationFilters } from '../..
 const list = (v: unknown) => typeof v === 'string' && v ? v.split(',').map(s => s.trim()).filter(Boolean) : []
 
 /**
- * GET /api/admin/chest-item-translations/list
+ * GET /api/admin/chest-items/list
  * ?status=incomplete|names|descriptions|suspicious|duplicates|all &source=official|wiki|all &langs=fr,en,es
  * &categories=A,B &subcategories=C,D &q=… &page=1 &pageSize=50 (ou &all=1 : sans pagination)
  * Items du coffre avec traductions et manques, statistiques et facettes (catégories).

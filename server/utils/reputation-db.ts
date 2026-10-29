@@ -2621,21 +2621,7 @@ export function searchChestItemsByName(query: string, limit: number): Array<{ id
   return rows.map(r => ({ id: r.id, name: r.name, image: r.image, colors: parseColors(r.colors), manual: r.colors_manual === 1 }))
 }
 
-export interface ChestItemTranslationRow {
-  id: number
-  itemKey: string
-  name: string
-  descFr: string | null
-  image: string | null
-  en: string | null
-  es: string | null
-  enDesc: string | null
-  esDesc: string | null
-  // Nom de la page wiki si différent du nom anglais (rapprochement), sinon null.
-  wikiName: string | null
-}
-
-// ---- Vue d'ensemble des traductions (page admin « Traductions des objets ») ----
+// ---- Vue d'ensemble des objets (page admin « Objets du coffre ») ----
 
 // Champs manquants d'un item : noms EN/ES, descriptions FR/EN/ES (seulement si une autre
 // langue en a une), nom / description FR des items wiki (encore le texte anglais du wiki).
@@ -2812,30 +2798,6 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     stats: { global: stats(rows, false), scope: stats(scoped, true) },
     facets: [...facetMap.values()].map(f => ({ ...f, subcategories: [...f.subcategories.values()] }))
   }
-}
-
-/**
- * Recherche d'items du coffre par nom FR (nom de base) avec leurs traductions EN/ES
- * actuelles (nom + description), pour l'éditeur d'administration. Le FR sert de
- * référence (lecture seule côté admin) ; seules EN/ES sont éditables.
- */
-export function searchChestItemTranslations(query: string, limit: number): ChestItemTranslationRow[] {
-  const db = getReputationDb()
-  // `%`/`_` du terme sont échappés pour rester littéraux (ESCAPE '\').
-  const term = `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`
-  return db.prepare(`
-    SELECT
-      ci.id, ci.item_key as itemKey, ci.name, ci.description as descFr, ci.image,
-      en_t.name as en, es_t.name as es,
-      en_t.description as enDesc, es_t.description as esDesc,
-      NULLIF(ci.wiki_name, '') as wikiName
-    FROM chest_items ci
-    LEFT JOIN chest_item_translations en_t ON en_t.item_key = ci.item_key AND en_t.locale = 'en'
-    LEFT JOIN chest_item_translations es_t ON es_t.item_key = ci.item_key AND es_t.locale = 'es'
-    WHERE ci.name LIKE ? ESCAPE '\\'
-    ORDER BY ci.name
-    LIMIT ?
-  `).all(term, limit) as ChestItemTranslationRow[]
 }
 
 export interface ChestItemTranslationInput {

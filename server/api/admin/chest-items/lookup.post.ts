@@ -2,7 +2,7 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { getChestTranslationOverview } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-item-translations/lookup  { keys: string[] }
+ * POST /api/admin/chest-items/lookup  { keys: string[] }
  * Valeurs actuelles (noms, descriptions, nom wiki) des objets désignés par leur clé, pour
  * comparer un import (CSV, réponse d'IA) à la base avant de l'appliquer.
  */

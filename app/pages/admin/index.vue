@@ -285,7 +285,7 @@ watchEffect(() => {
 
           <!-- Traductions des objets -->
           <NuxtLink
-            to="/admin/chest-item-translations"
+            to="/admin/chest-items"
             class="block"
           >
             <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">

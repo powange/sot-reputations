@@ -2,7 +2,7 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { mergeWikiDuplicates } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-item-translations/merge-wiki-duplicates  { apply }
+ * POST /api/admin/chest-items/merge-wiki-duplicates  { apply }
  * Fusionne les items wiki qui doublonnent un objet officiel (« X Emote » du wiki = « X »
  * du jeu…) dans cet objet, puis les supprime. apply = false : aperçu sans écriture.
  */

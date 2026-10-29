@@ -2,7 +2,7 @@ import { requireAdminOrModerator } from '../../../utils/admin'
 import { restoreChestTranslations } from '../../../utils/reputation-db'
 
 /**
- * POST /api/admin/chest-item-translations/restore  { en, es, apply }
+ * POST /api/admin/chest-items/restore  { en, es, apply }
  * Restaure les noms / descriptions EN et ES des objets déjà au catalogue depuis un export
  * du bookmarklet (en = chestEn, es = chestEs). apply = false : aperçu sans écriture.
  */

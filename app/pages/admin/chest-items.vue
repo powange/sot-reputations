@@ -157,7 +157,7 @@ async function load() {
   syncUrl()
   loading.value = true
   try {
-    const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', {
+    const res = await $fetch<ListResult>('/api/admin/chest-items/list', {
       query: {
         status: status.value,
         source: source.value,
@@ -242,7 +242,7 @@ async function save(list: Row[]) {
     ],
     wikiName: r.fields.wikiName
   }))
-  await $fetch('/api/admin/chest-item-translations', { method: 'PUT', body: { entries } })
+  await $fetch('/api/admin/chest-items/translations', { method: 'PUT', body: { entries } })
   for (const r of list) r.original = { ...r.fields }
 }
 
@@ -463,7 +463,7 @@ async function openBulkPreview(title: string, patches: Map<string, Partial<Field
     toast.add({ title: 'Aucune modification exploitable', color: 'warning' })
     return
   }
-  const { items } = await $fetch<{ items: ApiItem[] }>('/api/admin/chest-item-translations/lookup', { method: 'POST', body: { keys } })
+  const { items } = await $fetch<{ items: ApiItem[] }>('/api/admin/chest-items/lookup', { method: 'POST', body: { keys } })
   const byKey = new Map(items.map(i => [i.itemKey, i]))
   const changes: BulkChange[] = []
   for (const [key, patch] of patches) {
@@ -499,7 +499,7 @@ async function applyBulk() {
         ],
         wikiName: c.after.wikiName
       }))
-      await $fetch('/api/admin/chest-item-translations', { method: 'PUT', body: { entries } })
+      await $fetch('/api/admin/chest-items/translations', { method: 'PUT', body: { entries } })
     }
     toast.add({ title: `${list.length} objet(s) mis à jour`, color: 'success' })
     // Traduction par IA en cours : les objets traités sortent de la liste, le lot suivant
@@ -520,7 +520,7 @@ async function applyBulk() {
 
 // Tous les objets du filtre courant (sans pagination) : export CSV, prompt IA.
 async function fetchAllFiltered(): Promise<ApiItem[]> {
-  const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', {
+  const res = await $fetch<ListResult>('/api/admin/chest-items/list', {
     query: {
       status: status.value,
       source: source.value,
@@ -817,7 +817,7 @@ async function runRestore(apply: boolean) {
   if (!exportData.value) return
   restoring.value = true
   try {
-    const res = await $fetch<RestoreResult>('/api/admin/chest-item-translations/restore', {
+    const res = await $fetch<RestoreResult>('/api/admin/chest-items/restore', {
       method: 'POST',
       body: { ...exportData.value, apply }
     })
@@ -842,7 +842,7 @@ const repairing = ref(false)
 async function runTrophyRepair(apply: boolean) {
   repairing.value = true
   try {
-    const res = await $fetch<RepairResult>('/api/admin/chest-item-translations/repair-trophies', {
+    const res = await $fetch<RepairResult>('/api/admin/chest-items/repair-trophies', {
       method: 'POST',
       body: { apply }
     })
@@ -940,7 +940,7 @@ async function searchMerge() {
   }
   mergeSearching.value = true
   try {
-    const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', { query: { status: 'all', q, page: 1, pageSize: 30 } })
+    const res = await $fetch<ListResult>('/api/admin/chest-items/list', { query: { status: 'all', q, page: 1, pageSize: 30 } })
     // Même nom anglais que l'objet de départ en tête (doublon le plus probable).
     const sameEn = (i: ApiItem) => !!from.en && i.en?.toLowerCase() === from.en.toLowerCase() && i.subcategory === from.subcategory
     mergeResults.value = res.items.filter(i => i.id !== from.id).sort((a, b) => Number(sameEn(b)) - Number(sameEn(a)))
@@ -991,7 +991,7 @@ const fixingSuffixes = ref(false)
 async function runSuffixRepair(apply: boolean) {
   fixingSuffixes.value = true
   try {
-    const res = await $fetch<NonNullable<typeof suffixPreview.value>>('/api/admin/chest-item-translations/repair-wiki-suffixes', {
+    const res = await $fetch<NonNullable<typeof suffixPreview.value>>('/api/admin/chest-items/repair-wiki-suffixes', {
       method: 'POST',
       body: { apply }
     })
@@ -1018,7 +1018,7 @@ async function runWikiMerge(apply: boolean) {
   if (apply && !confirm(`Fusionner ${mergePreview.value?.count ?? 0} item(s) wiki dans leur objet officiel puis les supprimer ?`)) return
   merging.value = true
   try {
-    const res = await $fetch<WikiDuplicateMerge>('/api/admin/chest-item-translations/merge-wiki-duplicates', {
+    const res = await $fetch<WikiDuplicateMerge>('/api/admin/chest-items/merge-wiki-duplicates', {
       method: 'POST',
       body: { apply }
     })

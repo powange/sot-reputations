@@ -38,7 +38,8 @@ export default defineNuxtConfig({
   routeRules: {
     '/mes-reputations': { redirect: { to: '/reputations', statusCode: 301 } },
     '/your-chest': { redirect: { to: '/chest', statusCode: 301 } },
-    '/coffre': { redirect: { to: '/chest', statusCode: 301 } }
+    '/coffre': { redirect: { to: '/chest', statusCode: 301 } },
+    '/admin/chest-item-translations': { redirect: { to: '/admin/chest-items', statusCode: 301 } }
   },
 
   compatibilityDate: '2025-01-15',
