@@ -2622,6 +2622,8 @@ export interface ChestTranslationOverviewItem {
   enDesc: string | null
   esDesc: string | null
   wikiName: string | null
+  // Joueurs possédant l'objet (coffre importé).
+  owners: number
   missing: ChestTranslationGap[]
   // Traductions suspectes (probablement une copie non traduite de l'anglais).
   suspects: ChestTranslationSuspect[]
@@ -2681,10 +2683,12 @@ export function getChestTranslationOverview(filters: ChestTranslationFilters, of
     SELECT ci.id, ci.item_key AS itemKey, ci.source, ci.published, ci.category, ci.subcategory,
       ci.name, ci.description AS descFr, ci.image, NULLIF(ci.wiki_name, '') AS wikiName,
       NULLIF(en.name, '') AS en, NULLIF(es.name, '') AS es,
-      NULLIF(en.description, '') AS enDesc, NULLIF(es.description, '') AS esDesc
+      NULLIF(en.description, '') AS enDesc, NULLIF(es.description, '') AS esDesc,
+      COALESCE(o.n, 0) AS owners
     FROM chest_items ci
     LEFT JOIN chest_item_translations en ON en.item_key = ci.item_key AND en.locale = 'en'
     LEFT JOIN chest_item_translations es ON es.item_key = ci.item_key AND es.locale = 'es'
+    LEFT JOIN (SELECT item_id, COUNT(*) AS n FROM user_chest_items GROUP BY item_id) o ON o.item_id = ci.id
     WHERE ci.item_key IS NOT NULL
   `).all() as Array<Omit<ChestTranslationOverviewItem, 'missing' | 'suspects' | 'published'> & { published: number }>)
     .map(r => ({ ...r, published: r.published === 1, missing: translationGaps(r), suspects: translationSuspects(r) }) as ChestTranslationOverviewItem)
@@ -2914,6 +2918,106 @@ export function repairWikiTypeSuffixes(apply: boolean): { count: number, samples
     })()
   }
   return { count: fixes.length, samples: fixes.slice(0, 1000).map(f => ({ name: f.name, before: f.en, after: f.fixed, wikiName: f.wikiName ?? f.title })) }
+}
+
+/**
+ * Supprime un objet du catalogue (officiel ou wiki) : sa possession par les joueurs et ses
+ * traductions avec. Renvoie le nombre de possesseurs détachés, ou null si l'objet n'existe pas.
+ * Un objet officiel encore possédé reviendra au prochain import d'un de ses possesseurs.
+ */
+export function deleteChestItem(id: number): { owners: number } | null {
+  const db = getReputationDb()
+  const row = db.prepare('SELECT item_key AS itemKey FROM chest_items WHERE id = ?').get(id) as { itemKey: string | null } | undefined
+  if (!row) return null
+  let owners = 0
+  db.transaction(() => {
+    owners = db.prepare('DELETE FROM user_chest_items WHERE item_id = ?').run(id).changes
+    if (row.itemKey) db.prepare('DELETE FROM chest_item_translations WHERE item_key = ?').run(row.itemKey)
+    db.prepare('DELETE FROM chest_items WHERE id = ?').run(id)
+  })()
+  invalidatePrereqIndex()
+  return { owners }
+}
+
+export interface ChestItemMergePreview {
+  keep: { id: number, name: string, source: string, owners: number }
+  remove: { id: number, name: string, source: string, owners: number }
+  // Possesseurs de l'objet conservé après fusion (union des deux).
+  ownersAfter: number
+  // Ce que l'objet conservé reprend de l'objet supprimé (champs vides de son côté).
+  transferred: string[]
+}
+
+/**
+ * Fusionne deux objets en un : `keepId` est conservé et reprend de `removeId` ce qui lui
+ * manque (description, image, coût, prérequis, couleurs, nom wiki.gg, traductions EN/ES), ainsi
+ * que ses possesseurs ; `removeId` est ensuite supprimé. apply = false : aperçu sans écriture.
+ */
+export function mergeChestItems(keepId: number, removeId: number, apply: boolean): ChestItemMergePreview | null {
+  if (keepId === removeId) return null
+  const db = getReputationDb()
+  type Item = { id: number, itemKey: string, name: string, source: string, description: string | null, image: string | null, cost: string | null, prerequisites: string | null, colors: string | null, colorsManual: number | null, wikiName: string | null }
+  const get = db.prepare(`
+    SELECT id, item_key AS itemKey, name, source, description, image, cost, prerequisites, colors,
+      colors_manual AS colorsManual, wiki_name AS wikiName
+    FROM chest_items WHERE id = ?
+  `)
+  const keep = get.get(keepId) as Item | undefined
+  const remove = get.get(removeId) as Item | undefined
+  if (!keep || !remove) return null
+  const getTr = db.prepare('SELECT locale, name, description FROM chest_item_translations WHERE item_key = ?')
+  const keepTr = new Map((getTr.all(keep.itemKey) as Array<{ locale: string, name: string, description: string | null }>).map(t => [t.locale, t]))
+  const removeTr = getTr.all(remove.itemKey) as Array<{ locale: string, name: string, description: string | null }>
+  const owners = db.prepare('SELECT COUNT(*) AS n FROM user_chest_items WHERE item_id = ?')
+  const keepOwners = (owners.get(keep.id) as { n: number }).n
+  const removeOwners = (owners.get(remove.id) as { n: number }).n
+  const ownersAfter = (db.prepare(`
+    SELECT COUNT(DISTINCT user_id) AS n FROM user_chest_items WHERE item_id IN (?, ?)
+  `).get(keep.id, remove.id) as { n: number }).n
+
+  // Champs vides de l'objet conservé, remplis par l'objet supprimé.
+  const fill = {
+    description: !keep.description && remove.description ? remove.description : null,
+    image: !keep.image && remove.image ? remove.image : null,
+    cost: !keep.cost && remove.cost ? remove.cost : null,
+    prerequisites: !keep.prerequisites && remove.prerequisites ? remove.prerequisites : null,
+    colors: !keep.colors && remove.colors ? remove.colors : null,
+    wikiName: !keep.wikiName && remove.wikiName ? remove.wikiName : null
+  }
+  const translations = removeTr.filter(t => t.name && !keepTr.get(t.locale)?.name)
+  const transferred = [
+    fill.description && 'description FR', fill.image && 'image', fill.cost && 'coût',
+    fill.prerequisites && 'prérequis', fill.colors && 'couleurs', fill.wikiName && 'nom wiki.gg',
+    ...translations.map(t => `traduction ${t.locale.toUpperCase()}`),
+    ownersAfter > keepOwners && `${ownersAfter - keepOwners} possesseur(s)`
+  ].filter((x): x is string => !!x)
+
+  if (apply) {
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE chest_items SET
+          description = COALESCE(?, description), image = COALESCE(?, image), cost = COALESCE(?, cost),
+          prerequisites = COALESCE(?, prerequisites), colors = COALESCE(?, colors),
+          colors_manual = CASE WHEN ? IS NOT NULL THEN ? ELSE colors_manual END,
+          wiki_name = COALESCE(?, wiki_name)
+        WHERE id = ?
+      `).run(fill.description, fill.image, fill.cost, fill.prerequisites, fill.colors, fill.colors, remove.colorsManual ?? 0, fill.wikiName, keep.id)
+      const upsertTr = db.prepare(`
+        INSERT INTO chest_item_translations (item_key, locale, name, description) VALUES (?, ?, ?, ?)
+        ON CONFLICT(item_key, locale) DO UPDATE SET name = excluded.name, description = excluded.description
+      `)
+      for (const t of translations) upsertTr.run(keep.itemKey, t.locale, t.name, t.description)
+      db.prepare('INSERT OR IGNORE INTO user_chest_items (user_id, item_id) SELECT user_id, ? FROM user_chest_items WHERE item_id = ?').run(keep.id, remove.id)
+      deleteChestItem(remove.id)
+    })()
+    invalidatePrereqIndex()
+  }
+  return {
+    keep: { id: keep.id, name: keep.name, source: keep.source, owners: keepOwners },
+    remove: { id: remove.id, name: remove.name, source: remove.source, owners: removeOwners },
+    ownersAfter,
+    transferred
+  }
 }
 
 export interface WikiDuplicateMerge {

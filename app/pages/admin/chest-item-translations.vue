@@ -3,7 +3,7 @@ const { isAdminOrModerator, isAuthenticated, saveRedirectUrl } = useAuth()
 const toast = useToast()
 
 useSeoMeta({
-  title: 'Traductions des objets - Administration'
+  title: 'Objets du coffre - Administration'
 })
 
 // Redirection si non admin/modérateur
@@ -43,6 +43,7 @@ interface ApiItem {
   enDesc: string | null
   esDesc: string | null
   wikiName: string | null
+  owners: number
   missing: Gap[]
   suspects: Suspect[]
 }
@@ -857,6 +858,128 @@ async function runTrophyRepair(apply: boolean) {
   }
 }
 
+// --- Gestion d'un objet : suppression, fusion avec un autre ---
+function itemActions(i: ApiItem) {
+  return [[
+    { label: 'Fusionner avec un autre objet…', icon: 'i-lucide-merge', onSelect: () => openMerge(i) },
+    { label: 'Supprimer…', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => { deleting.value = i } }
+  ]]
+}
+
+const deleting = ref<ApiItem | null>(null)
+const deleteOpen = computed({
+  get: () => !!deleting.value,
+  set: (v) => {
+    if (!v) deleting.value = null
+  }
+})
+const deleteBusy = ref(false)
+
+async function confirmDelete() {
+  const i = deleting.value
+  if (!i) return
+  deleteBusy.value = true
+  try {
+    const res = await $fetch<{ owners: number }>(`/api/admin/chest-items/${i.id}`, { method: 'DELETE' })
+    toast.add({ title: `Objet supprimé : ${i.name}`, description: res.owners ? `Retiré du coffre de ${res.owners} joueur(s).` : undefined, color: 'success' })
+    deleting.value = null
+    await load()
+  } catch {
+    toast.add({ title: 'Erreur lors de la suppression', color: 'error' })
+  } finally {
+    deleteBusy.value = false
+  }
+}
+
+interface ItemMergePreview {
+  keep: { id: number, name: string, source: string, owners: number }
+  remove: { id: number, name: string, source: string, owners: number }
+  ownersAfter: number
+  transferred: string[]
+}
+// Objet d'où la fusion est lancée, objet choisi, et lequel des deux est conservé.
+const mergeFrom = ref<ApiItem | null>(null)
+const mergeWith = ref<ApiItem | null>(null)
+const mergeKeepFrom = ref(true)
+const mergeQuery = ref('')
+const mergeResults = ref<ApiItem[]>([])
+const mergeSearching = ref(false)
+const itemMerge = ref<ItemMergePreview | null>(null)
+const itemMergeBusy = ref(false)
+const mergeOpen = computed({
+  get: () => !!mergeFrom.value,
+  set: (v) => {
+    if (!v) mergeFrom.value = null
+  }
+})
+const mergeKeep = computed(() => mergeKeepFrom.value ? mergeFrom.value : mergeWith.value)
+const mergeRemove = computed(() => mergeKeepFrom.value ? mergeWith.value : mergeFrom.value)
+
+function openMerge(i: ApiItem) {
+  mergeFrom.value = i
+  mergeWith.value = null
+  itemMerge.value = null
+  mergeResults.value = []
+  mergeQuery.value = i.en || i.name
+  searchMerge()
+}
+
+let mergeDebounce: ReturnType<typeof setTimeout> | null = null
+watch(mergeQuery, () => {
+  if (mergeDebounce) clearTimeout(mergeDebounce)
+  mergeDebounce = setTimeout(searchMerge, 300)
+})
+async function searchMerge() {
+  const from = mergeFrom.value
+  const q = mergeQuery.value.trim()
+  if (!from || q.length < 2) {
+    mergeResults.value = []
+    return
+  }
+  mergeSearching.value = true
+  try {
+    const res = await $fetch<ListResult>('/api/admin/chest-item-translations/list', { query: { status: 'all', q, page: 1, pageSize: 30 } })
+    mergeResults.value = res.items.filter(i => i.id !== from.id)
+  } catch {
+    mergeResults.value = []
+  } finally {
+    mergeSearching.value = false
+  }
+}
+
+// Choix de l'objet cible : on conserve par défaut l'objet officiel (le jeu le réimporte sous
+// sa clé), sinon celui d'où la fusion est lancée.
+async function pickMergeTarget(t: ApiItem) {
+  mergeWith.value = t
+  mergeKeepFrom.value = !(mergeFrom.value?.source === 'wiki' && t.source === 'official')
+  await previewItemMerge()
+}
+async function swapMerge() {
+  mergeKeepFrom.value = !mergeKeepFrom.value
+  await previewItemMerge()
+}
+async function previewItemMerge(apply = false) {
+  if (!mergeKeep.value || !mergeRemove.value) return
+  itemMergeBusy.value = true
+  try {
+    const res = await $fetch<ItemMergePreview>('/api/admin/chest-items/merge', {
+      method: 'POST',
+      body: { keepId: mergeKeep.value.id, removeId: mergeRemove.value.id, apply }
+    })
+    if (apply) {
+      toast.add({ title: `Objets fusionnés dans « ${res.keep.name} »`, color: 'success' })
+      mergeFrom.value = null
+      await load()
+    } else {
+      itemMerge.value = res
+    }
+  } catch {
+    toast.add({ title: apply ? 'Erreur lors de la fusion' : 'Aperçu impossible', color: 'error' })
+  } finally {
+    itemMergeBusy.value = false
+  }
+}
+
 // Suffixe de type du wiki (« Emote », « Hair », « Makeup ») retiré des noms EN des items wiki.
 const suffixPreview = ref<{ count: number, samples: Array<{ name: string, before: string, after: string, wikiName: string }> } | null>(null)
 const fixingSuffixes = ref(false)
@@ -923,12 +1046,13 @@ async function runWikiMerge(apply: boolean) {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 class="text-4xl font-pirate">
-            Traductions des objets
+            Objets du coffre
           </h1>
           <p class="text-muted mt-2 max-w-3xl">
-            Noms et descriptions FR / EN / ES des objets du coffre, et leur nom wiki.gg (titre de leur
-            page sur wiki.gg quand il diffère du nom anglais). Le FR des objets officiels est réécrit
-            par le jeu au prochain import d'un joueur qui les possède.
+            Tous les objets du coffre : noms et descriptions FR / EN / ES, nom wiki.gg (titre de leur
+            page sur wiki.gg quand il diffère du nom anglais), suppression et fusion de deux objets.
+            Le FR des objets officiels est réécrit par le jeu au prochain import d'un joueur qui les
+            possède.
           </p>
         </div>
         <UButton
@@ -1231,15 +1355,37 @@ async function runWikiMerge(apply: boolean) {
               >
                 {{ SUSPECT_LABELS[x] }}
               </UBadge>
-              <UButton
-                v-if="isDirty(r)"
-                icon="i-lucide-save"
-                label="Enregistrer"
-                size="xs"
-                class="ml-auto"
-                :loading="savingId === r.item.id"
-                @click="saveOne(r)"
-              />
+              <UBadge
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                :title="`${r.item.owners} joueur(s) possèdent cet objet`"
+              >
+                <UIcon
+                  name="i-lucide-users"
+                  class="w-3 h-3"
+                />
+                {{ r.item.owners }}
+              </UBadge>
+              <div class="ml-auto flex items-center gap-1">
+                <UButton
+                  v-if="isDirty(r)"
+                  icon="i-lucide-save"
+                  label="Enregistrer"
+                  size="xs"
+                  :loading="savingId === r.item.id"
+                  @click="saveOne(r)"
+                />
+                <UDropdownMenu :items="itemActions(r.item)">
+                  <UButton
+                    icon="i-lucide-ellipsis-vertical"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    aria-label="Actions sur l'objet"
+                  />
+                </UDropdownMenu>
+              </div>
             </div>
 
             <div class="grid gap-2 sm:grid-cols-2">
@@ -1566,6 +1712,242 @@ async function runWikiMerge(apply: boolean) {
         </div>
       </template>
     </UModal>
+    <!-- Suppression d'un objet -->
+    <UModal
+      v-model:open="deleteOpen"
+      title="Supprimer l'objet"
+    >
+      <template #body>
+        <div
+          v-if="deleting"
+          class="space-y-3 text-sm"
+        >
+          <div class="flex items-center gap-3">
+            <ChestItemImage
+              v-if="deleting.image"
+              :src="deleting.image"
+              :alt="deleting.name"
+              :size="64"
+              format="webp"
+              class="w-16 h-16 object-contain rounded bg-elevated shrink-0"
+            />
+            <div>
+              <p class="font-medium">
+                {{ deleting.name }}
+              </p>
+              <p class="text-xs text-muted">
+                {{ deleting.en || '—' }} · {{ scopeLabel(deleting) }} · {{ deleting.source === 'wiki' ? 'item du wiki' : 'officiel' }}
+              </p>
+            </div>
+          </div>
+          <UAlert
+            v-if="deleting.owners"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-users"
+            :title="`${deleting.owners} joueur(s) possèdent cet objet`"
+            :description="deleting.source === 'official'
+              ? 'Il sera retiré de leur coffre. Comme c\'est un objet du jeu, il sera recréé au prochain import d\'un de ces joueurs : pour un doublon, préférez la fusion.'
+              : 'Il sera retiré de leur coffre.'"
+          />
+          <p
+            v-else
+            class="text-muted"
+          >
+            Aucun joueur ne possède cet objet.
+          </p>
+          <p>Ses traductions sont supprimées avec lui. Cette action est définitive.</p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Annuler"
+            color="neutral"
+            variant="outline"
+            @click="deleting = null"
+          />
+          <UButton
+            icon="i-lucide-trash-2"
+            label="Supprimer définitivement"
+            color="error"
+            :loading="deleteBusy"
+            @click="confirmDelete"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Fusion de deux objets -->
+    <UModal
+      v-model:open="mergeOpen"
+      title="Fusionner deux objets"
+      :description="mergeFrom ? `Fusionner « ${mergeFrom.name} » avec un autre objet en un seul.` : ''"
+      :ui="{ content: 'sm:max-w-3xl' }"
+    >
+      <template #body>
+        <div
+          v-if="mergeFrom"
+          class="space-y-4 text-sm"
+        >
+          <template v-if="!mergeWith">
+            <UInput
+              v-model="mergeQuery"
+              icon="i-lucide-search"
+              placeholder="Rechercher l'autre objet (FR, EN, ES ou nom wiki.gg)…"
+              :loading="mergeSearching"
+              class="w-full"
+              autofocus
+            />
+            <p
+              v-if="!mergeSearching && mergeQuery.trim().length >= 2 && !mergeResults.length"
+              class="text-muted"
+            >
+              Aucun objet trouvé.
+            </p>
+            <ul class="space-y-1 max-h-[50vh] overflow-y-auto">
+              <li
+                v-for="t in mergeResults"
+                :key="t.id"
+              >
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-3 p-2 rounded hover:bg-elevated text-left"
+                  @click="pickMergeTarget(t)"
+                >
+                  <ChestItemImage
+                    v-if="t.image"
+                    :src="t.image"
+                    :alt="t.name"
+                    :size="40"
+                    format="webp"
+                    loading="lazy"
+                    class="w-10 h-10 object-contain rounded bg-elevated shrink-0"
+                  />
+                  <span class="min-w-0 flex-1">
+                    <span class="font-medium">{{ t.name }}</span>
+                    <span class="text-muted"> · {{ t.en || '—' }}</span>
+                    <span class="block text-xs text-muted">
+                      {{ scopeLabel(t) }} · {{ t.source === 'wiki' ? 'wiki' : 'officiel' }} · {{ t.owners }} possesseur(s)
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </template>
+
+          <template v-else>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div
+                v-for="side in (['keep', 'remove'] as const)"
+                :key="side"
+                class="rounded-lg p-3 border"
+                :class="side === 'keep' ? 'border-success/50 bg-success/5' : 'border-error/50 bg-error/5'"
+              >
+                <p
+                  class="text-xs font-semibold mb-2"
+                  :class="side === 'keep' ? 'text-success' : 'text-error'"
+                >
+                  {{ side === 'keep' ? 'Conservé' : 'Supprimé après fusion' }}
+                </p>
+                <template v-if="side === 'keep' ? mergeKeep : mergeRemove">
+                  <div class="flex items-center gap-3">
+                    <ChestItemImage
+                      v-if="(side === 'keep' ? mergeKeep : mergeRemove)!.image"
+                      :src="(side === 'keep' ? mergeKeep : mergeRemove)!.image!"
+                      :alt="(side === 'keep' ? mergeKeep : mergeRemove)!.name"
+                      :size="56"
+                      format="webp"
+                      class="w-14 h-14 object-contain rounded bg-elevated shrink-0"
+                    />
+                    <div class="min-w-0">
+                      <p class="font-medium">
+                        {{ (side === 'keep' ? mergeKeep : mergeRemove)!.name }}
+                      </p>
+                      <p class="text-xs text-muted">
+                        {{ (side === 'keep' ? mergeKeep : mergeRemove)!.en || '—' }}
+                      </p>
+                      <p class="text-xs text-muted">
+                        {{ scopeLabel((side === 'keep' ? mergeKeep : mergeRemove)!) }}
+                        · {{ (side === 'keep' ? mergeKeep : mergeRemove)!.source === 'wiki' ? 'wiki' : 'officiel' }}
+                        · {{ (side === 'keep' ? mergeKeep : mergeRemove)!.owners }} possesseur(s)
+                      </p>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                icon="i-lucide-arrow-left-right"
+                label="Inverser"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                :disabled="itemMergeBusy"
+                @click="swapMerge"
+              />
+              <UButton
+                icon="i-lucide-search"
+                label="Choisir un autre objet"
+                size="sm"
+                color="neutral"
+                variant="ghost"
+                @click="mergeWith = null; itemMerge = null"
+              />
+            </div>
+            <UAlert
+              v-if="mergeRemove?.source === 'official' && mergeKeep?.source === 'wiki'"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              title="L'objet supprimé est un objet officiel"
+              description="Le jeu le recréera au prochain import d'un joueur qui le possède. Conservez de préférence l'objet officiel (bouton Inverser)."
+            />
+            <div
+              v-if="itemMerge"
+              class="space-y-1"
+            >
+              <p>
+                Après fusion : <strong>{{ itemMerge.ownersAfter }}</strong> possesseur(s)
+                ({{ itemMerge.keep.owners }} + {{ itemMerge.remove.owners }}, sans doublon).
+              </p>
+              <p v-if="itemMerge.transferred.length">
+                L'objet conservé reprend : <span class="font-medium">{{ itemMerge.transferred.join(', ') }}</span>.
+              </p>
+              <p
+                v-else
+                class="text-muted"
+              >
+                L'objet conservé ne reprend aucune donnée (il a déjà tout).
+              </p>
+              <p class="text-muted">
+                Les noms et descriptions déjà renseignés de l'objet conservé ne changent pas.
+              </p>
+            </div>
+          </template>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Annuler"
+            color="neutral"
+            variant="outline"
+            @click="mergeFrom = null"
+          />
+          <UButton
+            icon="i-lucide-merge"
+            label="Fusionner"
+            color="success"
+            :loading="itemMergeBusy"
+            :disabled="!itemMerge"
+            @click="previewItemMerge(true)"
+          />
+        </div>
+      </template>
+    </UModal>
+
     <!-- Édition d'un objet avec son image en grand -->
     <UModal
       v-model:open="zoomOpen"

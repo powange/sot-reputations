@@ -297,8 +297,8 @@ watchEffect(() => {
                   />
                 </div>
                 <div>
-                  <h3 class="font-semibold">Traductions des objets</h3>
-                  <p class="text-sm text-muted">Corriger les noms EN / ES des objets du coffre</p>
+                  <h3 class="font-semibold">Objets du coffre</h3>
+                  <p class="text-sm text-muted">Traduire, supprimer ou fusionner les objets du coffre</p>
                 </div>
               </div>
             </UCard>
