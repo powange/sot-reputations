@@ -336,6 +336,26 @@ watchEffect(() => {
               </div>
             </UCard>
           </NuxtLink>
+          <!-- Éclipses -->
+          <NuxtLink
+            to="/admin/eclipses"
+            class="block"
+          >
+            <UCard class="hover:ring-2 hover:ring-primary transition-all cursor-pointer h-full">
+              <div class="flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-moon"
+                    class="w-6 h-6 text-primary"
+                  />
+                </div>
+                <div>
+                  <h3 class="font-semibold">Éclipses</h3>
+                  <p class="text-sm text-muted">Recaler le calendrier des éclipses et régler leur durée</p>
+                </div>
+              </div>
+            </UCard>
+          </NuxtLink>
         </div>
       </section>
 

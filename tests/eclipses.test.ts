@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ECLIPSE_SERIES_MS, eclipsesBetween, lastEclipse, upcomingEclipses } from '../shared/utils/eclipses'
+import { ECLIPSE_ANCHOR, ECLIPSE_SERIES_MS, eclipseAnchorFromObservation, eclipsesBetween, isEclipseActive, lastEclipse, upcomingEclipses } from '../shared/utils/eclipses'
 
 const utc = (iso: string) => Date.parse(iso)
 
@@ -26,5 +26,19 @@ describe('éclipses', () => {
     const from = utc('2024-01-01T00:00:00Z')
     expect(eclipsesBetween(from, from + 10 * ECLIPSE_SERIES_MS)).toHaveLength(40)
     expect(lastEclipse(utc('2024-12-30T03:31:00Z')).order).toBe(4)
+  })
+
+  it('recalage : une 3e éclipse observée à 04:29 UTC donne la même série de référence', () => {
+    const anchor = eclipseAnchorFromObservation({ at: utc('2024-12-30T04:29:00Z'), order: 3 })
+    expect(anchor).toBe(ECLIPSE_ANCHOR)
+    const shifted = eclipseAnchorFromObservation({ at: utc('2024-12-30T04:31:00Z'), order: 3 })
+    expect(upcomingEclipses(utc('2024-12-30T03:00:00Z'), 1, shifted)[0]!.start).toBe(utc('2024-12-30T03:34:00Z'))
+  })
+
+  it('éclipse en cours seulement si la durée est connue', () => {
+    const e = lastEclipse(utc('2024-12-30T03:33:00Z'))
+    expect(isEclipseActive(e, utc('2024-12-30T03:33:00Z'), 0)).toBe(false)
+    expect(isEclipseActive(e, utc('2024-12-30T03:33:00Z'), 5)).toBe(true)
+    expect(isEclipseActive(e, utc('2024-12-30T03:38:00Z'), 5)).toBe(false)
   })
 })

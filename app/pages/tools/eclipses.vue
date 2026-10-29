@@ -10,6 +10,14 @@ useSeoMeta({
   ogDescription: () => t('tools.eclipses.description')
 })
 
+// Réglages (recalage du planning, durée d'une éclipse) définis dans /admin/eclipses
+const { data: settings } = await useFetch<{ anchor: number, observation: EclipseObservation | null, updatedAt: string | null, durationMinutes: number }>('/api/eclipses-settings', {
+  key: 'eclipses-settings'
+})
+const anchor = computed(() => settings.value?.anchor ?? ECLIPSE_ANCHOR)
+// Durée d'une éclipse (0 = inconnue : pas d'état « en cours »)
+const duration = computed(() => settings.value?.durationMinutes ?? DEFAULT_ECLIPSE_DURATION_MINUTES)
+
 // Nombre de jours affichés dans le calendrier
 const CALENDAR_DAYS = 3
 
@@ -78,9 +86,11 @@ const approx = (ms: number) => {
 }
 
 // --- Planning ---
-const upcoming = computed(() => upcomingEclipses(now.value, 8))
+const upcoming = computed(() => upcomingEclipses(now.value, 8, anchor.value))
 const next = computed(() => upcoming.value[0]!)
-const last = computed(() => lastEclipse(now.value))
+const last = computed(() => lastEclipse(now.value, anchor.value))
+const active = computed(() => isEclipseActive(last.value, now.value, duration.value))
+const endsIn = computed(() => clock(last.value.start + duration.value * 60_000 - now.value))
 // Début de la série suivante (si la prochaine éclipse n'ouvre pas déjà une série)
 const nextSeries = computed(() => upcoming.value.find(e => e.order === 1 && e.series !== next.value.series))
 
@@ -92,7 +102,7 @@ const countdownMinutes = computed(() => Math.max(1, Math.ceil(countdownMs.value 
 // rattachée au jour de sa première éclipse)
 const calendar = computed(() => {
   const todayKey = dayKeyIn(tz.value, now.value)
-  const eclipses = eclipsesBetween(now.value - 2 * 3_600_000, now.value + (CALENDAR_DAYS + 1) * 86_400_000)
+  const eclipses = eclipsesBetween(now.value - 2 * 3_600_000, now.value + (CALENDAR_DAYS + 1) * 86_400_000, anchor.value)
   const series = new Map<number, Eclipse[]>()
   for (const e of eclipses) series.set(e.series, [...(series.get(e.series) ?? []), e])
   const days = new Map<string, { key: string, label: string, today: boolean, series: Eclipse[][] }>()
@@ -106,7 +116,15 @@ const calendar = computed(() => {
   }
   return [...days.values()].slice(0, CALENDAR_DAYS)
 })
-const isPast = (e: Eclipse) => e.start <= now.value
+// Note de bas de page : règle, durée connue, recalage manuel
+const ruleNote = computed(() => [
+  t('tools.eclipses.rule'),
+  duration.value ? t('tools.eclipses.durationRule', { duration: duration.value }) : '',
+  settings.value?.observation && settings.value.updatedAt
+    ? t('tools.fireworks.adjusted', { date: new Date(settings.value.updatedAt.replace(' ', 'T') + 'Z').toLocaleDateString(locale.value) })
+    : ''
+].filter(Boolean).join(' '))
+const isPast = (e: Eclipse) => e.start <= now.value && !(active.value && e.start === last.value.start)
 </script>
 
 <template>
@@ -212,12 +230,23 @@ const isPast = (e: Eclipse) => e.start <= now.value
           </p>
         </UCard>
 
-        <!-- Dernière éclipse et série suivante -->
-        <UCard>
+        <!-- Éclipse en cours (durée connue), sinon la dernière ; puis la série suivante -->
+        <UCard :class="active ? 'ring-2 ring-warning/60' : ''">
           <p class="text-xs uppercase tracking-wide text-muted">
-            {{ $t('tools.eclipses.last') }}
+            {{ active ? $t('tools.eclipses.current') : $t('tools.eclipses.last') }}
           </p>
-          <p class="mt-1 text-sm">
+          <p
+            v-if="active"
+            class="mt-1 text-sm"
+          >
+            <span class="font-semibold tabular-nums">{{ formatTime(last.start) }}</span>
+            <span class="text-muted"> · </span>
+            <span class="font-semibold tabular-nums">{{ $t('tools.eclipses.endsIn', { time: endsIn }) }}</span>
+          </p>
+          <p
+            v-else
+            class="mt-1 text-sm"
+          >
             <span class="font-semibold tabular-nums">{{ formatTime(last.start) }}</span>
             <span class="text-muted"> · {{ $t('tools.eclipses.ago', { time: approx(now - last.start) }) }}</span>
           </p>
@@ -268,9 +297,11 @@ const isPast = (e: Eclipse) => e.start <= now.value
                   :key="e.order"
                   :class="[
                     'w-16 py-0.5 rounded-md text-sm text-center tabular-nums',
-                    e.start === next.start
-                      ? 'font-bold ring-2 ring-primary bg-primary/10'
-                      : isPast(e) ? 'text-dimmed' : 'bg-elevated'
+                    active && e.start === last.start
+                      ? 'font-bold ring-2 ring-warning bg-warning/10'
+                      : e.start === next.start
+                        ? 'font-bold ring-2 ring-primary bg-primary/10'
+                        : isPast(e) ? 'text-dimmed' : 'bg-elevated'
                   ]"
                   :aria-current="e.start === next.start ? 'time' : undefined"
                 >{{ formatTime(e.start) }}</span>
@@ -281,7 +312,7 @@ const isPast = (e: Eclipse) => e.start <= now.value
       </UCard>
 
       <p class="text-xs text-muted mt-4">
-        {{ $t('tools.eclipses.rule') }}
+        {{ ruleNote }}
       </p>
     </template>
   </UContainer>

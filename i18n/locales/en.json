@@ -866,7 +866,10 @@
       "today": "Today",
       "rule": "Community-observed rule (unofficial): a series of four eclipses every 11h 12m, spaced 24, 33 then 24 minutes apart. A small offset from the in-game clock is possible.",
       "ago": "{time} ago",
-      "in": "in {time}"
+      "in": "in {time}",
+      "current": "Eclipse in progress",
+      "endsIn": "ends in {time}",
+      "durationRule": "An eclipse lasts about {duration} minutes."
     }
   }
 }

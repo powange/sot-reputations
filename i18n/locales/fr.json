@@ -867,7 +867,10 @@
       "today": "Aujourd'hui",
       "rule": "Règle observée par la communauté (non officielle) : une série de quatre éclipses toutes les 11 h 12, espacées de 24, 33 puis 24 minutes. Un petit décalage avec l'horloge du jeu est possible.",
       "ago": "il y a {time}",
-      "in": "dans {time}"
+      "in": "dans {time}",
+      "current": "Éclipse en cours",
+      "endsIn": "se termine dans {time}",
+      "durationRule": "Une éclipse dure environ {duration} minutes."
     }
   }
 }
