@@ -849,6 +849,25 @@
       "none": "Aucun feu en ce moment",
       "endsIn": "se termine dans {time}",
       "lastShow": "Dernier feu tiré à {time} (terminé, un feu dure environ {duration} min)"
+    },
+    "eclipses": {
+      "title": "Calendrier des éclipses",
+      "description": "Dans combien de temps arrive la prochaine éclipse, et le calendrier des éclipses à venir, à l'heure de votre fuseau.",
+      "intro": "Les éclipses arrivent par séries de quatre, à quelques minutes d'intervalle, puis il faut attendre près de dix heures avant la série suivante. Les horaires s'affichent dans votre fuseau horaire, heure d'été comprise.",
+      "loading": "Chargement du calendrier…",
+      "next": "Prochaine éclipse",
+      "at": "à {time}",
+      "inSeries": "Éclipse {order}/4 de la série",
+      "countdownAria": "Prochaine éclipse dans {minutes} minute(s)",
+      "last": "Dernière éclipse",
+      "nextSeries": "Série suivante",
+      "calendar": "Calendrier",
+      "calendarHint": "Les {days} prochains jours, dans votre fuseau horaire. Chaque ligne est une série de quatre éclipses.",
+      "series": "Série",
+      "today": "Aujourd'hui",
+      "rule": "Règle observée par la communauté (non officielle) : une série de quatre éclipses toutes les 11 h 12, espacées de 24, 33 puis 24 minutes. Un petit décalage avec l'horloge du jeu est possible.",
+      "ago": "il y a {time}",
+      "in": "dans {time}"
     }
   }
 }

@@ -16,7 +16,8 @@ interface Tool {
 
 const tools: Tool[] = [
   { to: '/tools/fishing', icon: 'i-lucide-fish', titleKey: 'tools.fishing.title', descriptionKey: 'tools.fishing.description' },
-  { to: '/tools/fireworks', icon: 'i-lucide-sparkles', titleKey: 'tools.fireworks.title', descriptionKey: 'tools.fireworks.description' }
+  { to: '/tools/fireworks', icon: 'i-lucide-sparkles', titleKey: 'tools.fireworks.title', descriptionKey: 'tools.fireworks.description' },
+  { to: '/tools/eclipses', icon: 'i-lucide-moon', titleKey: 'tools.eclipses.title', descriptionKey: 'tools.eclipses.description' }
 ]
 </script>
 

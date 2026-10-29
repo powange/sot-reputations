@@ -848,6 +848,25 @@
       "none": "No fireworks right now",
       "endsIn": "ends in {time}",
       "lastShow": "Last show fired at {time} (over, a show lasts about {duration} min)"
+    },
+    "eclipses": {
+      "title": "Eclipse calendar",
+      "description": "How long until the next eclipse, and the calendar of upcoming eclipses, in your time zone.",
+      "intro": "Eclipses come in series of four, a few minutes apart, then you wait almost ten hours for the next series. Times are shown in your time zone, daylight saving included.",
+      "loading": "Loading calendar…",
+      "next": "Next eclipse",
+      "at": "at {time}",
+      "inSeries": "Eclipse {order}/4 of the series",
+      "countdownAria": "Next eclipse in {minutes} minute(s)",
+      "last": "Last eclipse",
+      "nextSeries": "Next series",
+      "calendar": "Calendar",
+      "calendarHint": "The next {days} days, in your time zone. Each row is a series of four eclipses.",
+      "series": "Series",
+      "today": "Today",
+      "rule": "Community-observed rule (unofficial): a series of four eclipses every 11h 12m, spaced 24, 33 then 24 minutes apart. A small offset from the in-game clock is possible.",
+      "ago": "{time} ago",
+      "in": "in {time}"
     }
   }
 }

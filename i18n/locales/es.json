@@ -848,6 +848,25 @@
       "none": "No hay fuegos en este momento",
       "endsIn": "termina en {time}",
       "lastShow": "Últimos fuegos lanzados a las {time} (terminados, duran unos {duration} min)"
+    },
+    "eclipses": {
+      "title": "Calendario de eclipses",
+      "description": "Cuánto falta para el próximo eclipse y el calendario de los próximos eclipses, en tu zona horaria.",
+      "intro": "Los eclipses llegan en series de cuatro, con pocos minutos de diferencia, y luego hay que esperar casi diez horas hasta la siguiente serie. Los horarios se muestran en tu zona horaria, horario de verano incluido.",
+      "loading": "Cargando el calendario…",
+      "next": "Próximo eclipse",
+      "at": "a las {time}",
+      "inSeries": "Eclipse {order}/4 de la serie",
+      "countdownAria": "Próximo eclipse en {minutes} minuto(s)",
+      "last": "Último eclipse",
+      "nextSeries": "Siguiente serie",
+      "calendar": "Calendario",
+      "calendarHint": "Los próximos {days} días, en tu zona horaria. Cada fila es una serie de cuatro eclipses.",
+      "series": "Serie",
+      "today": "Hoy",
+      "rule": "Regla observada por la comunidad (no oficial): una serie de cuatro eclipses cada 11 h 12 min, separados por 24, 33 y luego 24 minutos. Puede haber un pequeño desfase con el reloj del juego.",
+      "ago": "hace {time}",
+      "in": "en {time}"
     }
   }
 }
