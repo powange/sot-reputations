@@ -917,6 +917,33 @@ const mergeOpen = computed({
 const mergeKeep = computed(() => mergeKeepFrom.value ? mergeFrom.value : mergeWith.value)
 const mergeRemove = computed(() => mergeKeepFrom.value ? mergeWith.value : mergeFrom.value)
 
+// Comparaison des deux objets : champ par champ et score de ressemblance des images.
+const MERGE_FIELDS: Array<{ key: keyof ApiItem, label: string }> = [
+  { key: 'name', label: 'FR — nom' }, { key: 'descFr', label: 'FR — description' },
+  { key: 'en', label: 'EN — nom' }, { key: 'enDesc', label: 'EN — description' },
+  { key: 'es', label: 'ES — nom' }, { key: 'esDesc', label: 'ES — description' },
+  { key: 'wikiName', label: 'Nom wiki.gg' }
+]
+const fieldText = (i: ApiItem | null, k: keyof ApiItem) => String(i?.[k] ?? '').trim()
+const fieldDiffers = (k: keyof ApiItem) => fieldText(mergeKeep.value, k).toLowerCase() !== fieldText(mergeRemove.value, k).toLowerCase()
+const mergeDiffCount = computed(() => MERGE_FIELDS.filter(f => fieldDiffers(f.key)).length)
+const imageMatch = ref<{ score: number, distance: number } | null>(null)
+const imageMatchError = ref('')
+const imageMatchLabel = (d: number) => d < 8 ? 'quasi identiques' : d < 15 ? 'très proches' : d < 30 ? 'ressemblantes' : 'différentes'
+async function compareImages(a: ApiItem, b: ApiItem) {
+  imageMatch.value = null
+  imageMatchError.value = ''
+  if (!a.image || !b.image) {
+    imageMatchError.value = 'image manquante'
+    return
+  }
+  try {
+    imageMatch.value = await $fetch<{ score: number, distance: number }>('/api/admin/chest-items/image-similarity', { method: 'POST', body: { aId: a.id, bId: b.id } })
+  } catch {
+    imageMatchError.value = 'comparaison impossible'
+  }
+}
+
 function openMerge(i: ApiItem) {
   mergeFrom.value = i
   mergeWith.value = null
@@ -956,6 +983,7 @@ async function searchMerge() {
 async function pickMergeTarget(t: ApiItem) {
   mergeWith.value = t
   mergeKeepFrom.value = !(mergeFrom.value?.source === 'wiki' && t.source === 'official')
+  if (mergeFrom.value) compareImages(mergeFrom.value, t)
   await previewItemMerge()
 }
 async function swapMerge() {
@@ -1928,6 +1956,101 @@ async function runWikiMerge(apply: boolean) {
                 @click="mergeWith = null; itemMerge = null"
               />
             </div>
+            <!-- Images côte à côte et score de ressemblance -->
+            <div class="flex flex-wrap items-center justify-center gap-4 rounded-lg bg-elevated/50 p-3">
+              <ChestItemImage
+                v-if="mergeKeep?.image"
+                :src="mergeKeep.image"
+                :alt="mergeKeep.name"
+                :size="160"
+                format="webp"
+                class="w-32 h-32 object-contain rounded bg-elevated ring-2 ring-success/50"
+              />
+              <div class="text-center min-w-28">
+                <p class="text-xs text-muted">
+                  Images
+                </p>
+                <p
+                  v-if="imageMatch"
+                  class="text-2xl font-semibold"
+                  :class="imageMatch.distance < 8 ? 'text-success' : imageMatch.distance < 15 ? 'text-primary' : imageMatch.distance < 30 ? 'text-warning' : 'text-error'"
+                >
+                  {{ imageMatch.score }} %
+                </p>
+                <p
+                  v-if="imageMatch"
+                  class="text-xs text-muted"
+                >
+                  {{ imageMatchLabel(imageMatch.distance) }}
+                </p>
+                <p
+                  v-else-if="imageMatchError"
+                  class="text-xs text-muted"
+                >
+                  {{ imageMatchError }}
+                </p>
+                <UIcon
+                  v-else
+                  name="i-lucide-loader-2"
+                  class="w-5 h-5 animate-spin text-muted"
+                />
+              </div>
+              <ChestItemImage
+                v-if="mergeRemove?.image"
+                :src="mergeRemove.image"
+                :alt="mergeRemove.name"
+                :size="160"
+                format="webp"
+                class="w-32 h-32 object-contain rounded bg-elevated ring-2 ring-error/50"
+              />
+            </div>
+
+            <!-- Comparaison champ par champ -->
+            <div class="overflow-x-auto">
+              <p class="text-xs text-muted mb-1">
+                {{ mergeDiffCount }} champ(s) différent(s) sur {{ MERGE_FIELDS.length }}
+              </p>
+              <table class="w-full text-xs border-collapse">
+                <thead>
+                  <tr class="text-left text-muted">
+                    <th class="py-1 pr-2 font-medium w-28" />
+                    <th class="py-1 pr-2 font-medium text-success">
+                      Conservé
+                    </th>
+                    <th class="py-1 font-medium text-error">
+                      Supprimé
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="f in MERGE_FIELDS"
+                    :key="f.key"
+                    class="border-t border-muted/20 align-top"
+                    :class="fieldDiffers(f.key) ? 'bg-warning/10' : ''"
+                  >
+                    <td class="py-1 pr-2 text-muted whitespace-nowrap">
+                      <UIcon
+                        :name="fieldDiffers(f.key) ? 'i-lucide-equal-not' : 'i-lucide-equal'"
+                        class="w-3 h-3 align-middle"
+                        :class="fieldDiffers(f.key) ? 'text-warning' : 'text-success'"
+                      />
+                      {{ f.label }}
+                    </td>
+                    <td class="py-1 pr-2">
+                      {{ fieldText(mergeKeep, f.key) || '—' }}
+                    </td>
+                    <td
+                      class="py-1"
+                      :class="fieldDiffers(f.key) ? 'font-medium' : 'text-muted'"
+                    >
+                      {{ fieldText(mergeRemove, f.key) || '—' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <UAlert
               v-if="mergeRemove?.source === 'official' && mergeKeep?.source === 'wiki'"
               color="warning"
