@@ -292,7 +292,9 @@
       "grades": "Grade thresholds",
       "noProgress": "No imported progress",
       "error": "Could not load the emblem"
-    }
+    },
+    "totalCost": "Total cost of the {count} item(s):",
+    "totalCostUnknown": "({count} with no known price, not counted)"
   },
   "factionNames": {
     "hoarder": "Gold Hoarders",

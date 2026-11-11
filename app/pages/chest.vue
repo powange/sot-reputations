@@ -323,6 +323,24 @@ const pageSize = 60
 const currentPage = ref(Math.max(1, Number.parseInt(queryToString(route.query.page), 10) || 1))
 // Conteneur de la grille : on y revient en haut au changement de page.
 const gridRef = ref<HTMLElement | null>(null)
+// Coût total de tous les objets filtrés (toutes pages), par devise, et nombre d'objets sans
+// prix connu (le total ne les compte pas).
+const totalCost = computed(() => {
+  const sums: Record<string, number> = { gold: 0, doubloons: 0, ancientCoins: 0 }
+  let unknown = 0
+  for (const item of filteredItems.value) {
+    const entries = costEntries(item)
+    if (!entries.length) unknown++
+    for (const c of entries) sums[c.key]! += c.value
+  }
+  return {
+    entries: (['gold', 'doubloons', 'ancientCoins'] as const)
+      .filter(k => sums[k]! > 0)
+      .map(k => ({ key: k, icon: CURRENCY_META[k]!.icon, label: currencyLabel(k), value: sums[k]! })),
+    unknown
+  }
+})
+
 const totalPages = computed(() => Math.ceil(filteredItems.value.length / pageSize))
 const paginatedItems = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -623,6 +641,31 @@ watch(
             />
           </div>
         </FilterPanel>
+
+        <!-- Coût total des objets filtrés (toutes pages) -->
+        <div
+          v-if="totalCost.entries.length"
+          class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-4 rounded-lg bg-elevated/60 px-3 py-2 text-sm"
+        >
+          <span class="text-muted">{{ $t('yourChest.totalCost', { count: filteredItems.length }) }}</span>
+          <span
+            v-for="c in totalCost.entries"
+            :key="c.key"
+            class="inline-flex items-center gap-1 font-semibold tabular-nums"
+            :title="c.label"
+          >
+            {{ c.value.toLocaleString(locale) }}
+            <img
+              :src="c.icon"
+              :alt="c.label"
+              class="w-4 h-4"
+            >
+          </span>
+          <span
+            v-if="totalCost.unknown"
+            class="text-xs text-muted"
+          >{{ $t('yourChest.totalCostUnknown', { count: totalCost.unknown }) }}</span>
+        </div>
 
         <!-- Grille -->
         <div

@@ -292,7 +292,9 @@
       "grades": "Paliers de grade",
       "noProgress": "Aucune progression importée",
       "error": "Impossible de charger l'emblème"
-    }
+    },
+    "totalCost": "Coût total des {count} objet(s) :",
+    "totalCostUnknown": "(dont {count} sans prix connu, non comptés)"
   },
   "factionNames": {
     "hoarder": "Collectionneurs d'or",
