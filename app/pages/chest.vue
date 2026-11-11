@@ -178,6 +178,8 @@ function toggleColor(which: 'primary' | 'secondary', name: string) {
 // Options du filtre devises (icône + libellé via CURRENCY_META) et bascule.
 const CURRENCY_KEYS = ['gold', 'ancientCoins', 'doubloons'] as const
 const currencyOptions = computed(() => CURRENCY_KEYS.map(k => ({ key: k as string, icon: CURRENCY_META[k]!.icon, label: currencyLabel(k) })))
+// Option « Sans prix » du filtre devises : objets dont aucun coût n'est connu.
+const NO_COST_KEY = 'none'
 function toggleCurrency(key: string) {
   const i = selectedCurrencies.value.indexOf(key)
   if (i === -1) selectedCurrencies.value.push(key)
@@ -299,8 +301,12 @@ const filteredItems = computed(() => {
       : list.filter(i => i.colors.slice(1).some(c => sel.includes(c))) // OU : au moins une
   }
   if (selectedCurrencies.value.length) {
-    // OU : l'item a un coût dans au moins une des devises sélectionnées.
-    list = list.filter(i => !!i.cost && selectedCurrencies.value.some(c => (i.cost as Record<string, number | undefined>)[c] != null))
+    // OU : l'item a un coût dans au moins une des devises sélectionnées, ou n'a pas de prix
+    // connu si « Sans prix » est sélectionné.
+    const noCost = selectedCurrencies.value.includes(NO_COST_KEY)
+    list = list.filter(i => costEntries(i).length
+      ? selectedCurrencies.value.some(c => (i.cost as Record<string, number | undefined>)[c] != null)
+      : noCost)
   }
   if (!isPublic.value && eligibilityFilter.value !== 'all') {
     list = eligibilityFilter.value === 'prereq'
@@ -621,6 +627,15 @@ watch(
                 class="w-4 h-4"
               >
               {{ cur.label }}
+            </UButton>
+            <UButton
+              :color="selectedCurrencies.includes(NO_COST_KEY) ? 'primary' : 'neutral'"
+              :variant="selectedCurrencies.includes(NO_COST_KEY) ? 'solid' : 'outline'"
+              size="sm"
+              icon="i-lucide-circle-slash"
+              @click="toggleCurrency(NO_COST_KEY)"
+            >
+              {{ $t('yourChest.noCost') }}
             </UButton>
           </div>
 

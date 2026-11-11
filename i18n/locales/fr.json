@@ -294,7 +294,8 @@
       "error": "Impossible de charger l'emblème"
     },
     "totalCost": "Coût total des {count} objet(s) :",
-    "totalCostUnknown": "(dont {count} sans prix connu, non comptés)"
+    "totalCostUnknown": "(dont {count} sans prix connu, non comptés)",
+    "noCost": "Sans prix"
   },
   "factionNames": {
     "hoarder": "Collectionneurs d'or",

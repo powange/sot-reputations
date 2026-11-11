@@ -294,7 +294,8 @@
       "error": "No se pudo cargar el emblema"
     },
     "totalCost": "Coste total de los {count} objeto(s):",
-    "totalCostUnknown": "({count} sin precio conocido, no contados)"
+    "totalCostUnknown": "({count} sin precio conocido, no contados)",
+    "noCost": "Sin precio"
   },
   "factionNames": {
     "hoarder": "Acaparadores de Oro",

@@ -294,7 +294,8 @@
       "error": "Could not load the emblem"
     },
     "totalCost": "Total cost of the {count} item(s):",
-    "totalCostUnknown": "({count} with no known price, not counted)"
+    "totalCostUnknown": "({count} with no known price, not counted)",
+    "noCost": "No price"
   },
   "factionNames": {
     "hoarder": "Gold Hoarders",
