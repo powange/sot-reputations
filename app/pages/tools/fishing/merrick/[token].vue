@@ -81,6 +81,20 @@ function applyItemState(state: ItemState) {
   if (ing) Object.assign(ing, { delivered: state.delivered, trophy: state.trophy, cookingStartedAt: state.cookingStartedAt })
 }
 
+// Livraison d'un ingrédient (+1 / -1) : mise à jour immédiate à l'écran, puis état serveur
+// (le minuteur de cuisson s'arrête quand l'ingrédient est entièrement livré).
+async function step(ing: MerrickIngredient, delta: 1 | -1) {
+  const before = ing.delivered ?? 0
+  ing.delivered = Math.max(0, Math.min(ing.quantity, before + delta))
+  if (ing.delivered === before) return
+  try {
+    applyItemState(await $fetch<ItemState>(`/api/merrick-quests/${token}/items/${ing.id}`, { method: 'POST', body: { delta } }))
+  } catch {
+    toast.add({ title: t('tools.fishing.merrick.errorSave'), color: 'error' })
+    await refresh()
+  }
+}
+
 async function patchItem(ing: MerrickIngredient, body: { trophy?: boolean, cooking?: 'start' | 'stop' }) {
   cooking.unlockAudio()
   try {
