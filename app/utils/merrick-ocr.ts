@@ -95,7 +95,9 @@ function bestScore(line: string, words: string[]): number {
 
 // Autres libellés possibles d'un même item (le jeu écrit « Poule », on dit souvent « Poulet »)
 const OCR_ALIASES: MerrickVocabEntry[] = [
-  { text: 'poulet', item: { type: 'meat', key: 'chicken', variant: null } }
+  { text: 'poulet', item: { type: 'meat', key: 'chicken', variant: null } },
+  // Le menu du jeu dit « cochon », le site « porc »
+  { text: 'cochon', item: { type: 'meat', key: 'pork', variant: null } }
 ]
 
 // Vocabulaire des items à partir des messages i18n (une ou plusieurs langues).
