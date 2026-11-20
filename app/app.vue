@@ -268,12 +268,20 @@ async function handleLogout() {
         </p>
       </template>
       <template #right>
-        <NuxtLink
-          to="/mentions-legales"
-          class="text-sm text-muted hover:text-foreground transition-colors"
-        >
-          {{ $t('legal.title') }}
-        </NuxtLink>
+        <div class="flex items-center gap-4">
+          <NuxtLink
+            to="/api-docs"
+            class="text-sm text-muted hover:text-foreground transition-colors"
+          >
+            API
+          </NuxtLink>
+          <NuxtLink
+            to="/mentions-legales"
+            class="text-sm text-muted hover:text-foreground transition-colors"
+          >
+            {{ $t('legal.title') }}
+          </NuxtLink>
+        </div>
       </template>
     </UFooter>
   </UApp>
