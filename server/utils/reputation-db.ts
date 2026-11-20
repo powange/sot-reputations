@@ -810,11 +810,6 @@ export interface UserEmblemProgress {
   completed: boolean
 }
 
-export function getAllUsers(): UserInfo[] {
-  const db = getReputationDb()
-  return db.prepare('SELECT id, username, last_import_at as lastImportAt FROM users ORDER BY username').all() as UserInfo[]
-}
-
 export function getAllFactions(): FactionInfo[] {
   const db = getReputationDb()
   return db.prepare('SELECT id, key, name, motto FROM factions ORDER BY name').all() as FactionInfo[]
@@ -3711,77 +3706,6 @@ export function applyEmblemHighSeasOnly(hsMap: Map<string, boolean>, dryRun: boo
     unmatched: rows.length - matched,
     unmatchedNames
   }
-}
-
-export function getFullReputationData() {
-  const db = getReputationDb()
-
-  const users = getAllUsers()
-  const factions = getAllFactions()
-
-  const result: {
-    users: UserInfo[]
-    factions: Array<FactionInfo & {
-      campaigns: Array<CampaignInfo & {
-        emblems: Array<EmblemInfo & {
-          userProgress: Record<number, UserEmblemProgress>
-        }>
-      }>
-    }>
-  } = {
-    users,
-    factions: []
-  }
-
-  for (const faction of factions) {
-    const campaigns = getCampaignsByFaction(faction.id)
-    const factionWithCampaigns: typeof result.factions[0] = {
-      ...faction,
-      campaigns: []
-    }
-
-    for (const campaign of campaigns) {
-      const emblemRows = db.prepare(`
-        SELECT
-          e.id, e.key, e.name, e.description, e.image, e.max_grade as maxGrade,
-          e.campaign_id as campaignId,
-          e.high_seas_only as highSeasOnly,
-          (SELECT threshold FROM emblem_grade_thresholds WHERE emblem_id = e.id ORDER BY grade DESC LIMIT 1) as maxThreshold
-        FROM emblems e
-        WHERE e.campaign_id = ? AND e.validated = 1
-        ORDER BY e.sort_order, e.id
-      `).all(campaign.id) as Array<Omit<EmblemInfo, 'gradeThresholds' | 'factionKey' | 'campaignName' | 'highSeasOnly'> & { highSeasOnly: number }>
-
-      // Récupérer tous les seuils de grades pour les emblèmes de cette campagne
-      const emblemIds = emblemRows.map(e => e.id)
-      const allGradeThresholds = getAllGradeThresholdsForEmblems(emblemIds)
-
-      const emblemsWithProgress = emblemRows.map((emblem) => {
-        const progress = getUserProgressForEmblem(emblem.id)
-        const userProgress: Record<number, UserEmblemProgress> = {}
-        for (const p of progress) {
-          userProgress[p.userId] = p
-        }
-        return {
-          ...emblem,
-          factionKey: faction.key,
-          campaignName: campaign.name,
-          gradeThresholds: allGradeThresholds[emblem.id] || [],
-          userProgress,
-          highSeasOnly: !!emblem.highSeasOnly
-        }
-      })
-
-      factionWithCampaigns.campaigns.push({
-        ...campaign,
-        emblems: emblemsWithProgress
-      })
-    }
-
-    result.factions.push(factionWithCampaigns)
-  }
-
-  return result
 }
 
 // ============ ADMINISTRATION ============
